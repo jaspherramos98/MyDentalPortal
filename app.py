@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 import os
 from functools import wraps
 from dotenv import load_dotenv
+from config import get_config
 
 # Load environment variables
 load_dotenv()
@@ -13,9 +14,10 @@ load_dotenv()
 app = Flask(__name__)
 
 # Configuration
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here')
-app.config['MONGO_URI'] = os.environ.get('MONGO_URI', 'mongodb://localhost:27017/dental_portal')
-
+# Configuration
+config_class = get_config()
+app.config.from_object(config_class)
+config_class.init_app(app)
 # Initialize MongoDB
 mongo = PyMongo(app)
 
@@ -775,6 +777,38 @@ def patient_detail_fallback(patient_id):
         flash('Error loading patient details', 'error')
         return redirect(url_for('patients_fallback'))
 
+# Create route aliases for easier template usage
+@app.route('/patients')
+@login_required
+def patients():
+    return patients_fallback()
+
+@app.route('/patients/create', methods=['GET', 'POST'])
+@login_required
+def create_patient():
+    return create_patient_fallback()
+
+@app.route('/patients/<patient_id>')
+@login_required
+def patient_detail(patient_id):
+    return patient_detail_fallback(patient_id)
+
+@app.route('/clinics')
+@login_required
+def clinics():
+    return clinics_fallback()
+
+@app.route('/clinics/create', methods=['GET', 'POST'])
+@login_required
+def create_clinic():
+    return create_clinic_fallback()
+
+@app.route('/appointments')
+@login_required
+def appointments():
+    return appointments_fallback()
+
+
 @app.route('/patients_fallback')
 @login_required
 def patients_fallback():
@@ -892,7 +926,7 @@ def inject_route_helpers():
             # Try fallback routes
             fallback_map = {
                 'create_clinic': 'create_clinic_fallback',
-                'clinics': 'clinics_fallback',
+                'clinics': 'clinics_fallback', 
                 'patients': 'patients_fallback',
                 'create_patient': 'create_patient_fallback',
                 'appointments': 'appointments_fallback',

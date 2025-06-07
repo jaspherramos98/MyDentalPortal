@@ -3,7 +3,7 @@
 
 from flask import Flask
 from flask_pymongo import PyMongo
-from config import get_config
+from .config import get_config
 from models import init_database
 import os
 
