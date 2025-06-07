@@ -1,6 +1,6 @@
 # .gitignore
 .env
 *.env
-app/config.py
+config.py
 __pycache__/
 *.pyc
