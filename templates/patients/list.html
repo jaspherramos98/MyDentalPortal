@@ -102,9 +102,9 @@
                                 <a href="{{ url_for('patient_detail_fallback', patient_id=patient._id) }}" class="btn btn-sm btn-outline-primary" title="View Details">
                                     <i class="fas fa-eye"></i>
                                 </a>
-                                <button class="btn btn-sm btn-outline-info" onclick="alert('Dental chart coming soon!')" title="Dental Chart">
+                                <a href="/chart/patient/{{ patient._id }}" class="btn btn-sm btn-outline-info" title="Dental Chart">
                                     <i class="fas fa-tooth"></i>
-                                </button>
+                                </a>
                                 <button class="btn btn-sm btn-outline-success" onclick="alert('Treatments coming soon!')" title="Treatments">
                                     <i class="fas fa-procedures"></i>
                                 </button>

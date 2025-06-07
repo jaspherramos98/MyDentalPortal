@@ -1,0 +1,1337 @@
+<!-- File: dental-portal/templates/charts/dental_chart.html -->
+<!-- Interactive Dental Chart based on PDA Form Page 3 - Cross Layout -->
+
+{% extends "base.html" %}
+
+{% block title %}Dental Chart - {{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.dental-chart-container {
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.chart-header {
+    background: linear-gradient(135deg, #0d6efd, #0056b3);
+    color: white;
+    padding: 15px;
+    border-radius: 10px 10px 0 0;
+    margin: -15px -15px 15px -15px;
+}
+
+.patient-info-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+/* Cross Layout Styles */
+.chart-cross-container {
+    position: relative;
+    width: 100%;
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+.chart-axis {
+    position: absolute;
+    background: #000;
+    z-index: 1;
+}
+
+.chart-axis.horizontal {
+    top: 50%;
+    left: 20%;
+    right: 20%;
+    height: 2px;
+    transform: translateY(-50%);
+}
+
+.chart-axis.vertical {
+    left: 50%;
+    top: 20%;
+    bottom: 20%;
+    width: 2px;
+    transform: translateX(-50%);
+}
+
+.quadrant {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.quadrant-top-left {
+    top: 0;
+    left: 0;
+    right: 52%;
+    bottom: 52%;
+    align-items: flex-end;
+    justify-content: flex-end;
+}
+
+.quadrant-top-right {
+    top: 0;
+    left: 52%;
+    right: 0;
+    bottom: 52%;
+    align-items: flex-start;
+    justify-content: flex-end;
+}
+
+.quadrant-bottom-left {
+    top: 52%;
+    left: 0;
+    right: 52%;
+    bottom: 0;
+    align-items: flex-end;
+    justify-content: flex-start;
+}
+
+.quadrant-bottom-right {
+    top: 52%;
+    left: 52%;
+    right: 0;
+    bottom: 0;
+    align-items: flex-start;
+    justify-content: flex-start;
+}
+
+.tooth-row {
+    display: flex;
+    gap: 1px;
+    margin: 2px 0;
+    flex-wrap: nowrap;
+}
+
+/* Status Input Boxes */
+.status-input {
+    width: 32px;
+    height: 22px;
+    border: 1px solid #333;
+    text-align: center;
+    font-size: 10px;
+    padding: 1px;
+    background: white;
+    flex-shrink: 0;
+}
+
+.status-input:focus {
+    outline: none;
+    border-color: #0d6efd;
+    background: #f0f8ff;
+    box-shadow: 0 0 3px rgba(13, 110, 253, 0.3);
+}
+
+/* Tooth Numbers */
+.tooth-number-label {
+    width: 32px;
+    height: 20px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: bold;
+    color: #333;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Tooth Circles */
+.tooth-circle {
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.tooth-circle svg {
+    width: 100%;
+    height: 100%;
+}
+
+.tooth-segment {
+    fill: white;
+    stroke: #333;
+    stroke-width: 1.5;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.tooth-segment:hover {
+    stroke-width: 2.5;
+    stroke: #0d6efd;
+}
+
+/* Color states */
+.tooth-segment.blue { fill: #0d6efd; }
+.tooth-segment.red { fill: #dc3545; }
+.tooth-segment.light_red { fill: #e6abb1; }
+
+.temp-tooth-circle {
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.temp-tooth-circle svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Visual separation */
+.teeth-section {
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 15px;
+    margin: 10px 0;
+    background: #fdfdfd;
+}
+
+.section-title {
+    background: #0d6efd;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    font-weight: 600;
+    font-size: 16px;
+    text-align: center;
+}
+
+/* Legend - more compact */
+.legend-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin: 15px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.legend-column h6 {
+    color: #0d6efd;
+    border-bottom: 2px solid #0d6efd;
+    padding-bottom: 3px;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.legend-item {
+    display: flex;
+    margin-bottom: 4px;
+    font-size: 12px;
+}
+
+.legend-code {
+    font-weight: bold;
+    color: #000000;
+    width: 35px;
+    text-align: center;
+}
+
+/* Assessment Sections - more compact */
+.assessment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin: 15px 0;
+}
+
+.assessment-card {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.assessment-card h6 {
+    color: #0d6efd;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 3px;
+    font-size: 14px;
+}
+
+.assessment-card .form-control {
+    font-size: 12px;
+    padding: 6px;
+}
+
+.assessment-card .form-check-label {
+    font-size: 12px;
+}
+
+.save-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .status-input, .tooth-number-label {
+        width: 28px;
+        font-size: 10px;
+    }
+    
+    .tooth-circle, .temp-tooth-circle {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .tooth-number-label {
+        height: 18px;
+    }
+}
+
+@media (max-width: 992px) {
+    .status-input, .tooth-number-label {
+        width: 24px;
+        font-size: 9px;
+    }
+    
+    .tooth-circle, .temp-tooth-circle {
+        width: 24px;
+        height: 24px;
+    }
+    
+    .tooth-number-label {
+        height: 16px;
+    }
+}
+
+@media (max-width: 768px) {
+    .chart-cross-container {
+        overflow-x: auto;
+        padding: 10px;
+    }
+    
+    .status-input, .tooth-number-label {
+        width: 20px;
+        font-size: 8px;
+    }
+    
+    .tooth-circle, .temp-tooth-circle {
+        width: 20px;
+        height: 20px;
+    }
+    
+    .tooth-number-label {
+        height: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .status-input, .tooth-number-label {
+        width: 18px;
+        font-size: 7px;
+    }
+    
+    .tooth-circle, .temp-tooth-circle {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .tooth-number-label {
+        height: 12px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dental-chart-container">
+    <!-- Header -->
+    <div class="chart-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h3><i class="fas fa-tooth"></i> Dental Chart</h3>
+                <p class="mb-0">{{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}</p>
+            </div>
+            <div>
+                <a href="{{ url_for('patient_detail_fallback', patient_id=patient._id) }}" class="btn btn-outline-light">
+                    <i class="fas fa-arrow-left"></i> Back to Patient
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Patient Info Bar -->
+    <div class="patient-info-bar">
+        <div><strong>Name:</strong> {{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}</div>
+        <div><strong>Age:</strong> {{ patient.personal_info.age }} years</div>
+        <div><strong>Gender:</strong> {{ 'Male' if patient.personal_info.gender == 'M' else 'Female' }}</div>
+        <div><strong>Date:</strong> <span id="currentDate"></span></div>
+    </div>
+
+    <!-- Dental Chart Cross Layout -->
+    <div class="teeth-section">
+        <div class="section-title">Dental Chart</div>
+        
+        <div class="chart-cross-container" style="height: 600px;">
+            <!-- Axis Lines -->
+            <div class="chart-axis horizontal"></div>
+            <div class="chart-axis vertical"></div>
+            
+            <!-- TOP LEFT QUADRANT (55-51, 18-11) -->
+            <div class="quadrant quadrant-top-left">
+                <!-- Status boxes for temporary teeth 55-51 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [55, 54, 53, 52, 51] %}
+                    <input type="text" class="status-input" data-tooth="{{ tooth_num }}" data-type="temp_status" maxlength="4">
+                    {% endfor %}
+                </div>
+                
+                <!-- Numbers for 55-51 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [55, 54, 53, 52, 51] %}
+                    <div class="tooth-number-label">{{ tooth_num }}</div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Temporary teeth circles 55-51 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [55, 54, 53, 52, 51] %}
+                    <div class="temp-tooth-circle" id="temp-tooth-{{ tooth_num }}">
+                        <svg viewBox="0 0 50 50">
+                            <circle cx="25" cy="25" r="20" fill="none" stroke="#333" stroke-width="1.5"></circle>
+                            
+                            <!-- Buccal (top) -->
+                            <path d="M 25 25 L 40 10 A 20 20 0 0 1 40 40 Z" class="tooth-segment buccal" data-segment="buccal"></path>
+                            
+                            <!-- Distal (right) -->
+                            <path d="M 25 25 L 40 40 A 20 20 0 0 1 10 40 Z" class="tooth-segment distal" data-segment="distal"></path>
+                            
+                            <!-- Lingual (bottom) -->
+                            <path d="M 25 25 L 10 40 A 20 20 0 0 1 10 10 Z" class="tooth-segment lingual" data-segment="lingual"></path>
+                            
+                            <!-- Mesial (left) -->
+                            <path d="M 25 25 L 10 10 A 20 20 0 0 1 40 10 Z" class="tooth-segment mesial" data-segment="mesial"></path>
+                            
+                            <!-- Center -->
+                            <circle cx="25" cy="25" r="8" class="tooth-segment center" data-segment="center"></circle>
+                        </svg>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Status boxes for permanent teeth 18-11 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [18, 17, 16, 15, 14, 13, 12, 11] %}
+                    <input type="text" class="status-input" data-tooth="{{ tooth_num }}" data-type="upper_status" maxlength="4">
+                    {% endfor %}
+                </div>
+                
+                <!-- Numbers for 18-11 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [18, 17, 16, 15, 14, 13, 12, 11] %}
+                    <div class="tooth-number-label">{{ tooth_num }}</div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Permanent teeth circles 18-11 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [18, 17, 16, 15, 14, 13, 12, 11] %}
+                    <div class="tooth-circle" id="tooth-{{ tooth_num }}">
+                        <svg viewBox="0 0 50 50">
+                            <circle cx="25" cy="25" r="20" fill="none" stroke="#333" stroke-width="1.5"></circle>
+                            
+                            <!-- Buccal (top) -->
+                            <path d="M 25 25 L 40 10 A 20 20 0 0 1 40 40 Z" class="tooth-segment buccal" data-segment="buccal"></path>
+                            
+                            <!-- Distal (right) -->
+                            <path d="M 25 25 L 40 40 A 20 20 0 0 1 10 40 Z" class="tooth-segment distal" data-segment="distal"></path>
+                            
+                            <!-- Lingual (bottom) -->
+                            <path d="M 25 25 L 10 40 A 20 20 0 0 1 10 10 Z" class="tooth-segment lingual" data-segment="lingual"></path>
+                            
+                            <!-- Mesial (left) -->
+                            <path d="M 25 25 L 10 10 A 20 20 0 0 1 40 10 Z" class="tooth-segment mesial" data-segment="mesial"></path>
+                            
+                            <!-- Center -->
+                            <circle cx="25" cy="25" r="8" class="tooth-segment center" data-segment="center"></circle>
+                        </svg>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- TOP RIGHT QUADRANT (61-65, 21-28) -->
+            <div class="quadrant quadrant-top-right">
+                <!-- Status boxes for temporary teeth 61-65 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [61, 62, 63, 64, 65] %}
+                    <input type="text" class="status-input" data-tooth="{{ tooth_num }}" data-type="temp_status" maxlength="4">
+                    {% endfor %}
+                </div>
+                
+                <!-- Numbers for 61-65 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [61, 62, 63, 64, 65] %}
+                    <div class="tooth-number-label">{{ tooth_num }}</div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Temporary teeth circles 61-65 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [61, 62, 63, 64, 65] %}
+                    <div class="temp-tooth-circle" id="temp-tooth-{{ tooth_num }}">
+                        <svg viewBox="0 0 50 50">
+                            <circle cx="25" cy="25" r="20" fill="none" stroke="#333" stroke-width="1.5"></circle>
+                            
+                            <!-- Buccal (top) -->
+                            <path d="M 25 25 L 40 10 A 20 20 0 0 1 40 40 Z" class="tooth-segment buccal" data-segment="buccal"></path>
+                            
+                            <!-- Distal (right) -->
+                            <path d="M 25 25 L 40 40 A 20 20 0 0 1 10 40 Z" class="tooth-segment distal" data-segment="distal"></path>
+                            
+                            <!-- Lingual (bottom) -->
+                            <path d="M 25 25 L 10 40 A 20 20 0 0 1 10 10 Z" class="tooth-segment lingual" data-segment="lingual"></path>
+                            
+                            <!-- Mesial (left) -->
+                            <path d="M 25 25 L 10 10 A 20 20 0 0 1 40 10 Z" class="tooth-segment mesial" data-segment="mesial"></path>
+                            
+                            <!-- Center -->
+                            <circle cx="25" cy="25" r="8" class="tooth-segment center" data-segment="center"></circle>
+                        </svg>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Status boxes for permanent teeth 21-28 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [21, 22, 23, 24, 25, 26, 27, 28] %}
+                    <input type="text" class="status-input" data-tooth="{{ tooth_num }}" data-type="upper_status" maxlength="4">
+                    {% endfor %}
+                </div>
+                
+                <!-- Numbers for 21-28 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [21, 22, 23, 24, 25, 26, 27, 28] %}
+                    <div class="tooth-number-label">{{ tooth_num }}</div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Permanent teeth circles 21-28 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [21, 22, 23, 24, 25, 26, 27, 28] %}
+                    <div class="tooth-circle" id="tooth-{{ tooth_num }}">
+                        <svg viewBox="0 0 50 50">
+                            <circle cx="25" cy="25" r="20" fill="none" stroke="#333" stroke-width="1.5"></circle>
+                            
+                            <!-- Buccal (top) -->
+                            <path d="M 25 25 L 40 10 A 20 20 0 0 1 40 40 Z" class="tooth-segment buccal" data-segment="buccal"></path>
+                            
+                            <!-- Distal (right) -->
+                            <path d="M 25 25 L 40 40 A 20 20 0 0 1 10 40 Z" class="tooth-segment distal" data-segment="distal"></path>
+                            
+                            <!-- Lingual (bottom) -->
+                            <path d="M 25 25 L 10 40 A 20 20 0 0 1 10 10 Z" class="tooth-segment lingual" data-segment="lingual"></path>
+                            
+                            <!-- Mesial (left) -->
+                            <path d="M 25 25 L 10 10 A 20 20 0 0 1 40 10 Z" class="tooth-segment mesial" data-segment="mesial"></path>
+                            
+                            <!-- Center -->
+                            <circle cx="25" cy="25" r="8" class="tooth-segment center" data-segment="center"></circle>
+                        </svg>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- BOTTOM LEFT QUADRANT (48-41, 85-81) -->
+            <div class="quadrant quadrant-bottom-left">
+                <!-- Permanent teeth circles 48-41 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [48, 47, 46, 45, 44, 43, 42, 41] %}
+                    <div class="tooth-circle" id="tooth-{{ tooth_num }}">
+                        <svg viewBox="0 0 50 50">
+                            <circle cx="25" cy="25" r="20" fill="none" stroke="#333" stroke-width="1.5"></circle>
+                            
+                            <!-- Buccal (top) -->
+                            <path d="M 25 25 L 40 10 A 20 20 0 0 1 40 40 Z" class="tooth-segment buccal" data-segment="buccal"></path>
+                            
+                            <!-- Distal (right) -->
+                            <path d="M 25 25 L 40 40 A 20 20 0 0 1 10 40 Z" class="tooth-segment distal" data-segment="distal"></path>
+                            
+                            <!-- Lingual (bottom) -->
+                            <path d="M 25 25 L 10 40 A 20 20 0 0 1 10 10 Z" class="tooth-segment lingual" data-segment="lingual"></path>
+                            
+                            <!-- Mesial (left) -->
+                            <path d="M 25 25 L 10 10 A 20 20 0 0 1 40 10 Z" class="tooth-segment mesial" data-segment="mesial"></path>
+                            
+                            <!-- Center -->
+                            <circle cx="25" cy="25" r="8" class="tooth-segment center" data-segment="center"></circle>
+                        </svg>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Numbers for 48-41 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [48, 47, 46, 45, 44, 43, 42, 41] %}
+                    <div class="tooth-number-label">{{ tooth_num }}</div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Status boxes for permanent teeth 48-41 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [48, 47, 46, 45, 44, 43, 42, 41] %}
+                    <input type="text" class="status-input" data-tooth="{{ tooth_num }}" data-type="lower_status" maxlength="4">
+                    {% endfor %}
+                </div>
+                
+                <!-- Temporary teeth circles 85-81 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [85, 84, 83, 82, 81] %}
+                    <div class="temp-tooth-circle" id="temp-tooth-{{ tooth_num }}">
+                        <svg viewBox="0 0 50 50">
+                            <circle cx="25" cy="25" r="20" fill="none" stroke="#333" stroke-width="1.5"></circle>
+                            
+                            <!-- Buccal (top) -->
+                            <path d="M 25 25 L 40 10 A 20 20 0 0 1 40 40 Z" class="tooth-segment buccal" data-segment="buccal"></path>
+                            
+                            <!-- Distal (right) -->
+                            <path d="M 25 25 L 40 40 A 20 20 0 0 1 10 40 Z" class="tooth-segment distal" data-segment="distal"></path>
+                            
+                            <!-- Lingual (bottom) -->
+                            <path d="M 25 25 L 10 40 A 20 20 0 0 1 10 10 Z" class="tooth-segment lingual" data-segment="lingual"></path>
+                            
+                            <!-- Mesial (left) -->
+                            <path d="M 25 25 L 10 10 A 20 20 0 0 1 40 10 Z" class="tooth-segment mesial" data-segment="mesial"></path>
+                            
+                            <!-- Center -->
+                            <circle cx="25" cy="25" r="8" class="tooth-segment center" data-segment="center"></circle>
+                        </svg>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Numbers for 85-81 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [85, 84, 83, 82, 81] %}
+                    <div class="tooth-number-label">{{ tooth_num }}</div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Status boxes for temporary teeth 85-81 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [85, 84, 83, 82, 81] %}
+                    <input type="text" class="status-input" data-tooth="{{ tooth_num }}" data-type="temp_status" maxlength="4">
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- BOTTOM RIGHT QUADRANT (31-38, 71-75) -->
+            <div class="quadrant quadrant-bottom-right">
+                <!-- Permanent teeth circles 31-38 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [31, 32, 33, 34, 35, 36, 37, 38] %}
+                    <div class="tooth-circle" id="tooth-{{ tooth_num }}">
+                        <svg viewBox="0 0 50 50">
+                            <circle cx="25" cy="25" r="20" fill="none" stroke="#333" stroke-width="1.5"></circle>
+                            
+                            <!-- Buccal (top) -->
+                            <path d="M 25 25 L 40 10 A 20 20 0 0 1 40 40 Z" class="tooth-segment buccal" data-segment="buccal"></path>
+                            
+                            <!-- Distal (right) -->
+                            <path d="M 25 25 L 40 40 A 20 20 0 0 1 10 40 Z" class="tooth-segment distal" data-segment="distal"></path>
+                            
+                            <!-- Lingual (bottom) -->
+                            <path d="M 25 25 L 10 40 A 20 20 0 0 1 10 10 Z" class="tooth-segment lingual" data-segment="lingual"></path>
+                            
+                            <!-- Mesial (left) -->
+                            <path d="M 25 25 L 10 10 A 20 20 0 0 1 40 10 Z" class="tooth-segment mesial" data-segment="mesial"></path>
+                            
+                            <!-- Center -->
+                            <circle cx="25" cy="25" r="8" class="tooth-segment center" data-segment="center"></circle>
+                        </svg>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Numbers for 31-38 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [31, 32, 33, 34, 35, 36, 37, 38] %}
+                    <div class="tooth-number-label">{{ tooth_num }}</div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Status boxes for permanent teeth 31-38 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [31, 32, 33, 34, 35, 36, 37, 38] %}
+                    <input type="text" class="status-input" data-tooth="{{ tooth_num }}" data-type="lower_status" maxlength="4">
+                    {% endfor %}
+                </div>
+                
+                <!-- Temporary teeth circles 71-75 -->
+                <div class="tooth-row">
+                    {% for tooth_num in [71, 72, 73, 74, 75] %}
+                    <div class="temp-tooth-circle" id="temp-tooth-{{ tooth_num }}">
+                        <svg viewBox="0 0 50 50">
+                            <circle cx="25" cy="25" r="20" fill="none" stroke="#333" stroke-width="1.5"></circle>
+                            
+                            <!-- Buccal (top) -->
+                            <path d="M 25 25 L 40 10 A 20 20 0 0 1 40 40 Z" class="tooth-segment buccal" data-segment="buccal"></path>
+                            
+                            <!-- Distal (right) -->
+                            <path d="M 25 25 L 40 40 A 20 20 0 0 1 10 40 Z" class="tooth-segment distal" data-segment="distal"></path>
+                            
+                            <!-- Lingual (bottom) -->
+                            <path d="M 25 25 L 10 40 A 20 20 0 0 1 10 10 Z" class="tooth-segment lingual" data-segment="lingual"></path>
+                            
+                            <!-- Mesial (left) -->
+                            <!-- Mesial (left) -->
+                           <path d="M 25 25 L 10 10 A 20 20 0 0 1 40 10 Z" class="tooth-segment mesial" data-segment="mesial"></path>
+                           
+                           <!-- Center -->
+                           <circle cx="25" cy="25" r="8" class="tooth-segment center" data-segment="center"></circle>
+                       </svg>
+                   </div>
+                   {% endfor %}
+               </div>
+               
+               <!-- Numbers for 71-75 -->
+               <div class="tooth-row">
+                   {% for tooth_num in [71, 72, 73, 74, 75] %}
+                   <div class="tooth-number-label">{{ tooth_num }}</div>
+                   {% endfor %}
+               </div>
+               
+               <!-- Status boxes for temporary teeth 71-75 -->
+               <div class="tooth-row">
+                   {% for tooth_num in [71, 72, 73, 74, 75] %}
+                   <input type="text" class="status-input" data-tooth="{{ tooth_num }}" data-type="temp_status" maxlength="4">
+                   {% endfor %}
+               </div>
+           </div>
+       </div>
+   </div>
+
+   <!-- Legend Section -->
+   <div class="legend-section">
+       <div class="legend-column">
+           <h6>Condition</h6>
+           <div class="legend-item"><span class="legend-code">✓</span><span>Present Teeth</span></div>
+           <div class="legend-item"><span class="legend-code">D</span><span>Decayed (Caries Indicated for Filling)</span></div>
+           <div class="legend-item"><span class="legend-code">M</span><span>Missing due to Caries</span></div>
+           <div class="legend-item"><span class="legend-code">MO</span><span>Missing due to Other Causes</span></div>
+           <div class="legend-item"><span class="legend-code">Im</span><span>Impacted Tooth</span></div>
+           <div class="legend-item"><span class="legend-code">Sp</span><span>Supernumerary Tooth</span></div>
+           <div class="legend-item"><span class="legend-code">Rf</span><span>Root Fragment</span></div>
+           <div class="legend-item"><span class="legend-code">Un</span><span>Unerupted</span></div>
+       </div>
+       
+       <div class="legend-column">
+           <h6>Restorations & Prosthetics</h6>
+           <div class="legend-item"><span class="legend-code">Am</span><span>Amalgam Filling</span></div>
+           <div class="legend-item"><span class="legend-code">Co</span><span>Composite Filling</span></div>
+           <div class="legend-item"><span class="legend-code">JC</span><span>Jacket Crown</span></div>
+           <div class="legend-item"><span class="legend-code">Ab</span><span>Abutment</span></div>
+           <div class="legend-item"><span class="legend-code">Att</span><span>Attachment</span></div>
+           <div class="legend-item"><span class="legend-code">P</span><span>Pontic</span></div>
+           <div class="legend-item"><span class="legend-code">In</span><span>Inlay</span></div>
+           <div class="legend-item"><span class="legend-code">Imp</span><span>Implant</span></div>
+           <div class="legend-item"><span class="legend-code">S</span><span>Sealants</span></div>
+           <div class="legend-item"><span class="legend-code">Rm</span><span>Removable Denture</span></div>
+       </div>
+       
+       <div class="legend-column">
+           <h6>Surgery</h6>
+           <div class="legend-item"><span class="legend-code">X</span><span>Extraction due to Caries</span></div>
+           <div class="legend-item"><span class="legend-code">XO</span><span>Extraction due to Other Causes</span></div>
+           <div class="legend-item"><span class="legend-code"></span><span></span></div>
+           <h6 class="mt-3">X-ray Taken:</h6>
+           <div class="legend-item"><span class="legend-code"></span><span>Periapical (Tth No.): ____</span></div>
+           <div class="legend-item"><span class="legend-code"></span><span>Panoramic: ____</span></div>
+           <div class="legend-item"><span class="legend-code"></span><span>Cephalometric: ____</span></div>
+           <div class="legend-item"><span class="legend-code"></span><span>Occlusal (Upper/Lower): ____</span></div>
+           <div class="legend-item"><span class="legend-code"></span><span>Others: ____</span></div>
+       </div>
+   </div>
+
+   <!-- Assessment Sections -->
+   <div class="assessment-grid">
+       <div class="assessment-card">
+           <h6>Periodontal Screening</h6>
+           <div class="form-check">
+               <input class="form-check-input" type="checkbox" id="gingivitis">
+               <label class="form-check-label" for="gingivitis">Gingivitis</label>
+          </div>
+          <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="early_periodontitis">
+              <label class="form-check-label" for="early_periodontitis">Early Periodontitis</label>
+          </div>
+          <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="moderate_periodontitis">
+              <label class="form-check-label" for="moderate_periodontitis">Moderate Periodontitis</label>
+          </div>
+          <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="advanced_periodontitis">
+              <label class="form-check-label" for="advanced_periodontitis">Advanced Periodontitis</label>
+          </div>
+      </div>
+
+      <div class="assessment-card">
+          <h6>Occlusion</h6>
+          <div class="mb-2">
+              <label class="form-label">Class (Molar):</label>
+              <input type="text" class="form-control form-control-sm" id="class_molar">
+          </div>
+          <div class="mb-2">
+              <label class="form-label">Overjet:</label>
+              <input type="text" class="form-control form-control-sm" id="overjet">
+          </div>
+          <div class="mb-2">
+              <label class="form-label">Overbite:</label>
+              <input type="text" class="form-control form-control-sm" id="overbite">
+          </div>
+          <div class="mb-2">
+              <label class="form-label">Midline Deviation:</label>
+              <input type="text" class="form-control form-control-sm" id="midline_deviation">
+          </div>
+          <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="crossbite">
+              <label class="form-check-label" for="crossbite">Crossbite</label>
+          </div>
+      </div>
+
+      <div class="assessment-card">
+          <h6>Appliances</h6>
+          <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="orthodontic">
+              <label class="form-check-label" for="orthodontic">Orthodontic</label>
+          </div>
+          <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="stayplate">
+              <label class="form-check-label" for="stayplate">Stayplate</label>
+          </div>
+          <div class="mt-2">
+              <label class="form-label">Others:</label>
+              <input type="text" class="form-control form-control-sm" id="other_appliances">
+          </div>
+      </div>
+
+      <div class="assessment-card">
+          <h6>TMD</h6>
+          <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="clenching">
+              <label class="form-check-label" for="clenching">Clenching</label>
+          </div>
+          <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="clicking">
+              <label class="form-check-label" for="clicking">Clicking</label>
+          </div>
+          <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="trismus">
+              <label class="form-check-label" for="trismus">Trismus</label>
+          </div>
+          <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="muscle_spasm">
+              <label class="form-check-label" for="muscle_spasm">Muscle Spasm</label>
+          </div>
+      </div>
+  </div>
+
+  <!-- X-ray Section -->
+  <div class="assessment-card mt-4">
+      <h6>X-ray Taken</h6>
+      <div class="row">
+          <div class="col-md-6">
+              <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="periapical_taken">
+                  <label class="form-check-label" for="periapical_taken">Periapical</label>
+              </div>
+              <div class="mb-2">
+                  <label class="form-label">Tooth No.:</label>
+                  <input type="text" class="form-control form-control-sm" id="periapical_tooth">
+              </div>
+              <div class="mb-2">
+                  <label class="form-label">Date:</label>
+                  <input type="date" class="form-control form-control-sm" id="periapical_date">
+              </div>
+          </div>
+          <div class="col-md-6">
+              <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="panoramic_taken">
+                  <label class="form-check-label" for="panoramic_taken">Panoramic</label>
+              </div>
+              <div class="mb-2">
+                  <label class="form-label">Date:</label>
+                  <input type="date" class="form-control form-control-sm" id="panoramic_date">
+              </div>
+              
+              <div class="form-check mt-3">
+                  <input class="form-check-input" type="checkbox" id="cephalometric_taken">
+                  <label class="form-check-label" for="cephalometric_taken">Cephalometric</label>
+              </div>
+              <div class="mb-2">
+                  <label class="form-label">Date:</label>
+                  <input type="date" class="form-control form-control-sm" id="cephalometric_date">
+              </div>
+          </div>
+      </div>
+      <div class="row mt-3">
+          <div class="col-md-6">
+              <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="occlusal_taken">
+                  <label class="form-check-label" for="occlusal_taken">Occlusal</label>
+              </div>
+              <div class="mb-2">
+                  <label class="form-label">Upper/Lower:</label>
+                  <input type="text" class="form-control form-control-sm" id="occlusal_upper_lower">
+              </div>
+              <div class="mb-2">
+                  <label class="form-label">Date:</label>
+                  <input type="date" class="form-control form-control-sm" id="occlusal_date">
+              </div>
+          </div>
+          <div class="col-md-6">
+              <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="others_taken">
+                  <label class="form-check-label" for="others_taken">Others</label>
+              </div>
+              <div class="mb-2">
+                  <label class="form-label">Type:</label>
+                  <input type="text" class="form-control form-control-sm" id="others_type">
+              </div>
+              <div class="mb-2">
+                  <label class="form-label">Date:</label>
+                  <input type="date" class="form-control form-control-sm" id="others_date">
+              </div>
+          </div>
+      </div>
+  </div>
+</div>
+
+<!-- Floating Save Button -->
+<button class="btn btn-success btn-lg save-btn" onclick="saveDentalChart()">
+  <i class="fas fa-save"></i> Save Chart
+</button>
+
+<script>
+// Dental Chart JavaScript - same functionality as before
+let chartData = {};
+const patientId = "{{ patient._id }}";
+
+// Safely parse chart data
+try {
+   chartData = JSON.parse('{{ chart_data|tojson|safe }}');
+} catch (e) {
+   console.error('Error parsing chart data:', e);
+   chartData = {};
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+   // Set current date
+   const dateEl = document.getElementById('currentDate');
+   if (dateEl) {
+       dateEl.textContent = new Date().toLocaleDateString();
+   }
+   
+   // Initialize chartData structure if empty
+   if (!chartData.teeth_status) {
+       chartData.teeth_status = {};
+   }
+   
+   // Load existing chart data
+   loadChartData();
+   
+   // Setup tooth segment clicking
+   setupToothInteractions();
+   
+   // Setup auto-save on input changes
+   setupAutoSave();
+});
+
+function setupToothInteractions() {
+   // Handle tooth segment clicking for coloring
+   document.querySelectorAll('.tooth-segment').forEach(segment => {
+       segment.addEventListener('click', function() {
+           const currentClass = this.classList;
+           
+           if (currentClass.contains('blue')) {
+               // Blue -> Red
+               currentClass.remove('blue');
+               currentClass.add('red');
+           } else if (currentClass.contains('red')) {
+               // Red -> Light Red
+               currentClass.remove('red');
+               currentClass.add('light_red');
+           } else if (currentClass.contains('light_red')) {
+               // Light Red -> Clear
+               currentClass.remove('light_red');
+           } else {
+               // Clear -> Blue
+               currentClass.add('blue');
+           }
+           
+           // Save the color state
+           saveToothColor(this);
+       });
+   });
+}
+
+function saveToothColor(segment) {
+   const toothId = segment.closest('.tooth-circle, .temp-tooth-circle')?.id;
+   const segmentType = segment.dataset.segment;
+   
+   if (!toothId || !segmentType) return;
+   
+   let color = '';
+   if (segment.classList.contains('blue')) {
+       color = 'blue';
+   } else if (segment.classList.contains('red')) {
+       color = 'red';
+   } else if (segment.classList.contains('light_red')) {
+       color = 'light_red';
+   }
+   
+   // Store in chartData
+   if (!chartData.teeth_status) chartData.teeth_status = {};
+   
+   const toothKey = toothId.replace('tooth-', '').replace('temp-tooth-', 'temp_');
+   
+   if (!chartData.teeth_status[toothKey]) {
+       chartData.teeth_status[toothKey] = { colors: {}, notes: '' };
+   }
+   if (!chartData.teeth_status[toothKey].colors) {
+       chartData.teeth_status[toothKey].colors = {};
+   }
+   
+   chartData.teeth_status[toothKey].colors[segmentType] = color;
+}
+
+function setupAutoSave() {
+   // Auto-save on status input changes
+   document.querySelectorAll('.status-input').forEach(input => {
+       input.addEventListener('input', function() {
+           const tooth = this.dataset.tooth;
+           const type = this.dataset.type;
+           const value = this.value;
+           
+           if (!tooth) return;
+           
+           if (!chartData.teeth_status) chartData.teeth_status = {};
+           if (!chartData.teeth_status[tooth]) chartData.teeth_status[tooth] = {};
+           
+           chartData.teeth_status[tooth][type] = value;
+       });
+   });
+   
+   // Auto-save on checkbox changes
+   document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+       checkbox.addEventListener('change', function() {
+           saveAssessmentData();
+       });
+   });
+   
+   // Auto-save on other input changes
+   document.querySelectorAll('input[type="text"], input[type="date"]').forEach(input => {
+       if (!input.classList.contains('status-input')) {
+           input.addEventListener('input', function() {
+               saveAssessmentData();
+           });
+       }
+   });
+}
+
+function loadChartData() {
+   if (!chartData || !chartData.teeth_status) return;
+   
+   // Load tooth data - status inputs and colors
+   Object.keys(chartData.teeth_status).forEach(toothKey => {
+       const toothData = chartData.teeth_status[toothKey];
+       
+       // Load status inputs
+       const upperStatusInput = document.querySelector(`[data-tooth="${toothKey}"][data-type="upper_status"]`);
+       if (upperStatusInput && toothData.upper_status) {
+           upperStatusInput.value = toothData.upper_status;
+       }
+       
+       const lowerStatusInput = document.querySelector(`[data-tooth="${toothKey}"][data-type="lower_status"]`);
+       if (lowerStatusInput && toothData.lower_status) {
+           lowerStatusInput.value = toothData.lower_status;
+       }
+       
+       const tempStatusInput = document.querySelector(`[data-tooth="${toothKey}"][data-type="temp_status"]`);
+       if (tempStatusInput && toothData.temp_status) {
+           tempStatusInput.value = toothData.temp_status;
+       }
+       
+       // Load colors
+       if (toothData.colors) {
+           Object.keys(toothData.colors).forEach(segment => {
+               const color = toothData.colors[segment];
+               if (color) {
+                   const toothElement = document.getElementById(toothKey.includes('temp_') ? `temp-tooth-${toothKey.replace('temp_', '')}` : `tooth-${toothKey}`);
+                   if (toothElement) {
+                       const segmentElement = toothElement.querySelector(`[data-segment="${segment}"]`);
+                       if (segmentElement) {
+                           segmentElement.classList.add(color);
+                       }
+                   }
+               }
+           });
+       }
+   });
+   
+   // Load assessment data
+   loadAssessmentData();
+}
+
+function saveAssessmentData() {
+   // Helper function to safely get element
+   const getElement = (id) => document.getElementById(id);
+   
+   // Periodontal screening
+   chartData.periodontal_screening = {
+       gingivitis: getElement('gingivitis')?.checked || false,
+       early_periodontitis: getElement('early_periodontitis')?.checked || false,
+       moderate_periodontitis: getElement('moderate_periodontitis')?.checked || false,
+       advanced_periodontitis: getElement('advanced_periodontitis')?.checked || false
+   };
+   
+   // Occlusion
+   chartData.occlusion = {
+       class_molar: getElement('class_molar')?.value || '',
+       overjet: getElement('overjet')?.value || '',
+       overbite: getElement('overbite')?.value || '',
+       midline_deviation: getElement('midline_deviation')?.value || '',
+       crossbite: getElement('crossbite')?.checked || false
+   };
+   
+   // Appliances
+   chartData.appliances = {
+       orthodontic: getElement('orthodontic')?.checked || false,
+       stayplate: getElement('stayplate')?.checked || false,
+       others: getElement('other_appliances')?.value || ''
+   };
+   
+   // TMD
+   chartData.tmd_assessment = {
+       clenching: getElement('clenching')?.checked || false,
+       clicking: getElement('clicking')?.checked || false,
+       trismus: getElement('trismus')?.checked || false,
+       muscle_spasm: getElement('muscle_spasm')?.checked || false
+   };
+   
+   // X-ray
+   chartData.xray_taken = {
+       periapical: {
+           taken: getElement('periapical_taken')?.checked || false,
+           tooth_number: getElement('periapical_tooth')?.value || '',
+           date: getElement('periapical_date')?.value || ''
+       },
+       panoramic: {
+           taken: getElement('panoramic_taken')?.checked || false,
+           date: getElement('panoramic_date')?.value || ''
+       },
+       cephalometric: {
+           taken: getElement('cephalometric_taken')?.checked || false,
+           date: getElement('cephalometric_date')?.value || ''
+       },
+       occlusal: {
+           taken: getElement('occlusal_taken')?.checked || false,
+           upper_lower: getElement('occlusal_upper_lower')?.value || '',
+           date: getElement('occlusal_date')?.value || ''
+       },
+       others: {
+           taken: getElement('others_taken')?.checked || false,
+           type: getElement('others_type')?.value || '',
+           date: getElement('others_date')?.value || ''
+       }
+   };
+}
+
+function loadAssessmentData() {
+   // Helper function to safely get element
+   const getElement = (id) => document.getElementById(id);
+   
+   // Load periodontal screening
+   if (chartData.periodontal_screening) {
+       const gingivitis = getElement('gingivitis');
+       const earlyPerio = getElement('early_periodontitis');
+       const moderatePerio = getElement('moderate_periodontitis');
+       const advancedPerio = getElement('advanced_periodontitis');
+       
+       if (gingivitis) gingivitis.checked = chartData.periodontal_screening.gingivitis || false;
+       if (earlyPerio) earlyPerio.checked = chartData.periodontal_screening.early_periodontitis || false;
+       if (moderatePerio) moderatePerio.checked = chartData.periodontal_screening.moderate_periodontitis || false;
+       if (advancedPerio) advancedPerio.checked = chartData.periodontal_screening.advanced_periodontitis || false;
+   }
+   
+   // Load occlusion
+   if (chartData.occlusion) {
+       const classMolar = getElement('class_molar');
+       const overjet = getElement('overjet');
+       const overbite = getElement('overbite');
+       const midlineDeviation = getElement('midline_deviation');
+       const crossbite = getElement('crossbite');
+       
+       if (classMolar) classMolar.value = chartData.occlusion.class_molar || '';
+       if (overjet) overjet.value = chartData.occlusion.overjet || '';
+       if (overbite) overbite.value = chartData.occlusion.overbite || '';
+       if (midlineDeviation) midlineDeviation.value = chartData.occlusion.midline_deviation || '';
+       if (crossbite) crossbite.checked = chartData.occlusion.crossbite || false;
+   }
+   
+   // Load appliances
+   if (chartData.appliances) {
+       const orthodontic = getElement('orthodontic');
+       const stayplate = getElement('stayplate');
+       const otherAppliances = getElement('other_appliances');
+       
+       if (orthodontic) orthodontic.checked = chartData.appliances.orthodontic || false;
+       if (stayplate) stayplate.checked = chartData.appliances.stayplate || false;
+       if (otherAppliances) otherAppliances.value = chartData.appliances.others || '';
+   }
+   
+   // Load TMD
+   if (chartData.tmd_assessment) {
+       const clenching = getElement('clenching');
+       const clicking = getElement('clicking');
+       const trismus = getElement('trismus');
+       const muscleSpasm = getElement('muscle_spasm');
+       
+       if (clenching) clenching.checked = chartData.tmd_assessment.clenching || false;
+       if (clicking) clicking.checked = chartData.tmd_assessment.clicking || false;
+       if (trismus) trismus.checked = chartData.tmd_assessment.trismus || false;
+       if (muscleSpasm) muscleSpasm.checked = chartData.tmd_assessment.muscle_spasm || false;
+   }
+   
+   // Load X-ray data
+   if (chartData.xray_taken) {
+       if (chartData.xray_taken.periapical) {
+           const periapicalTaken = getElement('periapical_taken');
+           const periapicalTooth = getElement('periapical_tooth');
+           const periapicalDate = getElement('periapical_date');
+           
+           if (periapicalTaken) periapicalTaken.checked = chartData.xray_taken.periapical.taken || false;
+           if (periapicalTooth) periapicalTooth.value = chartData.xray_taken.periapical.tooth_number || '';
+           if (periapicalDate) periapicalDate.value = chartData.xray_taken.periapical.date || '';
+       }
+       
+       if (chartData.xray_taken.panoramic) {
+           const panoramicTaken = getElement('panoramic_taken');
+           const panoramicDate = getElement('panoramic_date');
+           
+           if (panoramicTaken) panoramicTaken.checked = chartData.xray_taken.panoramic.taken || false;
+           if (panoramicDate) panoramicDate.value = chartData.xray_taken.panoramic.date || '';
+       }
+       
+       if (chartData.xray_taken.cephalometric) {
+           const cephalometricTaken = getElement('cephalometric_taken');
+           const cephalometricDate = getElement('cephalometric_date');
+           
+           if (cephalometricTaken) cephalometricTaken.checked = chartData.xray_taken.cephalometric.taken || false;
+           if (cephalometricDate) cephalometricDate.value = chartData.xray_taken.cephalometric.date || '';
+       }
+       
+       if (chartData.xray_taken.occlusal) {
+           const occlusalTaken = getElement('occlusal_taken');
+           const occlusalUpperLower = getElement('occlusal_upper_lower');
+           const occlusalDate = getElement('occlusal_date');
+           
+           if (occlusalTaken) occlusalTaken.checked = chartData.xray_taken.occlusal.taken || false;
+           if (occlusalUpperLower) occlusalUpperLower.value = chartData.xray_taken.occlusal.upper_lower || '';
+           if (occlusalDate) occlusalDate.value = chartData.xray_taken.occlusal.date || '';
+       }
+       
+       if (chartData.xray_taken.others) {
+           const othersTaken = getElement('others_taken');
+           const othersType = getElement('others_type');
+           const othersDate = getElement('others_date');
+           
+           if (othersTaken) othersTaken.checked = chartData.xray_taken.others.taken || false;
+           if (othersType) othersType.value = chartData.xray_taken.others.type || '';
+           if (othersDate) othersDate.value = chartData.xray_taken.others.date || '';
+       }
+   }
+}
+
+function saveDentalChart() {
+   // Update assessment data before saving
+   saveAssessmentData();
+   
+   console.log('Saving chart data:', chartData); // Debug log
+   
+   // Try the main route first, then fallback
+   const saveUrls = [`/charts/update/${patientId}`, `/chart/update/${patientId}`];
+   
+   async function trySave(url) {
+       try {
+           const response = await fetch(url, {
+               method: 'POST',
+               headers: {
+                   'Content-Type': 'application/json',
+               },
+               body: JSON.stringify(chartData)
+           });
+           
+           if (!response.ok) {
+               throw new Error(`HTTP ${response.status}`);
+           }
+           
+           const data = await response.json();
+           return data;
+       } catch (error) {
+           console.log(`Failed to save to ${url}:`, error);
+           throw error;
+       }
+   }
+   
+   // Try each URL until one works
+   saveUrls.reduce((promise, url) => {
+       return promise.catch(() => trySave(url));
+   }, Promise.reject())
+   .then(data => {
+       if (data.success) {
+           showNotification('Dental chart saved successfully!', 'success');
+       } else {
+           showNotification('Error saving dental chart: ' + data.error, 'error');
+       }
+   })
+   .catch(error => {
+       console.error('All save attempts failed:', error);
+       showNotification('Error saving dental chart. Please try again.', 'error');
+   });
+}
+
+function showNotification(message, type) {
+   const notification = document.createElement('div');
+   notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+   notification.style.cssText = 'top: 100px; right: 20px; z-index: 9999; min-width: 300px;';
+   notification.innerHTML = `
+       ${message}
+       <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+   `;
+   
+   document.body.appendChild(notification);
+   
+   // Auto remove after 5 seconds
+   setTimeout(() => {
+       if (notification.parentNode) {
+           notification.remove();
+       }
+   }, 5000);
+}
+</script>
+{% endblock %}

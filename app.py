@@ -30,9 +30,10 @@ def register_blueprints():
         ('app.routes.clinics', 'clinics_bp', '/clinics'),
         ('app.routes.patients', 'patients_bp', '/patients'),
         ('app.routes.treatments', 'treatments_bp', '/treatments'),
-        ('app.routes.charts', 'charts_bp', '/charts'),
+        ('app.routes.charts', 'charts_bp', '/charts'),  # Make sure this line exists
         ('app.routes.main', 'main_bp', None)
     ]
+    
     
     for module_path, blueprint_name, url_prefix in blueprints:
         try:
@@ -709,17 +710,67 @@ def create_default_dental_chart(patient_id):
         
         # Adult teeth (1-32)
         for i in range(1, 33):
-            teeth_status[f"tooth_{i}"] = {
-                "status": "present",
-                "restorations": [],
-                "conditions": [],
-                "notes": ""
+            teeth_status[str(i)] = {
+                "buccal": "",
+                "lingual": "",
+                "mesial": "",
+                "distal": "",
+                "occlusal": "",
+                "colors": {
+                    "buccal": "",
+                    "lingual": "",
+                    "mesial": "",
+                    "distal": "",
+                    "occlusal": "",
+                    "center": ""
+                }
+            }
+        
+        # Temporary teeth
+        temp_teeth = [55, 54, 53, 52, 51, 61, 62, 63, 64, 65, 85, 84, 83, 82, 81, 71, 72, 73, 74, 75]
+        for tooth_num in temp_teeth:
+            teeth_status[f"temp_{tooth_num}"] = {
+                "general": "",
+                "colors": {
+                    "center": ""
+                }
             }
         
         chart_data = {
             "patient_id": ObjectId(patient_id),
             "chart_date": datetime.utcnow(),
             "teeth_status": teeth_status,
+            "periodontal_screening": {
+                "gingivitis": False,
+                "early_periodontitis": False,
+                "moderate_periodontitis": False,
+                "advanced_periodontitis": False
+            },
+            "occlusion": {
+                "class_molar": "",
+                "overjet": "",
+                "overbite": "",
+                "midline_deviation": "",
+                "crossbite": False
+            },
+            "appliances": {
+                "orthodontic": False,
+                "stayplate": False,
+                "others": ""
+            },
+            "tmd_assessment": {
+                "clenching": False,
+                "clicking": False,
+                "trismus": False,
+                "muscle_spasm": False
+            },
+            "xray_taken": {
+                "periapical": {"taken": False, "tooth_number": "", "date": ""},
+                "panoramic": {"taken": False, "date": ""},
+                "cephalometric": {"taken": False, "date": ""},
+                "occlusal": {"taken": False, "upper_lower": "", "date": ""},
+                "others": {"taken": False, "type": "", "date": ""}
+            },
             "created_by": session['user_id'],
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
@@ -729,6 +780,226 @@ def create_default_dental_chart(patient_id):
         
     except Exception as e:
         print(f"Error creating dental chart: {e}")
+
+@app.route('/chart/patient/<patient_id>')
+@login_required
+def dental_chart_fallback(patient_id):
+    """Fallback dental chart route if blueprint fails"""
+    try:
+        # Verify patient access
+        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
+        if not patient:
+            flash('Patient not found', 'error')
+            return redirect(url_for('patients_fallback'))
+        
+        clinic = mongo.db.clinics.find_one({
+            '_id': patient['clinic_id'],
+            'owner_id': session['user_id']
+        })
+        
+        if not clinic:
+            flash('Access denied', 'error')
+            return redirect(url_for('patients_fallback'))
+        
+        # Get or create dental chart
+        dental_chart = mongo.db.dental_charts.find_one({'patient_id': ObjectId(patient_id)})
+        
+        if not dental_chart:
+            # Create default chart structure
+            chart_data = create_default_dental_chart(patient_id)
+            result = mongo.db.dental_charts.insert_one(chart_data)
+            dental_chart = mongo.db.dental_charts.find_one({'_id': result.inserted_id})
+        
+        # Prepare chart data for template (ensure JSON serializable)
+        chart_data_json = {}
+        if dental_chart:
+            chart_data_copy = dental_chart.copy()
+            if '_id' in chart_data_copy:
+                chart_data_copy['_id'] = str(chart_data_copy['_id'])
+            if 'patient_id' in chart_data_copy:
+                chart_data_copy['patient_id'] = str(chart_data_copy['patient_id'])
+            chart_data_json = chart_data_copy
+        
+        return render_template('charts/dental_chart.html', 
+                             patient=patient, 
+                             dental_chart=dental_chart,
+                             chart_data=chart_data_json,
+                             clinic=clinic)
+                             
+    except Exception as e:
+        print(f"Dental chart fallback error: {e}")
+        flash('Error loading dental chart', 'error')
+        return redirect(url_for('patients_fallback'))
+
+@app.route('/chart/update/<patient_id>', methods=['POST'])
+@login_required
+def update_dental_chart_fallback(patient_id):
+    """Fallback route to update dental chart"""
+    try:
+        # Verify patient access
+        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
+        if not patient:
+            return jsonify({'success': False, 'error': 'Patient not found'}), 404
+        
+        clinic = mongo.db.clinics.find_one({
+            '_id': patient['clinic_id'],
+            'owner_id': session['user_id']
+        })
+        
+        if not clinic:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        data = request.get_json()
+        
+        # Update or create dental chart
+        update_data = {
+            'patient_id': ObjectId(patient_id),
+            'updated_at': datetime.utcnow(),
+            'updated_by': session['user_id']
+        }
+        
+        # Add all the chart data
+        if 'teeth_status' in data:
+            update_data['teeth_status'] = data['teeth_status']
+        if 'periodontal_screening' in data:
+            update_data['periodontal_screening'] = data['periodontal_screening']
+        if 'occlusion' in data:
+            update_data['occlusion'] = data['occlusion']
+        if 'appliances' in data:
+            update_data['appliances'] = data['appliances']
+        if 'tmd_assessment' in data:
+            update_data['tmd_assessment'] = data['tmd_assessment']
+        if 'xray_taken' in data:
+            update_data['xray_taken'] = data['xray_taken']
+        
+        # Upsert the dental chart
+        result = mongo.db.dental_charts.update_one(
+            {'patient_id': ObjectId(patient_id)},
+            {'$set': update_data},
+            upsert=True
+        )
+        
+        return jsonify({'success': True, 'message': 'Dental chart updated successfully'})
+        
+    except Exception as e:
+        print(f"Update dental chart error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to update dental chart'}), 500
+    
+    
+def create_default_dental_chart_fallback(patient_id):
+    """Create a default dental chart structure for a new patient"""
+    teeth_status = {}
+    
+    # Adult teeth numbers
+    permanent_teeth = [
+        # Upper right: 18-11
+        18, 17, 16, 15, 14, 13, 12, 11,
+        # Upper left: 21-28  
+        21, 22, 23, 24, 25, 26, 27, 28,
+        # Lower left: 38-31
+        38, 37, 36, 35, 34, 33, 32, 31,
+        # Lower right: 41-48
+        41, 42, 43, 44, 45, 46, 47, 48
+    ]
+    
+    for tooth_num in permanent_teeth:
+        teeth_status[str(tooth_num)] = {
+            "buccal": "",
+            "mesial": "",
+            "distal": "",
+            "lingual": "",
+            "occlusal": "",
+            "colors": {}
+        }
+    
+    # Temporary teeth
+    temporary_teeth = [55, 54, 53, 52, 51, 61, 62, 63, 64, 65, 85, 84, 83, 82, 81, 71, 72, 73, 74, 75]
+    for tooth_num in temporary_teeth:
+        teeth_status[f"temp_{tooth_num}"] = {
+            "general": "",
+            "colors": {}
+        }
+    
+    return {
+        "patient_id": ObjectId(patient_id),
+        "chart_date": datetime.utcnow(),
+        "teeth_status": teeth_status,
+        "periodontal_screening": {
+            "gingivitis": False,
+            "early_periodontitis": False,
+            "moderate_periodontitis": False,
+            "advanced_periodontitis": False
+        },
+        "occlusion": {
+            "class_molar": "",
+            "overjet": "",
+            "overbite": "",
+            "midline_deviation": "",
+            "crossbite": False
+        },
+        "appliances": {
+            "orthodontic": False,
+            "stayplate": False,
+            "others": ""
+        },
+        "tmd_assessment": {
+            "clenching": False,
+            "clicking": False,
+            "trismus": False,
+            "muscle_spasm": False
+        },
+        "xray_taken": {
+            "periapical": {"taken": False, "tooth_number": "", "date": ""},
+            "panoramic": {"taken": False, "date": ""},
+            "cephalometric": {"taken": False, "date": ""},
+            "occlusal": {"taken": False, "upper_lower": "", "date": ""},
+            "others": {"taken": False, "type": "", "date": ""}
+        },
+        "created_by": session['user_id'],
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
+    }
+
+@app.route('/chart/update/<patient_id>', methods=['POST'])
+@login_required
+def update_chart_fallback(patient_id):
+    """Update dental chart data - fallback route"""
+    # Verify patient access
+    patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
+    if not patient:
+        return jsonify({'success': False, 'error': 'Patient not found'}), 404
+    
+    clinic = mongo.db.clinics.find_one({
+        '_id': patient['clinic_id'],
+        'owner_id': session['user_id']
+    })
+    
+    if not clinic:
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    data = request.get_json()
+    
+    try:
+        # Update the entire chart data
+        mongo.db.dental_charts.update_one(
+            {'patient_id': ObjectId(patient_id)},
+            {
+                '$set': {
+                    **data,
+                    'updated_at': datetime.utcnow(),
+                    'updated_by': session['user_id']
+                }
+            },
+            upsert=True
+        )
+        
+        return jsonify({'success': True, 'message': 'Chart updated successfully'})
+        
+    except Exception as e:
+        print(f"Chart update error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to update chart'}), 500
+    
+
 
 @app.route('/patients_fallback/<patient_id>')
 @login_required
@@ -750,6 +1021,23 @@ def patient_detail_fallback(patient_id):
         if not clinic:
             flash('Access denied', 'error')
             return redirect(url_for('patients_fallback'))
+        
+        # Ensure all required data structures exist
+        if 'personal_info' not in patient:
+            patient['personal_info'] = {}
+        if 'contact_info' not in patient:
+            patient['contact_info'] = {}
+        if 'emergency_contact' not in patient:
+            patient['emergency_contact'] = {}
+        if 'medical_history' not in patient:
+            patient['medical_history'] = {
+                'allergies': {},
+                'medical_conditions': {},
+                'general_health': {},
+                'physician_info': {},
+                'women_health': {},
+                'vital_signs': {}
+            }
         
         # Get dental chart
         dental_chart = mongo.db.dental_charts.find_one({'patient_id': ObjectId(patient_id)})
@@ -930,7 +1218,8 @@ def inject_route_helpers():
                 'patients': 'patients_fallback',
                 'create_patient': 'create_patient_fallback',
                 'appointments': 'appointments_fallback',
-                'patient_detail': 'patient_detail_fallback'
+                'patient_detail': 'patient_detail_fallback',
+                'charts.view_chart': 'chart_fallback' 
             }
             
             fallback_endpoint = fallback_map.get(endpoint)

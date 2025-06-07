@@ -13,8 +13,8 @@
             <div>
                 <h1>
                     <i class="fas fa-user"></i> 
-                    {{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}
-                    {% if patient.personal_info.nickname %}
+                    {{ patient.personal_info.first_name or 'Unknown' }} {{ patient.personal_info.last_name or 'Unknown' }}
+                    {% if patient.personal_info.get('nickname') %}
                     <small class="text-muted">"{{ patient.personal_info.nickname }}"</small>
                     {% endif %}
                 </h1>
@@ -29,9 +29,9 @@
                 <button class="btn btn-outline-primary" onclick="alert('Edit patient coming soon!')">
                     <i class="fas fa-edit"></i> Edit
                 </button>
-                <button class="btn btn-outline-info" onclick="alert('Dental chart coming soon!')">
+                <a href="/chart/patient/{{ patient._id }}" class="btn btn-outline-info">
                     <i class="fas fa-tooth"></i> Dental Chart
-                </button>
+                </a>
                 <button class="btn btn-outline-success" onclick="alert('Add treatment coming soon!')">
                     <i class="fas fa-plus"></i> Add Treatment
                 </button>
@@ -48,12 +48,12 @@
                     <div class="card-body">
                         <div class="text-center mb-3">
                             <div class="patient-avatar mx-auto mb-3" style="width: 80px; height: 80px; font-size: 2rem;">
-                                {{ patient.personal_info.first_name[0] }}{{ patient.personal_info.last_name[0] }}
-                            </div>
-                            <h6>{{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}</h6>
-                            {% if patient.personal_info.nickname %}
-                            <p class="text-muted">"{{ patient.personal_info.nickname }}"</p>
-                            {% endif %}
+                            {{ (patient.personal_info.first_name or 'U')[0] }}{{ (patient.personal_info.last_name or 'U')[0] }}
+                        </div>
+                        <h6>{{ patient.personal_info.first_name or 'Unknown' }} {{ patient.personal_info.last_name or 'Unknown' }}</h6>
+                        {% if patient.personal_info.get('nickname') %}
+                        <p class="text-muted">"{{ patient.personal_info.nickname }}"</p>
+                        {% endif %}
                         </div>
 
                         <table class="table table-sm">
@@ -95,19 +95,32 @@
                     <div class="card-body">
                         <div class="mb-3">
                             <h6>Primary Contact</h6>
-                            {% if patient.contact_info.cell_phone %}
+                            {% if patient.contact_info.get('cell_phone') %}
                             <p><i class="fas fa-mobile-alt"></i> {{ patient.contact_info.cell_phone }}</p>
                             {% endif %}
-                            {% if patient.contact_info.email %}
+                            {% if patient.contact_info.get('email') %}
                             <p><i class="fas fa-envelope"></i> {{ patient.contact_info.email }}</p>
                             {% endif %}
-                            {% if patient.contact_info.home_phone %}
+                            {% if patient.contact_info.get('home_phone') %}
                             <p><i class="fas fa-home"></i> {{ patient.contact_info.home_phone }}</p>
                             {% endif %}
-                            {% if patient.contact_info.office_phone %}
+                            {% if patient.contact_info.get('office_phone') %}
                             <p><i class="fas fa-briefcase"></i> {{ patient.contact_info.office_phone }}</p>
                             {% endif %}
                         </div>
+
+                        {% if patient.emergency_contact.get('name') %}
+                        <div class="mb-3">
+                            <h6>Emergency Contact</h6>
+                            <p><strong>{{ patient.emergency_contact.name }}</strong></p>
+                            {% if patient.emergency_contact.get('relationship') %}
+                            <p class="text-muted">{{ patient.emergency_contact.relationship }}</p>
+                            {% endif %}
+                            {% if patient.emergency_contact.get('phone') %}
+                            <p><i class="fas fa-phone"></i> {{ patient.emergency_contact.phone }}</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
 
                         {% if patient.emergency_contact.name %}
                         <div class="mb-3">
@@ -141,12 +154,12 @@
                     <div class="card-body">
                         <!-- Allergies -->
                         {% set allergies = [] %}
-                        {% if patient.medical_history.allergies.local_anesthetic %}{% set _ = allergies.append('Local Anesthetic') %}{% endif %}
-                        {% if patient.medical_history.allergies.penicillin %}{% set _ = allergies.append('Penicillin') %}{% endif %}
-                        {% if patient.medical_history.allergies.sulfa_drugs %}{% set _ = allergies.append('Sulfa Drugs') %}{% endif %}
-                        {% if patient.medical_history.allergies.aspirin %}{% set _ = allergies.append('Aspirin') %}{% endif %}
-                        {% if patient.medical_history.allergies.latex %}{% set _ = allergies.append('Latex') %}{% endif %}
-                        {% if patient.medical_history.allergies.others %}{% set _ = allergies.append(patient.medical_history.allergies.others) %}{% endif %}
+                        {% if patient.medical_history.allergies.get('local_anesthetic') %}{% set _ = allergies.append('Local Anesthetic') %}{% endif %}
+                        {% if patient.medical_history.allergies.get('penicillin') %}{% set _ = allergies.append('Penicillin') %}{% endif %}
+                        {% if patient.medical_history.allergies.get('sulfa_drugs') %}{% set _ = allergies.append('Sulfa Drugs') %}{% endif %}
+                        {% if patient.medical_history.allergies.get('aspirin') %}{% set _ = allergies.append('Aspirin') %}{% endif %}
+                        {% if patient.medical_history.allergies.get('latex') %}{% set _ = allergies.append('Latex') %}{% endif %}
+                        {% if patient.medical_history.allergies.get('others') %}{% set _ = allergies.append(patient.medical_history.allergies.others) %}{% endif %}
 
                         {% if allergies %}
                         <div class="mb-3">
@@ -157,12 +170,12 @@
                         </div>
                         {% endif %}
 
-                        <!-- Medical Conditions -->
+                       <!-- Medical Conditions -->
                         {% set conditions = [] %}
-                        {% if patient.medical_history.medical_conditions.diabetes %}{% set _ = conditions.append('Diabetes') %}{% endif %}
-                        {% if patient.medical_history.medical_conditions.high_blood_pressure %}{% set _ = conditions.append('High Blood Pressure') %}{% endif %}
-                        {% if patient.medical_history.medical_conditions.heart_disease %}{% set _ = conditions.append('Heart Disease') %}{% endif %}
-                        {% if patient.medical_history.medical_conditions.asthma %}{% set _ = conditions.append('Asthma') %}{% endif %}
+                        {% if patient.medical_history.medical_conditions.get('diabetes') %}{% set _ = conditions.append('Diabetes') %}{% endif %}
+                        {% if patient.medical_history.medical_conditions.get('high_blood_pressure') %}{% set _ = conditions.append('High Blood Pressure') %}{% endif %}
+                        {% if patient.medical_history.medical_conditions.get('heart_disease') %}{% set _ = conditions.append('Heart Disease') %}{% endif %}
+                        {% if patient.medical_history.medical_conditions.get('asthma') %}{% set _ = conditions.append('Asthma') %}{% endif %}
 
                         {% if conditions %}
                         <div class="mb-3">
@@ -399,9 +412,9 @@
                                     <div class="col-12">
                                         <div class="d-flex justify-content-between align-items-center mb-3">
                                             <h6><i class="fas fa-chart-area"></i> Dental Chart Overview</h6>
-                                            <button class="btn btn-outline-primary btn-sm" onclick="alert('Full dental chart coming soon!')">
+                                            <a href="/chart/patient/{{ patient._id }}" class="btn btn-outline-primary btn-sm">
                                                 <i class="fas fa-expand"></i> View Full Chart
-                                            </button>
+                                            </a>
                                         </div>
                                         {% if dental_chart %}
                                         <div class="alert alert-info">
