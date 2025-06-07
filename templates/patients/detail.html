@@ -1,0 +1,561 @@
+<!-- File: MyDentalPortal/templates/patients/detail.html -->
+<!-- Patient Detail View Template -->
+
+{% extends "base.html" %}
+
+{% block title %}{{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }} - Dental Portal{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1>
+                    <i class="fas fa-user"></i> 
+                    {{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}
+                    {% if patient.personal_info.nickname %}
+                    <small class="text-muted">"{{ patient.personal_info.nickname }}"</small>
+                    {% endif %}
+                </h1>
+                <p class="text-muted mb-0">
+                    <i class="fas fa-building"></i> {{ clinic.name }}
+                </p>
+            </div>
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('patients') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Patients
+                </a>
+                <button class="btn btn-outline-primary" onclick="alert('Edit patient coming soon!')">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+                <button class="btn btn-outline-info" onclick="alert('Dental chart coming soon!')">
+                    <i class="fas fa-tooth"></i> Dental Chart
+                </button>
+                <button class="btn btn-outline-success" onclick="alert('Add treatment coming soon!')">
+                    <i class="fas fa-plus"></i> Add Treatment
+                </button>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Patient Summary Card -->
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-id-card"></i> Patient Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <div class="patient-avatar mx-auto mb-3" style="width: 80px; height: 80px; font-size: 2rem;">
+                                {{ patient.personal_info.first_name[0] }}{{ patient.personal_info.last_name[0] }}
+                            </div>
+                            <h6>{{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}</h6>
+                            {% if patient.personal_info.nickname %}
+                            <p class="text-muted">"{{ patient.personal_info.nickname }}"</p>
+                            {% endif %}
+                        </div>
+
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>Age:</strong></td>
+                                <td>{{ patient.personal_info.age or 'N/A' }} years</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Gender:</strong></td>
+                                <td>{{ 'Male' if patient.personal_info.gender == 'M' else 'Female' if patient.personal_info.gender == 'F' else 'N/A' }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Birthdate:</strong></td>
+                                <td>{{ patient.personal_info.birthdate or 'N/A' }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Occupation:</strong></td>
+                                <td>{{ patient.personal_info.occupation or 'N/A' }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Insurance:</strong></td>
+                                <td>{{ patient.personal_info.dental_insurance or 'None' }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Patient Since:</strong></td>
+                                <td>{{ patient.created_at.strftime('%B %d, %Y') }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-phone"></i> Contact Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <h6>Primary Contact</h6>
+                            {% if patient.contact_info.cell_phone %}
+                            <p><i class="fas fa-mobile-alt"></i> {{ patient.contact_info.cell_phone }}</p>
+                            {% endif %}
+                            {% if patient.contact_info.email %}
+                            <p><i class="fas fa-envelope"></i> {{ patient.contact_info.email }}</p>
+                            {% endif %}
+                            {% if patient.contact_info.home_phone %}
+                            <p><i class="fas fa-home"></i> {{ patient.contact_info.home_phone }}</p>
+                            {% endif %}
+                            {% if patient.contact_info.office_phone %}
+                            <p><i class="fas fa-briefcase"></i> {{ patient.contact_info.office_phone }}</p>
+                            {% endif %}
+                        </div>
+
+                        {% if patient.emergency_contact.name %}
+                        <div class="mb-3">
+                            <h6>Emergency Contact</h6>
+                            <p><strong>{{ patient.emergency_contact.name }}</strong></p>
+                            {% if patient.emergency_contact.relationship %}
+                            <p class="text-muted">{{ patient.emergency_contact.relationship }}</p>
+                            {% endif %}
+                            {% if patient.emergency_contact.phone %}
+                            <p><i class="fas fa-phone"></i> {{ patient.emergency_contact.phone }}</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        {% if patient.personal_info.home_address %}
+                        <div>
+                            <h6>Address</h6>
+                            <p class="text-muted">{{ patient.personal_info.home_address }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Medical Alerts -->
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Medical Alerts</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Allergies -->
+                        {% set allergies = [] %}
+                        {% if patient.medical_history.allergies.local_anesthetic %}{% set _ = allergies.append('Local Anesthetic') %}{% endif %}
+                        {% if patient.medical_history.allergies.penicillin %}{% set _ = allergies.append('Penicillin') %}{% endif %}
+                        {% if patient.medical_history.allergies.sulfa_drugs %}{% set _ = allergies.append('Sulfa Drugs') %}{% endif %}
+                        {% if patient.medical_history.allergies.aspirin %}{% set _ = allergies.append('Aspirin') %}{% endif %}
+                        {% if patient.medical_history.allergies.latex %}{% set _ = allergies.append('Latex') %}{% endif %}
+                        {% if patient.medical_history.allergies.others %}{% set _ = allergies.append(patient.medical_history.allergies.others) %}{% endif %}
+
+                        {% if allergies %}
+                        <div class="mb-3">
+                            <h6 class="text-danger"><i class="fas fa-exclamation-circle"></i> Allergies</h6>
+                            {% for allergy in allergies %}
+                            <span class="badge bg-danger me-1 mb-1">{{ allergy }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Medical Conditions -->
+                        {% set conditions = [] %}
+                        {% if patient.medical_history.medical_conditions.diabetes %}{% set _ = conditions.append('Diabetes') %}{% endif %}
+                        {% if patient.medical_history.medical_conditions.high_blood_pressure %}{% set _ = conditions.append('High Blood Pressure') %}{% endif %}
+                        {% if patient.medical_history.medical_conditions.heart_disease %}{% set _ = conditions.append('Heart Disease') %}{% endif %}
+                        {% if patient.medical_history.medical_conditions.asthma %}{% set _ = conditions.append('Asthma') %}{% endif %}
+
+                        {% if conditions %}
+                        <div class="mb-3">
+                            <h6 class="text-warning"><i class="fas fa-heartbeat"></i> Medical Conditions</h6>
+                            {% for condition in conditions %}
+                            <span class="badge bg-warning text-dark me-1 mb-1">{{ condition }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Current Medications -->
+                        {% if patient.medical_history.general_health.current_medications %}
+                        <div class="mb-3">
+                            <h6><i class="fas fa-pills"></i> Current Medications</h6>
+                            <p class="small">{{ patient.medical_history.general_health.current_medications }}</p>
+                        </div>
+                        {% endif %}
+
+                        <!-- Women's Health Alerts -->
+                        {% if patient.personal_info.gender == 'F' %}
+                        {% if patient.medical_history.women_health.pregnant %}
+                        <div class="alert alert-info py-2 px-3 mb-2">
+                            <small><i class="fas fa-baby"></i> Pregnant</small>
+                        </div>
+                        {% endif %}
+                        {% if patient.medical_history.women_health.nursing %}
+                        <div class="alert alert-info py-2 px-3 mb-2">
+                            <small><i class="fas fa-baby"></i> Nursing</small>
+                        </div>
+                        {% endif %}
+                        {% endif %}
+
+                        {% if not allergies and not conditions and not patient.medical_history.general_health.current_medications %}
+                        <p class="text-muted text-center">
+                            <i class="fas fa-check-circle text-success"></i><br>
+                            No medical alerts on file
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Information Tabs -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#dental-history" type="button" role="tab">
+                                    <i class="fas fa-tooth"></i> Dental History
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#treatment-history" type="button" role="tab">
+                                    <i class="fas fa-procedures"></i> Treatment History
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#personal-info" type="button" role="tab">
+                                    <i class="fas fa-id-card"></i> Personal Info
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <div class="tab-content">
+                            <!-- Medical History Tab -->
+                            <div class="tab-pane fade show active" id="medical-history" role="tabpanel">
+                                <div class="row">
+                                    <!-- Physician Information -->
+                                    <div class="col-md-6 mb-4">
+                                        <h6><i class="fas fa-user-md"></i> Physician Information</h6>
+                                        {% if patient.medical_history.physician_info.name %}
+                                        <table class="table table-sm">
+                                            <tr>
+                                                <td><strong>Name:</strong></td>
+                                                <td>Dr. {{ patient.medical_history.physician_info.name }}</td>
+                                            </tr>
+                                            {% if patient.medical_history.physician_info.specialty %}
+                                            <tr>
+                                                <td><strong>Specialty:</strong></td>
+                                                <td>{{ patient.medical_history.physician_info.specialty }}</td>
+                                            </tr>
+                                            {% endif %}
+                                            {% if patient.medical_history.physician_info.office_number %}
+                                            <tr>
+                                                <td><strong>Office:</strong></td>
+                                                <td>{{ patient.medical_history.physician_info.office_number }}</td>
+                                            </tr>
+                                            {% endif %}
+                                        </table>
+                                        {% else %}
+                                        <p class="text-muted">No physician information on file</p>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- General Health -->
+                                    <div class="col-md-6 mb-4">
+                                        <h6><i class="fas fa-heartbeat"></i> General Health</h6>
+                                        <table class="table table-sm">
+                                            <tr>
+                                                <td><strong>Good Health:</strong></td>
+                                                <td>
+                                                    <span class="badge bg-{{ 'success' if patient.medical_history.general_health.good_health else 'secondary' }}">
+                                                        {{ 'Yes' if patient.medical_history.general_health.good_health else 'No' }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Under Treatment:</strong></td>
+                                                <td>
+                                                    <span class="badge bg-{{ 'warning' if patient.medical_history.general_health.under_treatment else 'success' }}">
+                                                        {{ 'Yes' if patient.medical_history.general_health.under_treatment else 'No' }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            {% if patient.medical_history.general_health.treatment_condition %}
+                                            <tr>
+                                                <td><strong>Condition:</strong></td>
+                                                <td>{{ patient.medical_history.general_health.treatment_condition }}</td>
+                                            </tr>
+                                            {% endif %}
+                                            <tr>
+                                                <td><strong>Tobacco Use:</strong></td>
+                                                <td>
+                                                    <span class="badge bg-{{ 'danger' if patient.medical_history.general_health.tobacco_use else 'success' }}">
+                                                        {{ 'Yes' if patient.medical_history.general_health.tobacco_use else 'No' }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Alcohol/Drugs:</strong></td>
+                                                <td>
+                                                    <span class="badge bg-{{ 'warning' if patient.medical_history.general_health.alcohol_drugs else 'success' }}">
+                                                        {{ 'Yes' if patient.medical_history.general_health.alcohol_drugs else 'No' }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Vital Signs -->
+                                <div class="row">
+                                    <div class="col-md-12 mb-4">
+                                        <h6><i class="fas fa-chart-line"></i> Vital Signs</h6>
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <strong>Blood Type:</strong> {{ patient.medical_history.vital_signs.blood_type or 'Unknown' }}
+                                            </div>
+                                            <div class="col-md-3">
+                                                <strong>Blood Pressure:</strong> {{ patient.medical_history.vital_signs.blood_pressure or 'Not recorded' }}
+                                            </div>
+                                            <div class="col-md-6">
+                                                <strong>Bleeding Time:</strong> {{ patient.medical_history.vital_signs.bleeding_time or 'Not recorded' }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Medical Conditions Grid -->
+                                <div class="row">
+                                    <div class="col-12">
+                                        <h6><i class="fas fa-list-check"></i> Medical Conditions Checklist</h6>
+                                        <div class="row">
+                                            {% set condition_labels = {
+                                                'high_blood_pressure': 'High Blood Pressure',
+                                                'heart_disease': 'Heart Disease',
+                                                'diabetes': 'Diabetes',
+                                                'asthma': 'Asthma',
+                                                'cancer_tumors': 'Cancer/Tumors',
+                                                'heart_murmur': 'Heart Murmur',
+                                                'epilepsy': 'Epilepsy',
+                                                'hepatitis_liver': 'Hepatitis/Liver Disease',
+                                                'kidney_disease': 'Kidney Disease',
+                                                'arthritis': 'Arthritis',
+                                                'thyroid_problem': 'Thyroid Problem',
+                                                'bleeding_problems': 'Bleeding Problems'
+                                            } %}
+
+                                            {% for condition, label in condition_labels.items() %}
+                                            {% if patient.medical_history.medical_conditions[condition] %}
+                                            <div class="col-md-3 mb-2">
+                                                <span class="badge bg-warning text-dark">{{ label }}</span>
+                                            </div>
+                                            {% endif %}
+                                            {% endfor %}
+
+                                            {% if patient.medical_history.medical_conditions.other %}
+                                            <div class="col-md-12 mt-3">
+                                                <strong>Other Conditions:</strong> {{ patient.medical_history.medical_conditions.other }}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Dental History Tab -->
+                            <div class="tab-pane fade" id="dental-history" role="tabpanel">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6><i class="fas fa-tooth"></i> Previous Dental Care</h6>
+                                        <table class="table table-sm">
+                                            <tr>
+                                                <td><strong>Previous Dentist:</strong></td>
+                                                <td>{{ patient.dental_history.previous_dentist or 'None specified' }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Last Visit:</strong></td>
+                                                <td>{{ patient.dental_history.last_visit or 'Never' }}</td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6><i class="fas fa-handshake"></i> Referral Information</h6>
+                                        <table class="table table-sm">
+                                            <tr>
+                                                <td><strong>Referred By:</strong></td>
+                                                <td>{{ patient.referral_info.referred_by or 'Self-referral' }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Consultation Reason:</strong></td>
+                                                <td>{{ patient.referral_info.consultation_reason or 'General checkup' }}</td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Dental Chart Preview -->
+                                <div class="row mt-4">
+                                    <div class="col-12">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h6><i class="fas fa-chart-area"></i> Dental Chart Overview</h6>
+                                            <button class="btn btn-outline-primary btn-sm" onclick="alert('Full dental chart coming soon!')">
+                                                <i class="fas fa-expand"></i> View Full Chart
+                                            </button>
+                                        </div>
+                                        {% if dental_chart %}
+                                        <div class="alert alert-info">
+                                            <i class="fas fa-info-circle"></i>
+                                            Dental chart created on {{ dental_chart.created_at.strftime('%B %d, %Y') }}. 
+                                            Click "View Full Chart" to see detailed tooth-by-tooth information.
+                                        </div>
+                                        {% else %}
+                                        <div class="alert alert-warning">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                            No dental chart available. Create one to track dental conditions and treatments.
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Treatment History Tab -->
+                            <div class="tab-pane fade" id="treatment-history" role="tabpanel">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6><i class="fas fa-procedures"></i> Treatment History</h6>
+                                    <button class="btn btn-outline-success btn-sm" onclick="alert('Add treatment coming soon!')">
+                                        <i class="fas fa-plus"></i> Add Treatment
+                                    </button>
+                                </div>
+
+                                {% if treatment_records %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Procedure</th>
+                                                <th>Dentist</th>
+                                                <th>Amount</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for treatment in treatment_records %}
+                                            <tr>
+                                                <td>{{ treatment.date.strftime('%m/%d/%Y') }}</td>
+                                                <td>
+                                                    {{ treatment.procedure }}
+                                                    {% if treatment.tooth_numbers %}
+                                                    <br><small class="text-muted">Teeth: {{ treatment.tooth_numbers|join(', ') }}</small>
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ treatment.dentist }}</td>
+                                                <td>
+                                                    ${{ "%.2f"|format(treatment.amount_charged) }}
+                                                    {% if treatment.balance > 0 %}
+                                                    <br><small class="text-danger">Balance: ${{ "%.2f"|format(treatment.balance) }}</small>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-{{ 'success' if treatment.balance == 0 else 'warning' }}">
+                                                        {{ 'Paid' if treatment.balance == 0 else 'Outstanding' }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-procedures fa-3x text-muted mb-3"></i>
+                                    <h6>No Treatment History</h6>
+                                    <p class="text-muted">This patient has no recorded treatments yet.</p>
+                                    <button class="btn btn-primary" onclick="alert('Add treatment coming soon!')">
+                                        <i class="fas fa-plus"></i> Add First Treatment
+                                    </button>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Personal Info Tab -->
+                            <div class="tab-pane fade" id="personal-info" role="tabpanel">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6><i class="fas fa-user"></i> Personal Details</h6>
+                                        <table class="table table-sm">
+                                            <tr>
+                                                <td><strong>Full Name:</strong></td>
+                                                <td>
+                                                    {{ patient.personal_info.first_name }} 
+                                                    {% if patient.personal_info.middle_name %}{{ patient.personal_info.middle_name }} {% endif %}
+                                                    {{ patient.personal_info.last_name }}
+                                                </td>
+                                            </tr>
+                                            {% if patient.personal_info.religion %}
+                                            <tr>
+                                                <td><strong>Religion:</strong></td>
+                                                <td>{{ patient.personal_info.religion }}</td>
+                                            </tr>
+                                            {% endif %}
+                                            {% if patient.personal_info.nationality %}
+                                            <tr>
+                                                <td><strong>Nationality:</strong></td>
+                                                <td>{{ patient.personal_info.nationality }}</td>
+                                            </tr>
+                                            {% endif %}
+                                        </table>
+                                    </div>
+                                    <div class="col-md-6">
+                                        {% if patient.guardian_info.name %}
+                                        <h6><i class="fas fa-users"></i> Guardian Information</h6>
+                                        <table class="table table-sm">
+                                            <tr>
+                                                <td><strong>Guardian:</strong></td>
+                                                <td>{{ patient.guardian_info.name }}</td>
+                                            </tr>
+                                            {% if patient.guardian_info.occupation %}
+                                            <tr>
+                                                <td><strong>Occupation:</strong></td>
+                                                <td>{{ patient.guardian_info.occupation }}</td>
+                                            </tr>
+                                            {% endif %}
+                                        </table>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <h6><i class="fas fa-clock"></i> Record Information</h6>
+                                        <table class="table table-sm">
+                                            <tr>
+                                                <td><strong>Patient Since:</strong></td>
+                                                <td>{{ patient.created_at.strftime('%B %d, %Y at %I:%M %p') }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Last Updated:</strong></td>
+                                                <td>{{ patient.updated_at.strftime('%B %d, %Y at %I:%M %p') }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Patient ID:</strong></td>
+                                                <td class="font-monospace">{{ patient._id }}</td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#medical-history" type="button" role="tab">
+                                    <i class="fas fa-user-md"></i> Medical History
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">

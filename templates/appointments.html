@@ -1,0 +1,1398 @@
+<!-- 
+File: appointments.html
+Path: dental-portal/templates/appointments.html
+Description: Dental practice appointments calendar with drag-and-drop functionality
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dental Appointments Calendar</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #0d6efd;
+            --success-color: #198754;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --info-color: #0dcaf0;
+            --light-bg: #f8f9fa;
+            --border-color: #dee2e6;
+        }
+
+        body {
+            background-color: var(--light-bg);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Top Navigation Bar */
+        .top-nav-bar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        
+        .nav-link {
+            color: rgba(255,255,255,0.8) !important;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+            margin: 0 0.25rem;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            color: white !important;
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-1px);
+        }
+
+        .appointments-container {
+            height: calc(100vh - 80px);
+            overflow: hidden;
+        }
+
+        .sidebar {
+            background: white;
+            border-right: 2px solid var(--border-color);
+            height: calc(100vh - 80px);
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+
+        .calendar-container {
+            height: calc(100vh - 80px);
+            overflow-y: auto;
+            background: white;
+        }
+
+        .calendar-header {
+            background: linear-gradient(135deg, var(--primary-color), #0056b3);
+            color: white;
+            padding: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .calendar-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .nav-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+
+        .nav-btn.active {
+            background: white;
+            color: var(--primary-color);
+        }
+
+        /* Week View Styles */
+        .week-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: var(--border-color);
+            margin: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .week-day {
+            background: white;
+            min-height: 400px;
+            padding: 10px;
+            position: relative;
+            border: none;
+            transition: all 0.3s ease;
+        }
+
+        .week-day:hover {
+            background: #f0f8ff;
+        }
+
+        .week-day.drop-zone {
+            background: #e3f2fd;
+            border: 2px dashed var(--primary-color);
+        }
+
+        .week-day.today {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+            border: 2px solid var(--warning-color);
+        }
+
+        /* Month View Styles */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: var(--border-color);
+            margin: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .calendar-day {
+            background: white;
+            min-height: 120px;
+            padding: 10px;
+            position: relative;
+            border: none;
+            transition: all 0.3s ease;
+        }
+
+        .calendar-day:hover {
+            background: #f0f8ff;
+            transform: translateY(-2px);
+        }
+
+        .calendar-day.drop-zone {
+            background: #e3f2fd;
+            border: 2px dashed var(--primary-color);
+        }
+
+        .calendar-day.other-month {
+            background: #f8f9fa;
+            color: #6c757d;
+        }
+
+        .calendar-day.today {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+            border: 2px solid var(--warning-color);
+        }
+
+        .day-number {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .day-header {
+            background: var(--primary-color);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .patient-card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: grab;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .patient-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .patient-card.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+            cursor: grabbing;
+        }
+
+        .patient-name {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 4px;
+        }
+
+        .patient-phone {
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        /* Appointment Cards with Types */
+        .appointment-card {
+            border-radius: 6px;
+            padding: 8px;
+            margin-bottom: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .appointment-card:hover {
+            transform: scale(1.02);
+        }
+
+        .appointment-card.checkup {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            border: 1px solid var(--primary-color);
+        }
+
+        .appointment-card.emergency {
+            background: linear-gradient(135deg, #ffebee, #ffcdd2);
+            border: 1px solid var(--danger-color);
+        }
+
+        .appointment-card.follow-up {
+            background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+            border: 1px solid var(--success-color);
+        }
+
+        .appointment-card.surgery {
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+            border: 1px solid var(--warning-color);
+        }
+
+        .appointment-card.cleaning {
+            background: linear-gradient(135deg, #e0f2f1, #b2dfdb);
+            border: 1px solid #009688;
+        }
+
+        .appointment-card.filling {
+            background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+            border: 1px solid #9c27b0;
+        }
+
+        .appointment-time {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .appointment-patient {
+            margin-bottom: 2px;
+        }
+
+        .appointment-type {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-top: 4px;
+            color: white;
+        }
+
+        .appointment-type.checkup { background: var(--primary-color); }
+        .appointment-type.emergency { background: var(--danger-color); }
+        .appointment-type.follow-up { background: var(--success-color); }
+        .appointment-type.surgery { background: var(--warning-color); }
+        .appointment-type.cleaning { background: #009688; }
+        .appointment-type.filling { background: #9c27b0; }
+
+        .search-box {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            z-index: 50;
+        }
+
+        .patient-list {
+            max-height: calc(100vh - 400px);
+            overflow-y: auto;
+        }
+
+        .appointment-modal .modal-content {
+            border-radius: 15px;
+            border: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .appointment-modal .modal-header {
+            background: linear-gradient(135deg, var(--primary-color), #0056b3);
+            color: white;
+            border-radius: 15px 15px 0 0;
+        }
+
+        .legend {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+
+        .stats-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stats-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .stats-label {
+            color: #6c757d;
+            font-size: 12px;
+        }
+
+        .view-container {
+            display: none;
+        }
+
+        .view-container.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: -300px;
+                width: 300px;
+                z-index: 1050;
+                transition: left 0.3s ease;
+            }
+
+            .sidebar.show {
+                left: 0;
+            }
+
+            .calendar-container {
+                margin-left: 0;
+            }
+
+            .mobile-toggle {
+                position: fixed;
+                top: 100px;
+                left: 20px;
+                z-index: 1060;
+                background: var(--primary-color);
+                color: white;
+                border: none;
+                border-radius: 50%;
+                width: 50px;
+                height: 50px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <nav class="top-nav-bar">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <h4 class="mb-0 me-4">
+                        <i class="fas fa-tooth"></i> Dental Portal
+                    </h4>
+                </div>
+                
+                <ul class="nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/dashboard">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/clinics_fallback">
+                            <i class="fas fa-building"></i> Clinics
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/patients_fallback">
+                            <i class="fas fa-users"></i> Patients
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/appointments_fallback">
+                            <i class="fas fa-calendar-alt"></i> Appointments
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/logout">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="appointments-container d-flex">
+        <!-- Mobile Toggle Button -->
+        <button class="mobile-toggle d-md-none" onclick="toggleSidebar()">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <!-- Sidebar -->
+        <div class="sidebar col-md-3" id="sidebar">
+            <!-- Search and Filters -->
+            <div class="search-box">
+                <!-- Clinic Selector -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-building"></i> Select Clinic
+                    </label>
+                    <select class="form-select" id="clinicSelector">
+                        <option value="">All Clinics (Total View)</option>
+                        <!-- Clinics will be loaded dynamically -->
+                    </select>
+                    <small class="text-muted">Filter appointments by clinic</small>
+                </div>
+
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" placeholder="Search patients..." id="patientSearch">
+                    <button class="btn btn-outline-primary" type="button">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                
+                <div class="d-flex gap-2 mb-3">
+                    <select class="form-select form-select-sm" id="appointmentTypeFilter">
+                        <option value="">All Types</option>
+                        <option value="checkup">Checkup</option>
+                        <option value="cleaning">Cleaning</option>
+                        <option value="filling">Filling</option>
+                        <option value="emergency">Emergency</option>
+                        <option value="follow-up">Follow-up</option>
+                        <option value="surgery">Surgery</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Today's Stats -->
+            <div class="px-3">
+                <div class="stats-card">
+                    <div class="stats-number" id="todayAppointments">0</div>
+                    <div class="stats-label" id="todayLabel">Today's Appointments</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-number" id="availableSlots">12</div>
+                    <div class="stats-label">Available Slots</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-number" id="totalAppointments">0</div>
+                    <div class="stats-label" id="totalLabel">Total Appointments</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-number" id="clinicCount">0</div>
+                    <div class="stats-label">Active Clinics</div>
+                </div>
+            </div>
+
+            <!-- Legend -->
+            <div class="legend">
+                <h6><i class="fas fa-info-circle"></i> Legend</h6>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #e3f2fd, #bbdefb);"></div>
+                    <span>Regular Checkup</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #ffebee, #ffcdd2);"></div>
+                    <span>Emergency</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #e8f5e8, #c8e6c9);"></div>
+                    <span>Follow-up</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #fff3e0, #ffe0b2);"></div>
+                    <span>Surgery</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #e0f2f1, #b2dfdb);"></div>
+                    <span>Cleaning</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #f3e5f5, #e1bee7);"></div>
+                    <span>Filling</span>
+                </div>
+            </div>
+
+            <!-- Patient List -->
+            <div class="patient-list" id="patientList">
+                <div class="px-3">
+                    <h6><i class="fas fa-users"></i> Available Patients</h6>
+                    
+                    <!-- Sample patients -->
+                    <div class="patient-card" draggable="true" data-patient-id="1" data-patient-name="John Doe" data-patient-phone="(555) 123-4567">
+                        <div class="patient-name">John Doe</div>
+                        <div class="patient-phone"><i class="fas fa-phone"></i> (555) 123-4567</div>
+                        <small class="text-muted">Last visit: 2 weeks ago</small>
+                    </div>
+
+                    <div class="patient-card" draggable="true" data-patient-id="2" data-patient-name="Jane Smith" data-patient-phone="(555) 987-6543">
+                        <div class="patient-name">Jane Smith</div>
+                        <div class="patient-phone"><i class="fas fa-phone"></i> (555) 987-6543</div>
+                        <small class="text-muted">New patient</small>
+                    </div>
+
+                    <div class="patient-card" draggable="true" data-patient-id="3" data-patient-name="Mike Johnson" data-patient-phone="(555) 456-7890">
+                        <div class="patient-name">Mike Johnson</div>
+                        <div class="patient-phone"><i class="fas fa-phone"></i> (555) 456-7890</div>
+                        <small class="text-muted">Last visit: 1 month ago</small>
+                    </div>
+
+                    <div class="patient-card" draggable="true" data-patient-id="4" data-patient-name="Sarah Wilson" data-patient-phone="(555) 321-0987">
+                        <div class="patient-name">Sarah Wilson</div>
+                        <div class="patient-phone"><i class="fas fa-phone"></i> (555) 321-0987</div>
+                        <small class="text-muted">Emergency patient</small>
+                    </div>
+
+                    <div class="patient-card" draggable="true" data-patient-id="5" data-patient-name="Robert Brown" data-patient-phone="(555) 654-3210">
+                        <div class="patient-name">Robert Brown</div>
+                        <div class="patient-phone"><i class="fas fa-phone"></i> (555) 654-3210</div>
+                        <small class="text-muted">Follow-up needed</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Calendar -->
+        <div class="calendar-container col-md-9">
+            <!-- Calendar Header -->
+            <div class="calendar-header">
+                <div class="calendar-nav">
+                    <button class="btn nav-btn" onclick="previousPeriod()">
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </button>
+                    <h3 class="mb-0" id="currentPeriod">Week of June 1, 2025</h3>
+                    <button class="btn nav-btn" onclick="nextPeriod()">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <button class="btn nav-btn me-2" onclick="goToToday()">
+                            <i class="fas fa-calendar-day"></i> Today
+                        </button>
+                        <button class="btn nav-btn active" id="weekViewBtn" onclick="showWeekView()">
+                            <i class="fas fa-calendar-week"></i> Week View
+                        </button>
+                        <button class="btn nav-btn" id="monthViewBtn" onclick="showMonthView()">
+                            <i class="fas fa-calendar"></i> Month View
+                        </button>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-light text-dark me-2">
+                                <i class="fas fa-clock"></i> Office Hours: 9:00 AM - 5:00 PM
+                            </span>
+                            <span class="badge bg-light text-dark me-2" id="currentViewBadge">
+                                <i class="fas fa-building"></i> All Clinics
+                            </span>
+                            <span class="badge bg-light text-dark">
+                                <i class="fas fa-calendar-check"></i> <span id="selectedDate">Select a date</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Week View (Default) -->
+            <div class="view-container active" id="weekView">
+                <div class="week-grid" id="weekGrid">
+                    <!-- Day headers -->
+                    <div class="day-header">Sunday</div>
+                    <div class="day-header">Monday</div>
+                    <div class="day-header">Tuesday</div>
+                    <div class="day-header">Wednesday</div>
+                    <div class="day-header">Thursday</div>
+                    <div class="day-header">Friday</div>
+                    <div class="day-header">Saturday</div>
+                    
+                    <!-- Week days will be dynamically generated -->
+                </div>
+            </div>
+
+            <!-- Month View -->
+            <div class="view-container" id="monthView">
+                <div class="calendar-grid" id="calendarGrid">
+                    <!-- Day headers -->
+                    <div class="day-header">Sunday</div>
+                    <div class="day-header">Monday</div>
+                    <div class="day-header">Tuesday</div>
+                    <div class="day-header">Wednesday</div>
+                    <div class="day-header">Thursday</div>
+                    <div class="day-header">Friday</div>
+                    <div class="day-header">Saturday</div>
+                    
+                    <!-- Calendar days will be dynamically generated -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Appointment Details Modal -->
+    <div class="modal fade appointment-modal" id="appointmentModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-calendar-plus"></i> Schedule Appointment
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="appointmentForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Clinic *</label>
+                                <select class="form-select" id="modalClinicSelect" required>
+                                    <option value="">Select a clinic</option>
+                                    <!-- Clinics will be loaded dynamically -->
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Patient Name</label>
+                                <input type="text" class="form-control" id="modalPatientName" readonly>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Date</label>
+                                <input type="date" class="form-control" id="modalAppointmentDate">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Time *</label>
+                                <input type="time" class="form-control" id="modalAppointmentTime" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Duration</label>
+                                <select class="form-select" id="modalDuration">
+                                    <option value="30">30 minutes</option>
+                                    <option value="60">1 hour</option>
+                                    <option value="90">1.5 hours</option>
+                                    <option value="120">2 hours</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Appointment Type *</label>
+                                <select class="form-select" id="modalAppointmentType" required>
+                                    <option value="checkup">Regular Checkup</option>
+                                    <option value="cleaning">Teeth Cleaning</option>
+                                    <option value="filling">Dental Filling</option>
+                                    <option value="emergency">Emergency</option>
+                                    <option value="follow-up">Follow-up</option>
+                                    <option value="surgery">Surgery</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Priority</label>
+                                <select class="form-select" id="modalPriority">
+                                    <option value="normal">Normal</option>
+                                    <option value="high">High</option>
+                                    <option value="urgent">Urgent</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" id="modalNotes" rows="3" placeholder="Additional notes about the appointment..."></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveAppointment()">
+                        <i class="fas fa-save"></i> Schedule Appointment
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global variables
+        let currentDate = new Date();
+        let draggedPatient = null;
+        let appointments = [];
+        let currentView = 'week'; // Default to week view
+        let currentClinic = ''; // Current selected clinic filter
+        let userClinics = []; // User's clinics
+
+        // Sample clinic data (replace with real data from your backend)
+        const sampleClinics = [
+            { id: 'clinic1', name: 'Downtown Dental Clinic', address: '123 Main St' },
+            { id: 'clinic2', name: 'Suburban Family Dentistry', address: '456 Oak Ave' },
+            { id: 'clinic3', name: 'Emergency Dental Care', address: '789 Emergency Blvd' }
+        ];
+
+        // Sample appointments with clinic IDs
+        const sampleAppointments = [
+            {
+                id: 1,
+                clinicId: 'clinic1',
+                patientId: 1,
+                patientName: "John Doe",
+                date: "2025-06-06",
+                time: "09:00",
+                duration: 60,
+                type: "checkup",
+                priority: "normal",
+                notes: "Regular checkup"
+            },
+            {
+                id: 2,
+                clinicId: 'clinic2',
+                patientId: 2,
+                patientName: "Jane Smith",
+                date: "2025-06-07",
+                time: "14:00",
+                duration: 30,
+                type: "cleaning",
+                priority: "normal",
+                notes: "First visit"
+            },
+            {
+                id: 3,
+                clinicId: 'clinic1',
+                patientId: 3,
+                patientName: "Mike Johnson",
+                date: "2025-06-06",
+                time: "15:30",
+                duration: 45,
+                type: "filling",
+                priority: "high",
+                notes: "Cavity treatment"
+            }
+        ];
+
+        // Initialize calendar
+        document.addEventListener('DOMContentLoaded', function() {
+            userClinics = [...sampleClinics]; // Load user clinics
+            appointments = [...sampleAppointments]; // Load appointments
+            
+            loadClinics(); // Populate clinic selectors
+            generateWeekView(); // Start with week view
+            setupDragAndDrop();
+            setupSearch();
+            setupClinicFilter();
+            updateStats();
+        });
+
+        function showWeekView() {
+            currentView = 'week';
+            document.getElementById('weekView').classList.add('active');
+            document.getElementById('monthView').classList.remove('active');
+            document.getElementById('weekViewBtn').classList.add('active');
+            document.getElementById('monthViewBtn').classList.remove('active');
+            generateWeekView();
+        }
+
+        function showMonthView() {
+            currentView = 'month';
+            document.getElementById('monthView').classList.add('active');
+            document.getElementById('weekView').classList.remove('active');
+            document.getElementById('monthViewBtn').classList.add('active');
+            document.getElementById('weekViewBtn').classList.remove('active');
+            generateMonthView();
+        }
+
+        function generateWeekView() {
+            const grid = document.getElementById('weekGrid');
+            const periodDisplay = document.getElementById('currentPeriod');
+            
+            // Get the start of the week (Sunday)
+            const startOfWeek = new Date(currentDate);
+            startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+            
+            // Clear existing days (keep headers)
+            const dayHeaders = grid.querySelectorAll('.day-header');
+            grid.innerHTML = '';
+            dayHeaders.forEach(header => grid.appendChild(header));
+            
+            // Update period display
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+            periodDisplay.textContent = `Week of ${startOfWeek.toLocaleDateString('en-US', { 
+                month: 'long', 
+                day: 'numeric', 
+                year: 'numeric' 
+            })}`;
+            
+            // Generate 7 days for the week
+            for (let i = 0; i < 7; i++) {
+                const day = new Date(startOfWeek);
+                day.setDate(startOfWeek.getDate() + i);
+                
+                const dayElement = createWeekDayElement(day);
+                grid.appendChild(dayElement);
+            }
+        }
+
+        function generateMonthView() {
+            const grid = document.getElementById('calendarGrid');
+            const periodDisplay = document.getElementById('currentPeriod');
+            
+            // Clear existing calendar days (keep headers)
+            const dayHeaders = grid.querySelectorAll('.day-header');
+            grid.innerHTML = '';
+            dayHeaders.forEach(header => grid.appendChild(header));
+            
+            // Set month/year display
+            periodDisplay.textContent = currentDate.toLocaleDateString('en-US', { 
+                month: 'long', 
+                year: 'numeric' 
+            });
+            
+            // Get first day of month and number of days
+            const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+            const startDate = new Date(firstDay);
+            startDate.setDate(startDate.getDate() - firstDay.getDay());
+            
+            // Generate calendar days
+            for (let i = 0; i < 42; i++) {
+                const day = new Date(startDate);
+                day.setDate(startDate.getDate() + i);
+                
+                const dayElement = createMonthDayElement(day);
+                grid.appendChild(dayElement);
+            }
+        }
+
+        function createWeekDayElement(date) {
+            const day = document.createElement('div');
+            day.className = 'week-day';
+            // Use local date string to avoid timezone issues
+            day.dataset.date = formatDateForStorage(date);
+            
+            if (isToday(date)) {
+                day.classList.add('today');
+            }
+            
+            // Day header with date
+            const dayHeader = document.createElement('div');
+            dayHeader.className = 'day-number';
+            dayHeader.innerHTML = `
+                <strong>${date.getDate()}</strong><br>
+                <small>${date.toLocaleDateString('en-US', { weekday: 'short' })}</small>
+            `;
+            day.appendChild(dayHeader);
+            
+            // Add appointments for this day (filtered by current clinic)
+            const filteredAppointments = getFilteredAppointments();
+            const dayAppointments = filteredAppointments.filter(apt => apt.date === day.dataset.date);
+            dayAppointments.forEach(apt => {
+                const appointmentElement = createAppointmentElement(apt);
+                day.appendChild(appointmentElement);
+            });
+            
+            // Make droppable
+            setupDropZone(day);
+            
+            return day;
+        }
+
+        function createMonthDayElement(date) {
+            const day = document.createElement('div');
+            day.className = 'calendar-day';
+            // Use local date string to avoid timezone issues
+            day.dataset.date = formatDateForStorage(date);
+            
+            // Add classes for styling
+            if (date.getMonth() !== currentDate.getMonth()) {
+                day.classList.add('other-month');
+            }
+            
+            if (isToday(date)) {
+                day.classList.add('today');
+            }
+            
+            // Day number
+            const dayNumber = document.createElement('div');
+            dayNumber.className = 'day-number';
+            dayNumber.textContent = date.getDate();
+            day.appendChild(dayNumber);
+            
+            // Add appointments for this day (filtered by current clinic)
+            const filteredAppointments = getFilteredAppointments();
+            const dayAppointments = filteredAppointments.filter(apt => apt.date === day.dataset.date);
+            dayAppointments.forEach(apt => {
+                const appointmentElement = createAppointmentElement(apt);
+                day.appendChild(appointmentElement);
+            });
+            
+            // Make droppable
+            setupDropZone(day);
+            
+            return day;
+        }
+
+        function createAppointmentElement(appointment) {
+            const apt = document.createElement('div');
+            apt.className = `appointment-card ${appointment.type}`;
+            apt.dataset.appointmentId = appointment.id;
+            apt.dataset.clinicId = appointment.clinicId;
+            
+            const appointmentTime = document.createElement('div');
+            appointmentTime.className = 'appointment-time';
+            appointmentTime.textContent = formatTime(appointment.time);
+            
+            const appointmentPatient = document.createElement('div');
+            appointmentPatient.className = 'appointment-patient';
+            appointmentPatient.textContent = appointment.patientName;
+            
+            const appointmentType = document.createElement('div');
+            appointmentType.className = `appointment-type ${appointment.type}`;
+            appointmentType.textContent = appointment.type;
+            
+            // Add clinic name if in total view
+            if (!currentClinic) {
+                const clinicName = userClinics.find(c => c.id === appointment.clinicId)?.name || 'Unknown Clinic';
+                const appointmentClinic = document.createElement('div');
+                appointmentClinic.className = 'appointment-clinic';
+                appointmentClinic.style.fontSize = '10px';
+                appointmentClinic.style.color = '#666';
+                appointmentClinic.innerHTML = `<i class="fas fa-building"></i> ${clinicName}`;
+                apt.appendChild(appointmentClinic);
+            }
+            
+            apt.appendChild(appointmentTime);
+            apt.appendChild(appointmentPatient);
+            apt.appendChild(appointmentType);
+            
+            // Click to edit
+            apt.addEventListener('click', () => editAppointment(appointment));
+            
+            return apt;
+        }
+
+        function setupDragAndDrop() {
+            // Setup draggable patients
+            document.querySelectorAll('.patient-card').forEach(card => {
+                card.addEventListener('dragstart', handleDragStart);
+                card.addEventListener('dragend', handleDragEnd);
+            });
+        }
+
+        function setupDropZone(dayElement) {
+            dayElement.addEventListener('dragover', handleDragOver);
+            dayElement.addEventListener('drop', handleDrop);
+            dayElement.addEventListener('dragenter', handleDragEnter);
+            dayElement.addEventListener('dragleave', handleDragLeave);
+        }
+
+        function handleDragStart(e) {
+            draggedPatient = {
+                id: this.dataset.patientId,
+                name: this.dataset.patientName,
+                phone: this.dataset.patientPhone
+            };
+            this.classList.add('dragging');
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            this.classList.add('drop-zone');
+        }
+
+        function handleDragLeave(e) {
+            if (!this.contains(e.relatedTarget)) {
+                this.classList.remove('drop-zone');
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            this.classList.remove('drop-zone');
+            
+            if (draggedPatient && !this.classList.contains('other-month')) {
+                const selectedDate = this.dataset.date;
+                showAppointmentModal(draggedPatient, selectedDate);
+            }
+        }
+
+        function showAppointmentModal(patient, date) {
+            const modal = new bootstrap.Modal(document.getElementById('appointmentModal'));
+            
+            // Pre-fill form with patient and date info
+            document.getElementById('modalPatientName').value = patient.name;
+            document.getElementById('modalAppointmentDate').value = date;
+            
+            // Set default clinic if filtering by clinic
+            if (currentClinic) {
+                document.getElementById('modalClinicSelect').value = currentClinic;
+            } else {
+                document.getElementById('modalClinicSelect').value = '';
+            }
+            
+            // Clear other fields
+            document.getElementById('modalAppointmentTime').value = '';
+            document.getElementById('modalDuration').value = '30';
+            document.getElementById('modalAppointmentType').value = 'checkup';
+            document.getElementById('modalPriority').value = 'normal';
+            document.getElementById('modalNotes').value = '';
+            
+            // Update selected date display
+            const selectedDateFormatted = new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            document.getElementById('selectedDate').textContent = selectedDateFormatted;
+            
+            // Store dragged patient info
+            document.getElementById('appointmentForm').dataset.draggedPatient = JSON.stringify(patient);
+            document.getElementById('appointmentForm').dataset.selectedDate = date;
+            
+            modal.show();
+        }
+
+        function saveAppointment() {
+            // Validation
+            const patientName = document.getElementById('modalPatientName').value.trim();
+            const appointmentDate = document.getElementById('modalAppointmentDate').value;
+            const appointmentTime = document.getElementById('modalAppointmentTime').value;
+            const appointmentType = document.getElementById('modalAppointmentType').value;
+            const clinicId = document.getElementById('modalClinicSelect').value;
+            
+            if (!patientName || !appointmentDate || !appointmentTime || !appointmentType || !clinicId) {
+                alert('Please fill in all required fields including clinic selection.');
+                return;
+            }
+            
+            // Check for time conflicts in the same clinic
+            const existingAppointment = appointments.find(apt => 
+                apt.date === appointmentDate && 
+                apt.time === appointmentTime && 
+                apt.clinicId === clinicId
+            );
+            
+            if (existingAppointment) {
+                if (!confirm('There is already an appointment at this time in this clinic. Do you want to continue?')) {
+                    return;
+                }
+            }
+            
+            // Create new appointment
+            const newAppointment = {
+                id: Date.now(),
+                clinicId: clinicId,
+                patientId: draggedPatient ? draggedPatient.id : null,
+                patientName: patientName,
+                date: appointmentDate, // This should already be in YYYY-MM-DD format from the input
+                time: appointmentTime,
+                duration: parseInt(document.getElementById('modalDuration').value),
+                type: appointmentType,
+                priority: document.getElementById('modalPriority').value,
+                notes: document.getElementById('modalNotes').value
+            };
+            
+            console.log('Creating appointment:', newAppointment); // Debug log
+            
+            appointments.push(newAppointment);
+            
+            // Refresh current view
+            if (currentView === 'week') {
+                generateWeekView();
+            } else {
+                generateMonthView();
+            }
+            
+            updateStats();
+            
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('appointmentModal')).hide();
+            
+            // Show success message
+            const clinicName = userClinics.find(c => c.id === clinicId)?.name || 'Selected Clinic';
+            showNotification(`Appointment scheduled successfully at ${clinicName}!`, 'success');
+            
+            // Reset dragged patient
+            draggedPatient = null;
+        }
+
+        function editAppointment(appointment) {
+            const modal = new bootstrap.Modal(document.getElementById('appointmentModal'));
+            
+            // Pre-fill form with appointment data
+            document.getElementById('modalClinicSelect').value = appointment.clinicId;
+            document.getElementById('modalPatientName').value = appointment.patientName;
+            document.getElementById('modalAppointmentDate').value = appointment.date;
+            document.getElementById('modalAppointmentTime').value = appointment.time;
+            document.getElementById('modalDuration').value = appointment.duration;
+            document.getElementById('modalAppointmentType').value = appointment.type;
+            document.getElementById('modalPriority').value = appointment.priority;
+            document.getElementById('modalNotes').value = appointment.notes || '';
+            
+            // Store appointment ID for updates
+            document.getElementById('appointmentForm').dataset.editingId = appointment.id;
+            
+            modal.show();
+        }
+
+        function deleteAppointment(appointmentId) {
+            if (confirm('Are you sure you want to delete this appointment?')) {
+                appointments = appointments.filter(apt => apt.id !== appointmentId);
+                
+                if (currentView === 'week') {
+                    generateWeekView();
+                } else {
+                    generateMonthView();
+                }
+                
+                updateStats();
+                showNotification('Appointment deleted successfully!', 'warning');
+            }
+        }
+
+        function previousPeriod() {
+            if (currentView === 'week') {
+                currentDate.setDate(currentDate.getDate() - 7);
+                generateWeekView();
+            } else {
+                currentDate.setMonth(currentDate.getMonth() - 1);
+                generateMonthView();
+            }
+        }
+
+        function nextPeriod() {
+            if (currentView === 'week') {
+                currentDate.setDate(currentDate.getDate() + 7);
+                generateWeekView();
+            } else {
+                currentDate.setMonth(currentDate.getMonth() + 1);
+                generateMonthView();
+            }
+        }
+
+        function goToToday() {
+            currentDate = new Date();
+            if (currentView === 'week') {
+                generateWeekView();
+            } else {
+                generateMonthView();
+            }
+        }
+
+        function setupSearch() {
+            const searchInput = document.getElementById('patientSearch');
+            const typeFilter = document.getElementById('appointmentTypeFilter');
+            
+            searchInput.addEventListener('input', filterPatients);
+            typeFilter.addEventListener('change', filterAppointments);
+        }
+
+        function setupClinicFilter() {
+            const clinicSelector = document.getElementById('clinicSelector');
+            clinicSelector.addEventListener('change', function() {
+                currentClinic = this.value;
+                updateViewBadge();
+                updateStats();
+                
+                // Refresh current view
+                if (currentView === 'week') {
+                    generateWeekView();
+                } else {
+                    generateMonthView();
+                }
+            });
+        }
+
+        function loadClinics() {
+            const clinicSelector = document.getElementById('clinicSelector');
+            const modalClinicSelect = document.getElementById('modalClinicSelect');
+            
+            // Clear existing options (except "All Clinics")
+            modalClinicSelect.innerHTML = '<option value="">Select a clinic</option>';
+            
+            userClinics.forEach(clinic => {
+                // Add to filter dropdown
+                const filterOption = document.createElement('option');
+                filterOption.value = clinic.id;
+                filterOption.textContent = clinic.name;
+                clinicSelector.appendChild(filterOption);
+                
+                // Add to modal dropdown
+                const modalOption = document.createElement('option');
+                modalOption.value = clinic.id;
+                modalOption.textContent = clinic.name;
+                modalClinicSelect.appendChild(modalOption);
+            });
+        }
+
+        function getFilteredAppointments() {
+            if (!currentClinic) {
+                return appointments; // Return all appointments
+            }
+            return appointments.filter(apt => apt.clinicId === currentClinic);
+        }
+
+        function updateViewBadge() {
+            const badge = document.getElementById('currentViewBadge');
+            if (currentClinic) {
+                const clinicName = userClinics.find(c => c.id === currentClinic)?.name || 'Unknown Clinic';
+                badge.innerHTML = `<i class="fas fa-building"></i> ${clinicName}`;
+            } else {
+                badge.innerHTML = `<i class="fas fa-building"></i> All Clinics`;
+            }
+        }
+
+        function filterPatients() {
+            const searchTerm = document.getElementById('patientSearch').value.toLowerCase();
+            const patientCards = document.querySelectorAll('.patient-card');
+            
+            patientCards.forEach(card => {
+                const patientName = card.querySelector('.patient-name').textContent.toLowerCase();
+                if (patientName.includes(searchTerm)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        function filterAppointments() {
+            const typeFilter = document.getElementById('appointmentTypeFilter').value;
+            const appointmentCards = document.querySelectorAll('.appointment-card');
+            
+            appointmentCards.forEach(card => {
+                if (!typeFilter || card.classList.contains(typeFilter)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        function updateStats() {
+            const today = formatDateForStorage(new Date());
+            const filteredAppointments = getFilteredAppointments();
+            
+            const todayAppointments = filteredAppointments.filter(apt => apt.date === today).length;
+            const totalSlots = 12; // Assuming 12 slots per day
+            const availableSlots = totalSlots - todayAppointments;
+            const totalAppointments = filteredAppointments.length;
+            
+            document.getElementById('todayAppointments').textContent = todayAppointments;
+            document.getElementById('availableSlots').textContent = Math.max(0, availableSlots);
+            document.getElementById('totalAppointments').textContent = totalAppointments;
+            document.getElementById('clinicCount').textContent = userClinics.length;
+            
+            // Update labels based on current filter
+            if (currentClinic) {
+                const clinicName = userClinics.find(c => c.id === currentClinic)?.name || 'Selected Clinic';
+                document.getElementById('todayLabel').textContent = 'Today at This Clinic';
+                document.getElementById('totalLabel').textContent = 'Total at This Clinic';
+            } else {
+                document.getElementById('todayLabel').textContent = 'Today\'s Appointments';
+                document.getElementById('totalLabel').textContent = 'Total Appointments';
+            }
+        }
+
+        // Add this new utility function for consistent date formatting
+        function formatDateForStorage(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('show');
+        }
+
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+            notification.style.cssText = 'top: 100px; right: 20px; z-index: 9999; min-width: 300px;';
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+
+        // Utility functions
+        function isToday(date) {
+            const today = new Date();
+            return date.toDateString() === today.toDateString();
+        }
+
+        function formatTime(timeString) {
+            if (!timeString) return '';
+            
+            const time = timeString.split(':');
+            const hours = parseInt(time[0]);
+            const minutes = time[1];
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const displayHours = hours % 12 || 12;
+            return `${displayHours}:${minutes} ${ampm}`;
+        }
+
+        // Handle window resize for mobile
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 768) {
+                document.getElementById('sidebar').classList.remove('show');
+            }
+        });
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', function(e) {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.querySelector('.mobile-toggle');
+            
+            if (window.innerWidth <= 768 && 
+                sidebar.classList.contains('show') && 
+                !sidebar.contains(e.target) && 
+                !toggleBtn.contains(e.target)) {
+                sidebar.classList.remove('show');
+            }
+        });
+    </script>
+</body>
+</html>

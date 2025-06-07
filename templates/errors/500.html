@@ -1,0 +1,23 @@
+<!-- File: MyDentalPortal/templates/errors/500.html -->
+<!-- 500 Error Page -->
+
+{% extends "base.html" %}
+
+{% block title %}Server Error - Dental Portal{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="text-center">
+            <i class="fas fa-server fa-5x text-danger mb-4"></i>
+            <h1 class="display-4">500</h1>
+            <h2 class="mb-4">Server Error</h2>
+            <p class="lead mb-4">Something went wrong on our end. Please try again later.</p>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
+                <i class="fas fa-home"></i> Go to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

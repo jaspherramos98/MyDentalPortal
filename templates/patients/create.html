@@ -1,0 +1,958 @@
+<!-- File: MyDentalPortal/templates/patients/create.html -->
+<!-- Complete Patient Registration Form based on PDA form -->
+
+{% extends "base.html" %}
+
+{% block title %}Add New Patient - Dental Portal{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-left: 4px solid #0d6efd;
+}
+
+.form-section h5 {
+    color: #0d6efd;
+    margin-bottom: 15px;
+}
+
+.required {
+    color: #dc3545;
+}
+
+.medical-conditions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 10px;
+}
+
+/* NEW: Guardian section styles */
+.guardian-required {
+    border-left: 4px solid #dc3545 !important;
+    background-color: #fff5f5 !important;
+}
+
+.guardian-optional {
+    border-left: 4px solid #6c757d !important;
+    background-color: #f8f9fa !important;
+}
+
+.age-alert {
+    margin-top: 15px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-user-plus"></i> Add New Patient</h1>
+            <a href="{{ url_for('patients') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Patients
+            </a>
+        </div>
+
+        <form method="POST" action="{{ url_for('create_patient') }}" class="needs-validation" novalidate>
+            
+            <!-- Personal Information Section -->
+            <div class="form-section">
+                <h5><i class="fas fa-user"></i> Personal Information</h5>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="first_name" class="form-label">First Name <span class="required">*</span></label>
+                        <input type="text" class="form-control" id="first_name" name="first_name" 
+                               value="{{ form_data.get('first_name', '') }}" required>
+                        <div class="invalid-feedback">Please provide a first name.</div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="middle_name" class="form-label">Middle Name</label>
+                        <input type="text" class="form-control" id="middle_name" name="middle_name" 
+                               value="{{ form_data.get('middle_name', '') }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="last_name" class="form-label">Last Name <span class="required">*</span></label>
+                        <input type="text" class="form-control" id="last_name" name="last_name" 
+                               value="{{ form_data.get('last_name', '') }}" required>
+                        <div class="invalid-feedback">Please provide a last name.</div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label for="nickname" class="form-label">Nickname</label>
+                        <input type="text" class="form-control" id="nickname" name="nickname" 
+                               value="{{ form_data.get('nickname', '') }}">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="gender" class="form-label">Gender <span class="required">*</span></label>
+                        <select class="form-select" id="gender" name="gender" required>
+                            <option value="">Select Gender</option>
+                            <option value="M" {{ 'selected' if form_data.get('gender') == 'M' }}>Male</option>
+                            <option value="F" {{ 'selected' if form_data.get('gender') == 'F' }}>Female</option>
+                        </select>
+                        <div class="invalid-feedback">Please select a gender.</div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="birthdate" class="form-label">Birthdate <span class="required">*</span></label>
+                        <input type="date" class="form-control" id="birthdate" name="birthdate" 
+                            value="{{ form_data.get('birthdate', '') }}" required>
+                        <div class="invalid-feedback">Please provide a birthdate.</div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="age" class="form-label">Age <span class="required">*</span></label>
+                        <input type="number" class="form-control" id="age" name="age" min="0" max="150"
+                            value="{{ form_data.get('age', '') }}" required>
+                        <div class="invalid-feedback">Please provide an age.</div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="religion" class="form-label">Religion</label>
+                        <input type="text" class="form-control" id="religion" name="religion" 
+                               value="{{ form_data.get('religion', '') }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="nationality" class="form-label">Nationality</label>
+                        <input type="text" class="form-control" id="nationality" name="nationality" 
+                               value="{{ form_data.get('nationality', '') }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="occupation" class="form-label">Occupation</label>
+                        <input type="text" class="form-control" id="occupation" name="occupation" 
+                               value="{{ form_data.get('occupation', '') }}">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-8 mb-3">
+                        <label for="home_address" class="form-label">Home Address <span class="required">*</span></label>
+                        <textarea class="form-control" id="home_address" name="home_address" rows="2" required>{{ form_data.get('home_address', '') }}</textarea>
+                        <div class="invalid-feedback">Please provide a home address.</div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="dental_insurance" class="form-label">Dental Insurance</label>
+                        <input type="text" class="form-control" id="dental_insurance" name="dental_insurance" 
+                               value="{{ form_data.get('dental_insurance', '') }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Information Section -->
+            <div class="form-section">
+                <h5><i class="fas fa-phone"></i> Contact Information</h5>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label for="home_phone" class="form-label">Home Phone <span class="required">*</span></label>
+                        <input type="tel" class="form-control" id="home_phone" name="home_phone" 
+                            value="{{ form_data.get('home_phone', '') }}" required>
+                        <div class="invalid-feedback">Please provide a home phone number.</div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="cell_phone" class="form-label">Cell Phone</label>
+                        <input type="tel" class="form-control" id="cell_phone" name="cell_phone" 
+                               value="{{ form_data.get('cell_phone', '') }}">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="office_phone" class="form-label">Office Phone</label>
+                        <input type="tel" class="form-control" id="office_phone" name="office_phone" 
+                               value="{{ form_data.get('office_phone', '') }}">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" 
+                               value="{{ form_data.get('email', '') }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Emergency Contact Section -->
+            <div class="form-section">
+                <h5><i class="fas fa-exclamation-circle"></i> Emergency Contact</h5>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="emergency_name" class="form-label">Contact Name <span class="required">*</span></label>
+                        <input type="text" class="form-control" id="emergency_name" name="emergency_name" 
+                            value="{{ form_data.get('emergency_name', '') }}" required>
+                        <div class="invalid-feedback">Please provide an emergency contact name.</div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="emergency_relationship" class="form-label">Relationship <span class="required">*</span></label>
+                        <input type="text" class="form-control" id="emergency_relationship" name="emergency_relationship" 
+                            value="{{ form_data.get('emergency_relationship', '') }}" required>
+                        <div class="invalid-feedback">Please provide the relationship to patient.</div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="emergency_phone" class="form-label">Phone Number <span class="required">*</span></label>
+                        <input type="tel" class="form-control" id="emergency_phone" name="emergency_phone" 
+                            value="{{ form_data.get('emergency_phone', '') }}" required>
+                        <div class="invalid-feedback">Please provide an emergency contact phone number.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Guardian Information (for minors) -->
+            <div class="form-section" id="guardian-section">
+                <h5 id="guardian-section-title"><i class="fas fa-child"></i> Guardian Information</h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="guardian_name" class="form-label" id="guardian-name-label">Parent/Guardian Name</label>
+                        <input type="text" class="form-control" id="guardian_name" name="guardian_name" 
+                            value="{{ form_data.get('guardian_name', '') }}">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="guardian_occupation" class="form-label">Guardian Occupation</label>
+                        <input type="text" class="form-control" id="guardian_occupation" name="guardian_occupation" 
+                            value="{{ form_data.get('guardian_occupation', '') }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Referral Information -->
+            <div class="form-section">
+                <h5><i class="fas fa-handshake"></i> Referral Information</h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="referred_by" class="form-label">Referred By</label>
+                        <input type="text" class="form-control" id="referred_by" name="referred_by" 
+                               value="{{ form_data.get('referred_by', '') }}">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="consultation_reason" class="form-label">Reason for Consultation</label>
+                        <input type="text" class="form-control" id="consultation_reason" name="consultation_reason" 
+                               value="{{ form_data.get('consultation_reason', '') }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dental History -->
+            <div class="form-section">
+                <h5><i class="fas fa-tooth"></i> Dental History</h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="previous_dentist" class="form-label">Previous Dentist</label>
+                        <input type="text" class="form-control" id="previous_dentist" name="previous_dentist" 
+                               value="{{ form_data.get('previous_dentist', '') }}">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="last_dental_visit" class="form-label">Last Dental Visit</label>
+                        <input type="date" class="form-control" id="last_dental_visit" name="last_dental_visit" 
+                               value="{{ form_data.get('last_dental_visit', '') }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Medical History -->
+            <div class="form-section">
+                <h5><i class="fas fa-user-md"></i> Medical History</h5>
+                
+                <!-- Physician Information -->
+                <h6 class="mt-3 mb-3">Physician Information</h6>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="physician_name" class="form-label">Physician Name</label>
+                        <input type="text" class="form-control" id="physician_name" name="physician_name" 
+                               value="{{ form_data.get('physician_name', '') }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="physician_specialty" class="form-label">Specialty</label>
+                        <input type="text" class="form-control" id="physician_specialty" name="physician_specialty" 
+                               value="{{ form_data.get('physician_specialty', '') }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="physician_phone" class="form-label">Office Number</label>
+                        <input type="tel" class="form-control" id="physician_phone" name="physician_phone" 
+                               value="{{ form_data.get('physician_phone', '') }}">
+                    </div>
+                </div>
+
+                <!-- General Health Questions -->
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Are you in good health? <span class="required">*</span></label>
+                    <div class="radio-group" id="good-health-group">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="good_health" id="good_health_yes" value="yes" 
+                                {{ 'checked' if form_data.get('good_health') == 'yes' }} required>
+                            <label class="form-check-label" for="good_health_yes">Yes</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="good_health" id="good_health_no" value="no"
+                                {{ 'checked' if form_data.get('good_health') == 'no' }} required>
+                            <label class="form-check-label" for="good_health_no">No</label>
+                        </div>
+                        <div class="invalid-feedback">Please select your general health status.</div>
+                    </div>
+                </div>
+
+                <!-- Under Treatment Radio Buttons - REPLACE your existing section -->
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Are you under medical treatment now? <span class="required">*</span></label>
+                    <div class="radio-group" id="under-treatment-group">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="under_treatment" id="under_treatment_yes" value="yes"
+                                {{ 'checked' if form_data.get('under_treatment') == 'yes' }} required>
+                            <label class="form-check-label" for="under_treatment_yes">Yes</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="under_treatment" id="under_treatment_no" value="no"
+                                {{ 'checked' if form_data.get('under_treatment') == 'no' }} required>
+                            <label class="form-check-label" for="under_treatment_no">No</label>
+                        </div>
+                        <div class="invalid-feedback">Please select your current treatment status.</div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <label for="treatment_condition" class="form-label">If under treatment, what condition?</label>
+                        <input type="text" class="form-control" id="treatment_condition" name="treatment_condition" 
+                               value="{{ form_data.get('treatment_condition', '') }}">
+                    </div>
+                </div>
+
+                <div class="col-md-12 mb-3">
+                    <label for="current_medications" class="form-label">Current Medications <span class="required">*</span></label>
+                    <textarea class="form-control" id="current_medications" name="current_medications" rows="2" 
+                            placeholder="List all current medications or write 'None' if not taking any" required>{{ form_data.get('current_medications', '') }}</textarea>
+                    <div class="invalid-feedback">Please list current medications or write 'None'.</div>
+                </div>
+
+                <!-- Allergies Section -->
+                <h6 class="mt-4 mb-3">Allergies</h6>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="allergy_anesthetic" value="yes"
+                                   {{ 'checked' if form_data.get('allergy_anesthetic') == 'yes' }}>
+                            <label class="form-check-label">Local Anesthetic</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="allergy_penicillin" value="yes"
+                                   {{ 'checked' if form_data.get('allergy_penicillin') == 'yes' }}>
+                            <label class="form-check-label">Penicillin</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="allergy_sulfa" value="yes"
+                                   {{ 'checked' if form_data.get('allergy_sulfa') == 'yes' }}>
+                            <label class="form-check-label">Sulfa Drugs</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="allergy_aspirin" value="yes"
+                                   {{ 'checked' if form_data.get('allergy_aspirin') == 'yes' }}>
+                            <label class="form-check-label">Aspirin</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="allergy_latex" value="yes"
+                                   {{ 'checked' if form_data.get('allergy_latex') == 'yes' }}>
+                            <label class="form-check-label">Latex</label>
+                        </div>
+                    </div>
+                    <div class="col-md-9 mb-3">
+                        <label for="allergy_others" class="form-label">Other Allergies</label>
+                        <input type="text" class="form-control" id="allergy_others" name="allergy_others" 
+                               value="{{ form_data.get('allergy_others', '') }}">
+                    </div>
+                </div>
+
+                <!-- Women's Health (conditional) -->
+                <h6 class="mt-4 mb-3">For Women Only</h6>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Are you pregnant?</label>
+                        <div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="pregnant" value="yes"
+                                       {{ 'checked' if form_data.get('pregnant') == 'yes' }}>
+                                <label class="form-check-label">Yes</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="pregnant" value="no"
+                                       {{ 'checked' if form_data.get('pregnant') == 'no' }}>
+                                <label class="form-check-label">No</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Are you nursing?</label>
+                        <div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="nursing" value="yes"
+                                       {{ 'checked' if form_data.get('nursing') == 'yes' }}>
+                                <label class="form-check-label">Yes</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="nursing" value="no"
+                                       {{ 'checked' if form_data.get('nursing') == 'no' }}>
+                                <label class="form-check-label">No</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Taking birth control pills?</label>
+                        <div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="birth_control" value="yes"
+                                       {{ 'checked' if form_data.get('birth_control') == 'yes' }}>
+                                <label class="form-check-label">Yes</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="birth_control" value="no"
+                                       {{ 'checked' if form_data.get('birth_control') == 'no' }}>
+                                <label class="form-check-label">No</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vital Signs -->
+                <h6 class="mt-4 mb-3">Vital Signs</h6>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="blood_type" class="form-label">Blood Type</label>
+                        <select class="form-select" id="blood_type" name="blood_type">
+                            <option value="">Select Blood Type</option>
+                            <option value="A+" {{ 'selected' if form_data.get('blood_type') == 'A+' }}>A+</option>
+                            <option value="A-" {{ 'selected' if form_data.get('blood_type') == 'A-' }}>A-</option>
+                            <option value="B+" {{ 'selected' if form_data.get('blood_type') == 'B+' }}>B+</option>
+                            <option value="B-" {{ 'selected' if form_data.get('blood_type') == 'B-' }}>B-</option>
+                            <option value="AB+" {{ 'selected' if form_data.get('blood_type') == 'AB+' }}>AB+</option>
+                            <option value="AB-" {{ 'selected' if form_data.get('blood_type') == 'AB-' }}>AB-</option>
+                            <option value="O+" {{ 'selected' if form_data.get('blood_type') == 'O+' }}>O+</option>
+                            <option value="O-" {{ 'selected' if form_data.get('blood_type') == 'O-' }}>O-</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="blood_pressure" class="form-label">Blood Pressure</label>
+                        <input type="text" class="form-control" id="blood_pressure" name="blood_pressure" 
+                               placeholder="120/80" value="{{ form_data.get('blood_pressure', '') }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="bleeding_time" class="form-label">Bleeding Time</label>
+                        <input type="text" class="form-control" id="bleeding_time" name="bleeding_time" 
+                               value="{{ form_data.get('bleeding_time', '') }}">
+                    </div>
+                </div>
+
+                <!-- Medical Conditions Checklist -->
+                <h6 class="mt-4 mb-3">Medical Conditions</h6>
+                <p class="text-muted">Check any conditions that apply:</p>
+                <div class="medical-conditions-grid">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="condition_high_blood_pressure" value="yes"
+                               {{ 'checked' if form_data.get('condition_high_blood_pressure') == 'yes' }}>
+                        <label class="form-check-label">High Blood Pressure</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="condition_heart_disease" value="yes"
+                               {{ 'checked' if form_data.get('condition_heart_disease') == 'yes' }}>
+                        <label class="form-check-label">Heart Disease</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="condition_diabetes" value="yes"
+                               {{ 'checked' if form_data.get('condition_diabetes') == 'yes' }}>
+                        <label class="form-check-label">Diabetes</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="condition_asthma" value="yes"
+                               {{ 'checked' if form_data.get('condition_asthma') == 'yes' }}>
+                        <label class="form-check-label">Asthma</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="condition_cancer_tumors" value="yes"
+                               {{ 'checked' if form_data.get('condition_cancer_tumors') == 'yes' }}>
+                        <label class="form-check-label">Cancer/Tumors</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="condition_heart_murmur" value="yes"
+                               {{ 'checked' if form_data.get('condition_heart_murmur') == 'yes' }}>
+                        <label class="form-check-label">Heart Murmur</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="condition_epilepsy" value="yes"
+                               {{ 'checked' if form_data.get('condition_epilepsy') == 'yes' }}>
+                        <label class="form-check-label">Epilepsy</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="condition_hepatitis_liver" value="yes"
+                               {{ 'checked' if form_data.get('condition_hepatitis_liver') == 'yes' }}>
+                        <label class="form-check-label">Hepatitis/Liver Disease</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="condition_kidney_disease" value="yes"
+                               {{ 'checked' if form_data.get('condition_kidney_disease') == 'yes' }}>
+                        <label class="form-check-label">Kidney Disease</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="condition_arthritis" value="yes"
+                               {{ 'checked' if form_data.get('condition_arthritis') == 'yes' }}>
+                        <label class="form-check-label">Arthritis</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="condition_thyroid_problem" value="yes"
+                               {{ 'checked' if form_data.get('condition_thyroid_problem') == 'yes' }}>
+                        <label class="form-check-label">Thyroid Problem</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="condition_bleeding_problems" value="yes"
+                               {{ 'checked' if form_data.get('condition_bleeding_problems') == 'yes' }}>
+                        <label class="form-check-label">Bleeding Problems</label>
+                    </div>
+                </div>
+
+                <div class="row mt-3">
+                    <div class="col-md-12 mb-3">
+                        <label for="condition_other" class="form-label">Other Medical Conditions</label>
+                        <textarea class="form-control" id="condition_other" name="condition_other" rows="2" 
+                                  placeholder="List any other medical conditions not mentioned above">{{ form_data.get('condition_other', '') }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clinic Selection -->
+            <div class="form-section">
+                <h5><i class="fas fa-building"></i> Clinic Assignment</h5>
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <label for="clinic_id" class="form-label">Select Clinic <span class="required">*</span></label>
+                        <select class="form-select" id="clinic_id" name="clinic_id" required>
+                            <option value="">Choose a clinic...</option>
+                            {% for clinic in clinics %}
+                            <option value="{{ clinic._id }}" {{ 'selected' if form_data.get('clinic_id') == clinic._id|string }}>
+                                {{ clinic.name }} - {{ clinic.address or 'No address' }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="invalid-feedback">Please select a clinic for this patient.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('patients') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-user-plus"></i> Add Patient
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Enhanced form validation and age-based guardian requirements
+// Enhanced Dental Patient Form Validation and Interactive Features
+(function() {
+    'use strict';
+    
+    // Configuration object for easy maintenance
+    const CONFIG = {
+        MINOR_AGE_LIMIT: 18,
+        PHONE_PATTERN: /^\(\d{3}\) \d{3}-\d{4}$/,
+        EMAIL_PATTERN: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        REQUIRED_RADIO_GROUPS: ['good_health', 'under_treatment', 'serious_illness', 'hospitalized', 'taking_medication', 'tobacco_use', 'drug_use']
+    };
+
+    // Utility functions
+    const Utils = {
+        calculateAge: function(birthDate) {
+            const today = new Date();
+            const birth = new Date(birthDate);
+            let age = today.getFullYear() - birth.getFullYear();
+            const monthDiff = today.getMonth() - birth.getMonth();
+            
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+                age--;
+            }
+            return age;
+        },
+
+        formatPhoneNumber: function(value) {
+            const cleaned = value.replace(/\D/g, '');
+            if (cleaned.length === 10) {
+                return `(${cleaned.substring(0,3)}) ${cleaned.substring(3,6)}-${cleaned.substring(6,10)}`;
+            } else if (cleaned.length === 11 && cleaned[0] === '1') {
+                return `+1 (${cleaned.substring(1,4)}) ${cleaned.substring(4,7)}-${cleaned.substring(7,11)}`;
+            }
+            return value;
+        },
+
+        showAlert: function(container, type, message, icon = '') {
+            const existingAlert = container.querySelector('.dynamic-alert');
+            if (existingAlert) {
+                existingAlert.remove();
+            }
+
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} dynamic-alert fade-in`;
+            alertDiv.innerHTML = `
+                ${icon ? `<i class="${icon}"></i>` : ''}
+                ${message}
+            `;
+            container.appendChild(alertDiv);
+        },
+
+        removeAlert: function(container) {
+            const alert = container.querySelector('.dynamic-alert');
+            if (alert) {
+                alert.classList.add('fade-out');
+                setTimeout(() => alert.remove(), 300);
+            }
+        }
+    };
+
+    // Guardian Information Handler
+    const GuardianHandler = {
+        checkRequirement: function() {
+            const ageInput = document.getElementById('age');
+            const birthdateInput = document.getElementById('birthdate');
+            const guardianSection = document.getElementById('guardian-section');
+            const guardianNameInput = document.getElementById('guardian_name');
+            const guardianOccupationInput = document.getElementById('guardian_occupation');
+            
+            if (!guardianSection || !guardianNameInput) return;
+            
+            let age = null;
+            
+            // Get age from input or calculate from birthdate
+            if (ageInput && ageInput.value) {
+                age = parseInt(ageInput.value);
+            } else if (birthdateInput && birthdateInput.value) {
+                age = Utils.calculateAge(birthdateInput.value);
+            }
+
+            this.updateGuardianSection(age, guardianSection, guardianNameInput, guardianOccupationInput);
+        },
+
+        updateGuardianSection: function(age, section, nameInput, occupationInput) {
+            const title = section.querySelector('h6') || section.querySelector('.form-section-title');
+            
+            if (age !== null && age < CONFIG.MINOR_AGE_LIMIT) {
+                // Minor - Guardian required
+                section.className = 'form-section guardian-required';
+                if (title) {
+                    title.innerHTML = '<i class="fas fa-child text-danger"></i> Guardian Information <span class="text-danger">(Required for Minors)</span>';
+                }
+                
+                nameInput.setAttribute('required', 'required');
+                if (occupationInput) {
+                    occupationInput.setAttribute('required', 'required');
+                }
+                
+                Utils.showAlert(section, 'warning', 
+                    `<strong>Minor Patient (Age ${age}):</strong> Guardian information is required for patients under ${CONFIG.MINOR_AGE_LIMIT} years old.`, 
+                    'fas fa-exclamation-triangle'
+                );
+                
+            } else if (age !== null && age >= CONFIG.MINOR_AGE_LIMIT) {
+                // Adult - Guardian optional
+                section.className = 'form-section guardian-optional';
+                if (title) {
+                    title.innerHTML = '<i class="fas fa-users text-muted"></i> Guardian Information <span class="text-muted">(Optional)</span>';
+                }
+                
+                nameInput.removeAttribute('required');
+                if (occupationInput) {
+                    occupationInput.removeAttribute('required');
+                }
+                
+                Utils.showAlert(section, 'info', 
+                    `<strong>Adult Patient (Age ${age}):</strong> Guardian information is optional.`, 
+                    'fas fa-info-circle'
+                );
+                
+            } else {
+                // Age unknown - neutral state
+                section.className = 'form-section';
+                if (title) {
+                    title.innerHTML = '<i class="fas fa-child"></i> Guardian Information';
+                }
+                nameInput.removeAttribute('required');
+                if (occupationInput) {
+                    occupationInput.removeAttribute('required');
+                }
+                Utils.removeAlert(section);
+            }
+        }
+    };
+
+    // Form Validation Handler
+    const ValidationHandler = {
+        validateRadioGroups: function() {
+            let allValid = true;
+            
+            CONFIG.REQUIRED_RADIO_GROUPS.forEach(groupName => {
+                const radios = document.querySelectorAll(`input[name="${groupName}"]`);
+                if (radios.length === 0) return; // Skip if group doesn't exist
+                
+                const isChecked = Array.from(radios).some(radio => radio.checked);
+                const container = radios[0].closest('.form-group, .col-md-6, .row');
+                
+                if (!isChecked) {
+                    this.addRadioError(container);
+                    allValid = false;
+                } else {
+                    this.removeRadioError(container);
+                }
+            });
+            
+            return allValid;
+        },
+
+        addRadioError: function(container) {
+            if (container) {
+                container.classList.add('radio-group-error');
+                container.style.border = '2px solid #dc3545';
+                container.style.borderRadius = '8px';
+                container.style.padding = '10px';
+                container.style.backgroundColor = '#ffeaa7';
+                container.style.transition = 'all 0.3s ease';
+            }
+        },
+
+        removeRadioError: function(container) {
+            if (container) {
+                container.classList.remove('radio-group-error');
+                container.style.border = '';
+                container.style.borderRadius = '';
+                container.style.padding = '';
+                container.style.backgroundColor = '';
+            }
+        },
+
+        validateSpecialFields: function() {
+            let isValid = true;
+            const errors = [];
+
+            // Validate email if provided
+            const emailInput = document.getElementById('email');
+            if (emailInput && emailInput.value && !CONFIG.EMAIL_PATTERN.test(emailInput.value)) {
+                emailInput.classList.add('is-invalid');
+                errors.push('Please enter a valid email address.');
+                isValid = false;
+            } else if (emailInput) {
+                emailInput.classList.remove('is-invalid');
+            }
+
+            // Validate phone numbers if provided
+            const phoneInputs = document.querySelectorAll('input[type="tel"]');
+            phoneInputs.forEach(input => {
+                if (input.value && input.value.length > 0) {
+                    const cleaned = input.value.replace(/\D/g, '');
+                    if (cleaned.length < 10) {
+                        input.classList.add('is-invalid');
+                        errors.push('Phone numbers must have at least 10 digits.');
+                        isValid = false;
+                    } else {
+                        input.classList.remove('is-invalid');
+                    }
+                }
+            });
+
+            // Check minor guardian requirement
+            const age = parseInt(document.getElementById('age')?.value || 0);
+            const guardianName = document.getElementById('guardian_name')?.value?.trim();
+            
+            if (age > 0 && age < CONFIG.MINOR_AGE_LIMIT && !guardianName) {
+                errors.push(`Guardian information is required for patients under ${CONFIG.MINOR_AGE_LIMIT} years old.`);
+                document.getElementById('guardian_name')?.focus();
+                isValid = false;
+            }
+
+            if (errors.length > 0) {
+                this.showValidationErrors(errors);
+            }
+
+            return isValid;
+        },
+
+        showValidationErrors: function(errors) {
+            const errorContainer = document.getElementById('validation-errors') || this.createErrorContainer();
+            errorContainer.innerHTML = `
+                <div class="alert alert-danger" role="alert">
+                    <h6><i class="fas fa-exclamation-triangle"></i> Please correct the following errors:</h6>
+                    <ul class="mb-0">
+                        ${errors.map(error => `<li>${error}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+            errorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        },
+
+        createErrorContainer: function() {
+            const container = document.createElement('div');
+            container.id = 'validation-errors';
+            container.className = 'mb-3';
+            const form = document.querySelector('form');
+            form.insertBefore(container, form.firstChild);
+            return container;
+        }
+    };
+
+    // Gender-based Section Handler
+    const GenderHandler = {
+        toggleWomenSection: function(gender) {
+            const womenSectionHeaders = Array.from(document.querySelectorAll('h6, .section-title')).filter(header => 
+                header.textContent.toLowerCase().includes('women') || 
+                header.textContent.toLowerCase().includes('female')
+            );
+            
+            womenSectionHeaders.forEach(header => {
+                const section = header.closest('.form-section, .row')?.parentElement || header.parentElement;
+                if (section) {
+                    if (gender === 'F' || gender === 'female') {
+                        section.style.display = 'block';
+                        section.classList.add('fade-in');
+                    } else {
+                        section.style.display = 'none';
+                        // Clear women's health fields
+                        const inputs = section.querySelectorAll('input[type="radio"], input[type="checkbox"]');
+                        inputs.forEach(input => input.checked = false);
+                    }
+                }
+            });
+        }
+    };
+
+    // Event Listeners Setup
+    const EventListeners = {
+        init: function() {
+            this.setupFormValidation();
+            this.setupAgeCalculation();
+            this.setupPhoneFormatting();
+            this.setupGenderHandling();
+            this.setupRadioValidation();
+            this.setupGuardianChecks();
+        },
+
+        setupFormValidation: function() {
+            const forms = document.getElementsByClassName('needs-validation');
+            Array.from(forms).forEach(form => {
+                form.addEventListener('submit', function(event) {
+                    let formValid = true;
+                    
+                    // Custom validations
+                    if (!ValidationHandler.validateRadioGroups()) formValid = false;
+                    if (!ValidationHandler.validateSpecialFields()) formValid = false;
+                    
+                    // Standard HTML5 validation
+                    if (!form.checkValidity() || !formValid) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    } else {
+                        // Clear any existing error messages on successful validation
+                        const errorContainer = document.getElementById('validation-errors');
+                        if (errorContainer) errorContainer.innerHTML = '';
+                    }
+                    
+                    form.classList.add('was-validated');
+                }, false);
+            });
+        },
+
+        setupAgeCalculation: function() {
+            const birthdateInput = document.getElementById('birthdate');
+            const ageInput = document.getElementById('age');
+            
+            if (birthdateInput) {
+                birthdateInput.addEventListener('change', function() {
+                    const age = Utils.calculateAge(this.value);
+                    if (age >= 0 && age <= 150 && ageInput) {
+                        ageInput.value = age;
+                        GuardianHandler.checkRequirement();
+                    }
+                });
+            }
+            
+            if (ageInput) {
+                ageInput.addEventListener('input', function() {
+                    GuardianHandler.checkRequirement();
+                });
+            }
+        },
+
+        setupPhoneFormatting: function() {
+            const phoneInputs = document.querySelectorAll('input[type="tel"]');
+            phoneInputs.forEach(input => {
+                input.addEventListener('input', function() {
+                    this.value = Utils.formatPhoneNumber(this.value);
+                });
+                
+                input.addEventListener('blur', function() {
+                    if (this.value) {
+                        this.value = Utils.formatPhoneNumber(this.value);
+                    }
+                });
+            });
+        },
+
+        setupGenderHandling: function() {
+            const genderInput = document.getElementById('gender');
+            if (genderInput) {
+                genderInput.addEventListener('change', function() {
+                    GenderHandler.toggleWomenSection(this.value);
+                });
+                
+                // Initial check
+                if (genderInput.value) {
+                    GenderHandler.toggleWomenSection(genderInput.value);
+                }
+            }
+        },
+
+        setupRadioValidation: function() {
+            document.querySelectorAll('input[type="radio"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    const container = this.closest('.form-group, .col-md-6, .row');
+                    ValidationHandler.removeRadioError(container);
+                });
+            });
+        },
+
+        setupGuardianChecks: function() {
+            // Initial check on page load
+            setTimeout(() => {
+                GuardianHandler.checkRequirement();
+            }, 100);
+        }
+    };
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            EventListeners.init();
+        });
+    } else {
+        EventListeners.init();
+    }
+
+    // Expose public methods for external use
+    window.DentalFormValidator = {
+        validateForm: () => ValidationHandler.validateSpecialFields() && ValidationHandler.validateRadioGroups(),
+        checkGuardianRequirement: () => GuardianHandler.checkRequirement(),
+        formatPhone: Utils.formatPhoneNumber
+    };
+
+})();
+</script>
+{% endblock %}

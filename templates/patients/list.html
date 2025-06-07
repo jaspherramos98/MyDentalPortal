@@ -1,0 +1,172 @@
+<!-- File: MyDentalPortal/templates/patients/list.html -->
+<!-- Fixed Patient List Page with correct route names -->
+
+{% extends "base.html" %}
+
+{% block title %}Patients - Dental Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-users"></i> Patients</h1>
+    <a href="{{ url_for('create_patient_fallback') }}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Add New Patient
+    </a>
+</div>
+
+<!-- Search and Filter -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <form method="GET" class="d-flex">
+            <input type="text" class="form-control me-2" name="search" 
+                   placeholder="Search patients by name, nickname, or phone..." 
+                   value="{{ search_query }}">
+            <button type="submit" class="btn btn-outline-primary">
+                <i class="fas fa-search"></i>
+            </button>
+            {% if search_query %}
+            <a href="{{ url_for('patients_fallback') }}" class="btn btn-outline-secondary ms-2">
+                <i class="fas fa-times"></i> Clear
+            </a>
+            {% endif %}
+        </form>
+    </div>
+    <div class="col-md-4">
+        <form method="GET">
+            {% if search_query %}
+            <input type="hidden" name="search" value="{{ search_query }}">
+            {% endif %}
+            <select class="form-select" name="clinic_id" onchange="this.form.submit()">
+                <option value="">All Clinics</option>
+                {% for clinic in clinics %}
+                <option value="{{ clinic._id }}" {{ 'selected' if selected_clinic == clinic._id|string }}>
+                    {{ clinic.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+</div>
+
+{% if patients %}
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Patient Name</th>
+                        <th>Contact</th>
+                        <th>Age/Gender</th>
+                        <th>Last Visit</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for patient in patients %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="patient-avatar me-3">
+                                    {{ patient.personal_info.first_name[0] }}{{ patient.personal_info.last_name[0] }}
+                                </div>
+                                <div>
+                                    <div class="fw-semibold">
+                                        {{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}
+                                    </div>
+                                    {% if patient.personal_info.nickname %}
+                                    <small class="text-muted">"{{ patient.personal_info.nickname }}"</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if patient.contact_info.cell_phone %}
+                            <div><i class="fas fa-mobile-alt"></i> {{ patient.contact_info.cell_phone }}</div>
+                            {% endif %}
+                            {% if patient.contact_info.email %}
+                            <div><i class="fas fa-envelope"></i> {{ patient.contact_info.email }}</div>
+                            {% endif %}
+                            {% if not patient.contact_info.cell_phone and not patient.contact_info.email %}
+                            <span class="text-muted">No contact info</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div>{{ patient.personal_info.age or 'N/A' }} years old</div>
+                            <small class="text-muted">{{ patient.personal_info.gender }}</small>
+                        </td>
+                        <td>
+                            {{ patient.dental_history.last_visit or 'Never' }}
+                        </td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <a href="{{ url_for('patient_detail_fallback', patient_id=patient._id) }}" class="btn btn-sm btn-outline-primary" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <button class="btn btn-sm btn-outline-info" onclick="alert('Dental chart coming soon!')" title="Dental Chart">
+                                    <i class="fas fa-tooth"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-success" onclick="alert('Treatments coming soon!')" title="Treatments">
+                                    <i class="fas fa-procedures"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Pagination placeholder -->
+<nav class="mt-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div class="text-muted">
+            Showing {{ patients|length }} patient{{ 's' if patients|length != 1 else '' }}
+            {% if search_query %} matching "{{ search_query }}"{% endif %}
+        </div>
+        <!-- Pagination controls would go here -->
+    </div>
+</nav>
+
+{% else %}
+<div class="text-center py-5">
+    <i class="fas fa-user-plus fa-4x text-muted mb-4"></i>
+    {% if search_query %}
+    <h3>No Patients Found</h3>
+    <p class="text-muted mb-4">No patients match your search criteria.</p>
+    <a href="{{ url_for('patients_fallback') }}" class="btn btn-outline-secondary me-2">Clear Search</a>
+    {% else %}
+    <h3>No Patients Yet</h3>
+    <p class="text-muted mb-4">Add your first patient to get started with patient management.</p>
+    {% endif %}
+    <a href="{{ url_for('create_patient_fallback') }}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Add Patient
+    </a>
+</div>
+{% endif %}
+
+<!-- Quick Actions -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-bolt"></i> Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{{ url_for('create_patient_fallback') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-plus"></i> Add Patient
+                    </a>
+                    <a href="{{ url_for('clinics_fallback') }}" class="btn btn-outline-info">
+                        <i class="fas fa-building"></i> View Clinics
+                    </a>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-success">
+                        <i class="fas fa-tachometer-alt"></i> Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

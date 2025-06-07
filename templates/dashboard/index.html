@@ -1,0 +1,439 @@
+<!-- File: MyDentalPortal/templates/dashboard/index.html -->
+<!-- Fixed dashboard template with correct route names -->
+
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Dental Portal{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Header Section -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-tachometer-alt text-primary"></i> Dashboard</h1>
+        <div>
+            <a href="{{ safe_url_for('create_clinic') }}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-building"></i> Add Clinic
+            </a>
+            <a href="{{ safe_url_for('create_patient') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Patient
+            </a>
+        </div>
+    </div>
+
+    <!-- Welcome Message -->
+    <div class="alert alert-primary border-0 shadow-sm mb-4">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-user-md fa-2x text-primary me-3"></i>
+            <div>
+                <h4 class="alert-heading mb-1">Welcome back, {{ session.user_name }}!</h4>
+                <p class="mb-0">Here's an overview of your dental practice today.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clickable Statistics Cards -->
+    <div class="row mb-4">
+        <!-- Clinics Card -->
+        <div class="col-md-3 mb-3">
+            <a href="{{ safe_url_for('clinics') }}" class="text-decoration-none">
+                <div class="stat-card card h-100 bg-gradient-primary text-white shadow-sm hover-lift">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-1 opacity-75">Your Clinics</h6>
+                                <h2 class="mb-0 fw-bold">{{ stats.total_clinics or 0 }}</h2>
+                                <small class="opacity-75">Click to manage</small>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-clinic-medical fa-2x opacity-75"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-rgba-white-10 border-0">
+                        <small><i class="fas fa-arrow-right me-1"></i> Manage Clinics</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+        
+        <!-- Patients Card -->
+        <div class="col-md-3 mb-3">
+            <a href="{{ safe_url_for('patients') }}" class="text-decoration-none">
+                <div class="stat-card card h-100 bg-gradient-success text-white shadow-sm hover-lift">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-1 opacity-75">Total Patients</h6>
+                                <h2 class="mb-0 fw-bold">{{ stats.total_patients or 0 }}</h2>
+                                <small class="opacity-75">Click to view all</small>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-users fa-2x opacity-75"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-rgba-white-10 border-0">
+                        <small><i class="fas fa-arrow-right me-1"></i> View Patients</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+        
+        <!-- Appointments Card -->
+        <div class="col-md-3 mb-3">
+            <a href="{{ safe_url_for('appointments') }}" class="text-decoration-none">
+                <div class="stat-card card h-100 bg-gradient-warning text-white shadow-sm hover-lift">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-1 opacity-75">Today's Appointments</h6>
+                                <h2 class="mb-0 fw-bold">{{ stats.today_appointments or 0 }}</h2>
+                                <small class="opacity-75">Click to schedule</small>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-calendar-check fa-2x opacity-75"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-rgba-white-10 border-0">
+                        <small><i class="fas fa-arrow-right me-1"></i> View Calendar</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+        
+        <!-- This Week Card -->
+        <div class="col-md-3 mb-3">
+            <a href="{{ safe_url_for('appointments') }}" class="text-decoration-none">
+                <div class="stat-card card h-100 bg-gradient-info text-white shadow-sm hover-lift">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-1 opacity-75">This Week</h6>
+                                <h2 class="mb-0 fw-bold">{{ stats.appointments_this_week or 0 }}</h2>
+                                <small class="opacity-75">Appointments</small>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-calendar-alt fa-2x opacity-75"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-rgba-white-10 border-0">
+                        <small><i class="fas fa-arrow-right me-1"></i> Weekly View</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="row">
+        <!-- Your Clinics -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-clinic-medical me-2"></i> Your Clinics</h5>
+                    <a href="{{ safe_url_for('create_clinic') }}" class="btn btn-sm btn-outline-light">
+                        <i class="fas fa-plus"></i> Add Clinic
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if clinics %}
+                        <div class="clinic-list">
+                            {% for clinic in clinics %}
+                            <div class="clinic-item p-3 mb-3 bg-light rounded border-start border-4 border-primary">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1 text-primary fw-bold">{{ clinic.name }}</h6>
+                                        <p class="mb-1 text-muted small">
+                                            <i class="fas fa-map-marker-alt me-1"></i>
+                                            {{ clinic.address or 'No address specified' }}
+                                        </p>
+                                        <p class="mb-0 text-muted small">
+                                            <i class="fas fa-phone me-1"></i>
+                                            {{ clinic.phone or 'No phone' }}
+                                        </p>
+                                    </div>
+                                    <div class="text-end">
+                                        <small class="text-muted">{{ clinic.created_at.strftime('%m/%d/%Y') }}</small>
+                                        <div class="mt-1">
+                                            <a href="{{ safe_url_for('patients') }}?clinic_id={{ clinic._id }}" 
+                                               class="btn btn-sm btn-outline-primary me-1" title="View Patients">
+                                                <i class="fas fa-users"></i>
+                                            </a>
+                                            <a href="{{ safe_url_for('appointments') }}?clinic_id={{ clinic._id }}" 
+                                               class="btn btn-sm btn-primary" title="View Schedule">
+                                                <i class="fas fa-calendar"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="text-center mt-3">
+                            <a href="{{ safe_url_for('clinics') }}" class="btn btn-outline-primary">
+                                <i class="fas fa-clinic-medical me-1"></i> Manage All Clinics
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-clinic-medical fa-4x text-muted mb-3"></i>
+                            <h6 class="text-muted">No clinics yet</h6>
+                            <p class="text-muted small">Add your first clinic to get started!</p>
+                            <a href="{{ safe_url_for('create_clinic') }}" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i> Add Your First Clinic
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Patients -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-users me-2"></i> Recent Patients</h5>
+                    <a href="{{ safe_url_for('patients') }}" class="btn btn-sm btn-outline-light">
+                        View All
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if recent_patients %}
+                        <div class="patient-list">
+                            {% for patient in recent_patients[:5] %}
+                            <div class="patient-item d-flex align-items-center p-2 mb-2 bg-light rounded">
+                                <div class="patient-avatar me-3">
+                                    <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center" 
+                                         style="width: 40px; height: 40px;">
+                                        <i class="fas fa-user"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-0">
+                                        <a href="{{ safe_url_for('patient_detail', patient_id=patient._id) }}" 
+                                           class="text-decoration-none text-dark">
+                                            {{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}
+                                        </a>
+                                    </h6>
+                                    <small class="text-muted">
+                                        {{ patient.contact_info.cell_phone or patient.contact_info.home_phone or 'No phone' }}
+                                    </small>
+                                </div>
+                                <div class="text-end">
+                                    <small class="text-muted">{{ patient.created_at.strftime('%m/%d') }}</small>
+                                    <div>
+                                        <a href="{{ safe_url_for('patient_detail', patient_id=patient._id) }}" 
+                                           class="btn btn-sm btn-outline-success" title="View Patient">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="text-center mt-3">
+                            <a href="{{ safe_url_for('patients') }}" class="btn btn-outline-success">
+                                <i class="fas fa-users me-1"></i> View All Patients
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-user-plus fa-4x text-muted mb-3"></i>
+                            <h6 class="text-muted">No patients yet</h6>
+                            <p class="text-muted small">Add your first patient to get started!</p>
+                            <a href="{{ safe_url_for('create_patient') }}" class="btn btn-success">
+                                <i class="fas fa-plus me-1"></i> Add First Patient
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Today's Appointments -->
+    {% if today_appointments %}
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-calendar-day me-2"></i> Today's Appointments</h5>
+                    <a href="{{ safe_url_for('appointments') }}" class="btn btn-sm btn-outline-dark">
+                        View Calendar
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for appointment in today_appointments %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="appointment-card p-3 border rounded bg-light border-start border-4 border-warning">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1 fw-bold">{{ appointment.patient_name }}</h6>
+                                        <p class="mb-1 text-muted small">
+                                            <i class="fas fa-clock me-1"></i> {{ appointment.time }}
+                                        </p>
+                                        <p class="mb-0 text-muted small">
+                                            <i class="fas fa-stethoscope me-1"></i> {{ appointment.type or 'Checkup' }}
+                                        </p>
+                                    </div>
+                                    <span class="badge bg-warning text-dark">{{ appointment.status or 'Scheduled' }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Getting Started Guide (only show if no clinics) -->
+    {% if not clinics %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-primary shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-rocket me-2"></i> Getting Started</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h6 class="text-primary">Welcome to your Dental Portal!</h6>
+                            <p class="mb-3">Here's how to get started with your practice management:</p>
+                            <ol class="mb-3">
+                                <li><strong>Create a Clinic:</strong> Add your dental practice information</li>
+                                <li><strong>Add Patients:</strong> Start building your patient database</li>
+                                <li><strong>Schedule Appointments:</strong> Manage your daily schedule</li>
+                                <li><strong>Track Records:</strong> Keep patient histories and treatments</li>
+                            </ol>
+                            <a href="{{ safe_url_for('create_clinic') }}" class="btn btn-primary me-2">
+                                <i class="fas fa-plus me-1"></i> Create Your First Clinic
+                            </a>
+                            <a href="{{ safe_url_for('create_patient') }}" class="btn btn-outline-primary">
+                                <i class="fas fa-user-plus me-1"></i> Add Patient
+                            </a>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <i class="fas fa-tooth fa-5x text-primary opacity-25"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+/* Custom Dashboard Styles */
+.dashboard-container {
+    padding: 20px;
+}
+
+/* Gradient backgrounds for cards */
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+}
+
+.bg-gradient-success {
+    background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+}
+
+.bg-gradient-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+}
+
+.bg-gradient-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #117a8b 100%);
+}
+
+/* Hover effects for clickable cards */
+.hover-lift {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.hover-lift:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15) !important;
+}
+
+/* Stat card styling */
+.stat-card {
+    border: none;
+    overflow: hidden;
+}
+
+.stat-icon {
+    font-size: 1.2rem;
+}
+
+/* Semi-transparent overlay */
+.bg-rgba-white-10 {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Clinic and patient item styling */
+.clinic-item, .patient-item {
+    transition: all 0.2s ease;
+}
+
+.clinic-item:hover, .patient-item:hover {
+    background-color: rgba(0, 123, 255, 0.05) !important;
+    transform: translateX(5px);
+}
+
+/* Appointment card styling */
+.appointment-card {
+    transition: all 0.2s ease;
+}
+
+.appointment-card:hover {
+    background-color: rgba(255, 193, 7, 0.1) !important;
+    transform: translateY(-2px);
+}
+
+/* Alert customization */
+.alert-primary {
+    background: linear-gradient(135deg, rgba(0, 123, 255, 0.1) 0%, rgba(0, 123, 255, 0.05) 100%);
+    border: 1px solid rgba(0, 123, 255, 0.2);
+}
+
+/* Card header gradients */
+.card-header.bg-primary {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%) !important;
+}
+
+.card-header.bg-success {
+    background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%) !important;
+}
+
+.card-header.bg-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%) !important;
+}
+
+/* Patient avatar */
+.patient-avatar .rounded-circle {
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .dashboard-container {
+        padding: 10px;
+    }
+    
+    .stat-card .card-body {
+        padding: 1rem;
+    }
+    
+    .stat-card h2 {
+        font-size: 1.5rem;
+    }
+}
+</style>
+{% endblock %}
