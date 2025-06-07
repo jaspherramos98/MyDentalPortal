@@ -1,5 +1,6 @@
+# .gitignore
+.env
+*.env
+app/config.py
 __pycache__/
 *.pyc
-.env
-venv/
-*.sqlite3

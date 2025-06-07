@@ -1,6 +1,7 @@
 # config.py - Configuration file for Flask app
 import os
 from datetime import timedelta
+MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/dental_clinic')
 
 class Config:
     """Base configuration"""
