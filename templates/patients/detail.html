@@ -101,11 +101,11 @@
                             {% if patient.contact_info.get('email') %}
                             <p><i class="fas fa-envelope"></i> {{ patient.contact_info.email }}</p>
                             {% endif %}
-                            {% if patient.contact_info.get('home_phone') %}
-                            <p><i class="fas fa-home"></i> {{ patient.contact_info.home_phone }}</p>
+                            {% if patient.contact_info.get('landline') %}
+                            <p><i class="fas fa-phone"></i> {{ patient.contact_info.landline }}</p>
                             {% endif %}
-                            {% if patient.contact_info.get('office_phone') %}
-                            <p><i class="fas fa-briefcase"></i> {{ patient.contact_info.office_phone }}</p>
+                            {% if patient.contact_info.get('office_number') %}
+                            <p><i class="fas fa-briefcase"></i> {{ patient.contact_info.office_number }}</p>
                             {% endif %}
                         </div>
 
@@ -135,10 +135,10 @@
                         </div>
                         {% endif %}
 
-                        {% if patient.personal_info.home_address %}
+                        {% if patient.contact_info.get('home_address') %}
                         <div>
                             <h6>Address</h6>
-                            <p class="text-muted">{{ patient.personal_info.home_address }}</p>
+                            <p class="text-muted">{{ patient.contact_info.home_address }}</p>
                         </div>
                         {% endif %}
                     </div>

@@ -110,6 +110,27 @@
                     </div>
                 </div>
 
+                <hr>
+                <h5 class="mb-3 text-primary"><i class="fas fa-ambulance me-1"></i> Emergency Contact</h5>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Contact Name</label>
+                        <input type="text" class="form-control" name="emergency_name"
+                               value="{{ patient.emergency_contact.get('name', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Relationship</label>
+                        <input type="text" class="form-control" name="emergency_relationship"
+                               value="{{ patient.emergency_contact.get('relationship', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Contact Phone</label>
+                        <input type="text" class="form-control" name="emergency_phone"
+                               value="{{ patient.emergency_contact.get('phone', '') }}">
+                    </div>
+                </div>
+
+                <hr>
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <label class="form-label">Dental Insurance</label>

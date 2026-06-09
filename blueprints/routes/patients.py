@@ -365,6 +365,9 @@ def edit_patient(patient_id):
                 'contact_info.cell_phone': (f.get('cell_phone') or '').strip(),
                 'contact_info.office_number': (f.get('office_number') or '').strip(),
                 'contact_info.email': (f.get('patient_email') or '').strip().lower(),
+                'emergency_contact.name': (f.get('emergency_name') or '').strip(),
+                'emergency_contact.relationship': (f.get('emergency_relationship') or '').strip(),
+                'emergency_contact.phone': (f.get('emergency_phone') or '').strip(),
                 'insurance_info.dental_insurance': (f.get('dental_insurance') or '').strip(),
                 'updated_at': datetime.utcnow(),
             }
