@@ -17,26 +17,23 @@ patients_bp = Blueprint('patients', __name__)
 
 def _ensure_nested(patient):
     """Ensure all nested dicts exist so templates don't crash on missing keys."""
-    defaults = {
-        'personal_info': {},
-        'contact_info': {},
-        'dental_history': {},
-        'medical_history': {},
-        'referral_info': {},
-        'minor_info': {},
-        'insurance_info': {},
-    }
-    for key, default in defaults.items():
+    # Every nested dict the detail/list templates may access — keep this in
+    # sync with templates so a patient missing any section never 500s.
+    top_level = (
+        'personal_info', 'contact_info', 'emergency_contact', 'dental_history',
+        'medical_history', 'referral_info', 'guardian_info', 'minor_info',
+        'insurance_info',
+    )
+    for key in top_level:
         if key not in patient or not isinstance(patient[key], dict):
-            patient[key] = default
-    # Ensure medical_history sub-dicts
+            patient[key] = {}
+
+    # medical_history sub-dicts used by the template.
     mh = patient['medical_history']
-    if 'allergies' not in mh or not isinstance(mh.get('allergies'), dict):
-        mh['allergies'] = {}
-    if 'women_health' not in mh or not isinstance(mh.get('women_health'), dict):
-        mh['women_health'] = {}
-    if 'conditions' not in mh or not isinstance(mh.get('conditions'), dict):
-        mh['conditions'] = {}
+    for sub in ('allergies', 'women_health', 'medical_conditions',
+                'general_health', 'physician_info', 'vital_signs'):
+        if sub not in mh or not isinstance(mh.get(sub), dict):
+            mh[sub] = {}
     return patient
 
 
