@@ -229,11 +229,18 @@ def init_database():
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Startup seeding — runs on import so it executes under gunicorn too
+# (gunicorn imports `app:app`; it never runs this file as __main__).
+# init_database() is idempotent: indexes are no-ops if they exist, and the
+# default admin is created only when the users collection is empty.
+# ---------------------------------------------------------------------------
+with app.app_context():
+    init_database()
+
+# ---------------------------------------------------------------------------
+# Main (local development server only)
 # ---------------------------------------------------------------------------
 if __name__ == '__main__':
-    with app.app_context():
-        init_database()
     # Debug is opt-out via env and force-disabled in production, so the
     # interactive Werkzeug debugger can never accidentally run on a prod host.
     debug = (
