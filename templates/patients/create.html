@@ -370,7 +370,8 @@
                     </div>
                 </div>
 
-                <!-- Women's Health (conditional) -->
+                <!-- Women's Health (conditional) — toggled by gender via JS -->
+                <div id="womenOnlySection">
                 <h6 class="mt-4 mb-3">For Women Only</h6>
                 <div class="row">
                     <div class="col-md-4 mb-3">
@@ -419,6 +420,7 @@
                         </div>
                     </div>
                 </div>
+                </div><!-- /#womenOnlySection -->
 
                 <!-- Vital Signs -->
                 <h6 class="mt-4 mb-3">Vital Signs</h6>
@@ -813,25 +815,17 @@
     // Gender-based Section Handler
     const GenderHandler = {
         toggleWomenSection: function(gender) {
-            const womenSectionHeaders = Array.from(document.querySelectorAll('h6, .section-title')).filter(header => 
-                header.textContent.toLowerCase().includes('women') || 
-                header.textContent.toLowerCase().includes('female')
-            );
-            
-            womenSectionHeaders.forEach(header => {
-                const section = header.closest('.form-section, .row')?.parentElement || header.parentElement;
-                if (section) {
-                    if (gender === 'F' || gender === 'female') {
-                        section.style.display = 'block';
-                        section.classList.add('fade-in');
-                    } else {
-                        section.style.display = 'none';
-                        // Clear women's health fields
-                        const inputs = section.querySelectorAll('input[type="radio"], input[type="checkbox"]');
-                        inputs.forEach(input => input.checked = false);
-                    }
-                }
-            });
+            const section = document.getElementById('womenOnlySection');
+            if (!section) return;
+            if (gender === 'F' || gender === 'female') {
+                section.style.display = 'block';
+                section.classList.add('fade-in');
+            } else {
+                section.style.display = 'none';
+                // Clear women's health fields when not applicable
+                section.querySelectorAll('input[type="radio"], input[type="checkbox"]')
+                    .forEach(input => { input.checked = false; });
+            }
         }
     };
 
