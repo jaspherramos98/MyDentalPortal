@@ -23,18 +23,18 @@
                 </p>
             </div>
             <div class="btn-group" role="group">
-                <a href="{{ url_for('patients') }}" class="btn btn-outline-secondary">
-                    <i class="fas fa-arrow-left"></i> Back to Patients
+                <a href="{{ url_for('patients.list_patients') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back
                 </a>
-                <button class="btn btn-outline-primary" onclick="alert('Edit patient coming soon!')">
+                <a href="{{ url_for('patients.edit_patient', patient_id=patient._id) }}" class="btn btn-outline-primary">
                     <i class="fas fa-edit"></i> Edit
-                </button>
-                <a href="/chart/patient/{{ patient._id }}" class="btn btn-outline-info">
+                </a>
+                <a href="{{ url_for('charts.view_chart', patient_id=patient._id) }}" class="btn btn-outline-info">
                     <i class="fas fa-tooth"></i> Dental Chart
                 </a>
-                <button class="btn btn-outline-success" onclick="alert('Add treatment coming soon!')">
+                <a href="{{ url_for('treatments.add_treatment', patient_id=patient._id) }}" class="btn btn-outline-success">
                     <i class="fas fa-plus"></i> Add Treatment
-                </button>
+                </a>
             </div>
         </div>
 
@@ -79,7 +79,7 @@
                             </tr>
                             <tr>
                                 <td><strong>Patient Since:</strong></td>
-                                <td>{{ patient.created_at.strftime('%B %d, %Y') }}</td>
+                                <td>{{ patient.created_at | datefmt('%B %d, %Y') }}</td>
                             </tr>
                         </table>
                     </div>
@@ -226,6 +226,11 @@
                     <div class="card-header">
                         <ul class="nav nav-tabs card-header-tabs" role="tablist">
                             <li class="nav-item" role="presentation">
+                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#medical-history" type="button" role="tab">
+                                    <i class="fas fa-user-md"></i> Medical History
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
                                 <button class="nav-link" data-bs-toggle="tab" data-bs-target="#dental-history" type="button" role="tab">
                                     <i class="fas fa-tooth"></i> Dental History
                                 </button>
@@ -233,6 +238,16 @@
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link" data-bs-toggle="tab" data-bs-target="#treatment-history" type="button" role="tab">
                                     <i class="fas fa-procedures"></i> Treatment History
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#prescriptions" type="button" role="tab">
+                                    <i class="fas fa-prescription"></i> Prescriptions
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#files" type="button" role="tab">
+                                    <i class="fas fa-folder-open"></i> Files
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
@@ -412,14 +427,14 @@
                                     <div class="col-12">
                                         <div class="d-flex justify-content-between align-items-center mb-3">
                                             <h6><i class="fas fa-chart-area"></i> Dental Chart Overview</h6>
-                                            <a href="/chart/patient/{{ patient._id }}" class="btn btn-outline-primary btn-sm">
+                                            <a href="{{ url_for('charts.view_chart', patient_id=patient._id) }}" class="btn btn-outline-primary btn-sm">
                                                 <i class="fas fa-expand"></i> View Full Chart
                                             </a>
                                         </div>
                                         {% if dental_chart %}
                                         <div class="alert alert-info">
                                             <i class="fas fa-info-circle"></i>
-                                            Dental chart created on {{ dental_chart.created_at.strftime('%B %d, %Y') }}. 
+                                            Dental chart created on {{ dental_chart.created_at | datefmt('%B %d, %Y') }}.
                                             Click "View Full Chart" to see detailed tooth-by-tooth information.
                                         </div>
                                         {% else %}
@@ -436,9 +451,9 @@
                             <div class="tab-pane fade" id="treatment-history" role="tabpanel">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <h6><i class="fas fa-procedures"></i> Treatment History</h6>
-                                    <button class="btn btn-outline-success btn-sm" onclick="alert('Add treatment coming soon!')">
+                                    <a class="btn btn-outline-success btn-sm" href="{{ url_for('treatments.add_treatment', patient_id=patient._id) }}">
                                         <i class="fas fa-plus"></i> Add Treatment
-                                    </button>
+                                    </a>
                                 </div>
 
                                 {% if treatment_records %}
@@ -456,7 +471,7 @@
                                         <tbody>
                                             {% for treatment in treatment_records %}
                                             <tr>
-                                                <td>{{ treatment.date.strftime('%m/%d/%Y') }}</td>
+                                                <td>{{ treatment.date | datefmt('%m/%d/%Y') }}</td>
                                                 <td>
                                                     {{ treatment.procedure }}
                                                     {% if treatment.tooth_numbers %}
@@ -465,9 +480,9 @@
                                                 </td>
                                                 <td>{{ treatment.dentist }}</td>
                                                 <td>
-                                                    ${{ "%.2f"|format(treatment.amount_charged) }}
+                                                    {{ clinic.get("currency", "PHP") }} {{ "%.2f"|format(treatment.amount_charged) }}
                                                     {% if treatment.balance > 0 %}
-                                                    <br><small class="text-danger">Balance: ${{ "%.2f"|format(treatment.balance) }}</small>
+                                                    <br><small class="text-danger">Balance: {{ clinic.get("currency", "PHP") }} {{ "%.2f"|format(treatment.balance) }}</small>
                                                     {% endif %}
                                                 </td>
                                                 <td>
@@ -485,10 +500,178 @@
                                     <i class="fas fa-procedures fa-3x text-muted mb-3"></i>
                                     <h6>No Treatment History</h6>
                                     <p class="text-muted">This patient has no recorded treatments yet.</p>
-                                    <button class="btn btn-primary" onclick="alert('Add treatment coming soon!')">
+                                    <a class="btn btn-primary" href="{{ url_for('treatments.add_treatment', patient_id=patient._id) }}">
                                         <i class="fas fa-plus"></i> Add First Treatment
-                                    </button>
+                                    </a>
                                 </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Prescriptions Tab -->
+                            <div class="tab-pane fade" id="prescriptions" role="tabpanel">
+                                <h6 class="mb-3"><i class="fas fa-prescription"></i> Add Prescription</h6>
+                                <form method="POST"
+                                      action="{{ url_for('uploads.add_prescription', patient_id=patient._id) }}"
+                                      enctype="multipart/form-data" class="mb-4">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="presc_description">Description</label>
+                                        <textarea class="form-control" id="presc_description" name="description"
+                                                  rows="3" placeholder="Medication, dosage, instructions..."></textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="presc_image">Image (optional)</label>
+                                        <input type="file" class="form-control" id="presc_image" name="image"
+                                               accept=".png,.jpg,.jpeg,.webp,.heic,image/*">
+                                        <div class="form-text">Allowed: PNG, JPG, JPEG, WEBP, HEIC. Max 16 MB.</div>
+                                    </div>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-save"></i> Save Prescription
+                                    </button>
+                                </form>
+
+                                <hr>
+                                <h6 class="mb-3">History</h6>
+                                {% if prescriptions %}
+                                <div class="row">
+                                    {% for p in prescriptions %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-clock"></i> {{ p.created_at | datefmt('%B %d, %Y') }}
+                                                    </small>
+                                                    <form method="POST"
+                                                          action="{{ url_for('uploads.delete_prescription', prescription_id=p._id) }}"
+                                                          onsubmit="return confirm('Delete this prescription?');">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                                {% if p.description %}
+                                                <p class="mb-2" style="white-space: pre-wrap;">{{ p.description }}</p>
+                                                {% endif %}
+                                                {% if p.image_file_id %}
+                                                <a href="{{ url_for('uploads.prescription_image', prescription_id=p._id) }}"
+                                                   target="_blank" rel="noopener">
+                                                    <img src="{{ url_for('uploads.prescription_image', prescription_id=p._id) }}"
+                                                         alt="Prescription image" class="img-fluid rounded border"
+                                                         style="max-height: 220px;">
+                                                </a>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <p class="text-muted text-center py-3">No prescriptions recorded yet.</p>
+                                {% endif %}
+                            </div>
+
+                            <!-- Files Tab -->
+                            <div class="tab-pane fade" id="files" role="tabpanel">
+                                <h6 class="mb-3"><i class="fas fa-folder-open"></i> Upload File</h6>
+                                <form method="POST"
+                                      action="{{ url_for('uploads.add_file', patient_id=patient._id) }}"
+                                      enctype="multipart/form-data" class="mb-4">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-md-5">
+                                            <label class="form-label" for="file_upload">File</label>
+                                            <input type="file" class="form-control" id="file_upload" name="file"
+                                                   accept=".png,.jpg,.jpeg,.webp,.heic,.pdf,.docx,.pages,.numbers,.key" required>
+                                        </div>
+                                        <div class="col-md-5">
+                                            <label class="form-label" for="file_display_name">Display name (optional)</label>
+                                            <input type="text" class="form-control" id="file_display_name"
+                                                   name="display_name" maxlength="200" placeholder="e.g. X-ray report Jan 2026">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <button type="submit" class="btn btn-primary w-100">
+                                                <i class="fas fa-upload"></i> Upload
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="form-text mt-1">
+                                        Allowed: PNG, JPG, JPEG, WEBP, HEIC, PDF, DOCX, Pages, Numbers, Keynote. Max 16 MB.
+                                    </div>
+                                </form>
+
+                                <hr>
+                                {% if patient_files %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Type</th>
+                                                <th>Size</th>
+                                                <th>Uploaded</th>
+                                                <th class="text-end">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for f in patient_files %}
+                                            <tr>
+                                                <td>{{ f.display_name }}</td>
+                                                <td><span class="badge bg-secondary text-uppercase">{{ f.ext }}</span></td>
+                                                <td>{{ (f.size / 1024) | round(1) }} KB</td>
+                                                <td>{{ f.created_at | datefmt('%m/%d/%Y') }}</td>
+                                                <td class="text-end">
+                                                    <a class="btn btn-sm btn-outline-primary"
+                                                       href="{{ url_for('uploads.download_file', file_doc_id=f._id) }}">
+                                                        <i class="fas fa-download"></i>
+                                                    </a>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                            data-bs-toggle="modal" data-bs-target="#renameModal{{ f._id }}">
+                                                        <i class="fas fa-pen"></i>
+                                                    </button>
+                                                    <form method="POST" class="d-inline"
+                                                          action="{{ url_for('uploads.delete_file', file_doc_id=f._id) }}"
+                                                          onsubmit="return confirm('Delete this file?');">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+
+                                                    <!-- Rename modal -->
+                                                    <div class="modal fade" id="renameModal{{ f._id }}" tabindex="-1">
+                                                        <div class="modal-dialog">
+                                                            <div class="modal-content">
+                                                                <form method="POST"
+                                                                      action="{{ url_for('uploads.rename_file', file_doc_id=f._id) }}">
+                                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                                    <div class="modal-header">
+                                                                        <h5 class="modal-title">Rename File</h5>
+                                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                                    </div>
+                                                                    <div class="modal-body text-start">
+                                                                        <label class="form-label" for="rename{{ f._id }}">New name</label>
+                                                                        <input type="text" class="form-control" id="rename{{ f._id }}"
+                                                                               name="display_name" value="{{ f.display_name }}"
+                                                                               maxlength="200" required>
+                                                                    </div>
+                                                                    <div class="modal-footer">
+                                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                                        <button type="submit" class="btn btn-primary">Save</button>
+                                                                    </div>
+                                                                </form>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <p class="text-muted text-center py-3">No files uploaded yet.</p>
                                 {% endif %}
                             </div>
 
@@ -545,11 +728,11 @@
                                         <table class="table table-sm">
                                             <tr>
                                                 <td><strong>Patient Since:</strong></td>
-                                                <td>{{ patient.created_at.strftime('%B %d, %Y at %I:%M %p') }}</td>
+                                                <td>{{ patient.created_at | datefmt('%B %d, %Y at %I:%M %p') }}</td>
                                             </tr>
                                             <tr>
                                                 <td><strong>Last Updated:</strong></td>
-                                                <td>{{ patient.updated_at.strftime('%B %d, %Y at %I:%M %p') }}</td>
+                                                <td>{{ patient.updated_at | datefmt('%B %d, %Y at %I:%M %p') }}</td>
                                             </tr>
                                             <tr>
                                                 <td><strong>Patient ID:</strong></td>
@@ -567,8 +750,3 @@
     </div>
 </div>
 {% endblock %}
-                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#medical-history" type="button" role="tab">
-                                    <i class="fas fa-user-md"></i> Medical History
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">

@@ -1,1247 +1,244 @@
-from flask import Flask, request, jsonify, session, render_template, redirect, url_for, flash
-from flask_pymongo import PyMongo
-from werkzeug.security import generate_password_hash, check_password_hash
-from bson.objectid import ObjectId
-from datetime import datetime, timedelta, timezone
+# File: MyDentalPortal/app.py
+# Application entry point — slim orchestrator.
+# All route logic lives in app/routes/*.py
+
 import os
-from functools import wraps
+
+from flask import Flask, url_for, session
+from flask_wtf.csrf import CSRFProtect, CSRFError
+from werkzeug.security import generate_password_hash
+from datetime import datetime
 from dotenv import load_dotenv
+
+from extensions import mongo, limiter
 from config import get_config
 
-# Load environment variables
 load_dotenv()
 
+# ---------------------------------------------------------------------------
+# Create app
+# ---------------------------------------------------------------------------
 app = Flask(__name__)
 
-# Configuration
-# Configuration
 config_class = get_config()
 app.config.from_object(config_class)
 config_class.init_app(app)
-# Initialize MongoDB
-mongo = PyMongo(app)
 
-# Import and register blueprints with corrected paths
-def register_blueprints():
-    """Register all blueprints with proper error handling"""
-    blueprints = [
-        ('app.routes.appointments', 'appointments_bp', '/appointments'),
-        ('app.routes.auth', 'auth_bp', '/auth'),
-        ('app.routes.clinics', 'clinics_bp', '/clinics'),
-        ('app.routes.patients', 'patients_bp', '/patients'),
-        ('app.routes.treatments', 'treatments_bp', '/treatments'),
-        ('app.routes.charts', 'charts_bp', '/charts'),  # Make sure this line exists
-        ('app.routes.main', 'main_bp', None)
-    ]
-    
-    
-    for module_path, blueprint_name, url_prefix in blueprints:
-        try:
-            module = __import__(module_path, fromlist=[blueprint_name])
-            blueprint = getattr(module, blueprint_name)
-            if url_prefix:
-                app.register_blueprint(blueprint, url_prefix=url_prefix)
-            else:
-                app.register_blueprint(blueprint)
-            print(f"✓ {blueprint_name} registered successfully")
-        except ImportError as e:
-            print(f"✗ Could not import {blueprint_name}: {e}")
-        except AttributeError as e:
-            print(f"✗ Blueprint {blueprint_name} not found in module: {e}")
-        except Exception as e:
-            print(f"✗ Error registering {blueprint_name}: {e}")
+mongo.init_app(app)
 
+# CSRF protection for all state-changing requests (POST/PUT/PATCH/DELETE).
+# Form posts carry a hidden csrf_token field; fetch() calls send it via the
+# X-CSRFToken header (see the meta tag + fetch wrapper in templates).
+csrf = CSRFProtect(app)
+limiter.init_app(app)
+
+# ---------------------------------------------------------------------------
 # Register blueprints
-register_blueprints()
+# ---------------------------------------------------------------------------
+from blueprints.routes.auth import auth_bp
+from blueprints.routes.main import main_bp
+from blueprints.routes.clinics import clinics_bp
+from blueprints.routes.patients import patients_bp
+from blueprints.routes.charts import charts_bp
+from blueprints.routes.treatments import treatments_bp
+from blueprints.routes.appointments import appointments_bp
+from blueprints.routes.uploads import uploads_bp
+from blueprints.routes.admin import admin_bp
+from blueprints.utils import is_admin
 
-# Authentication decorator
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
+app.register_blueprint(auth_bp)
+app.register_blueprint(main_bp)
+app.register_blueprint(clinics_bp)
+app.register_blueprint(patients_bp)
+app.register_blueprint(charts_bp)
+app.register_blueprint(treatments_bp)
+app.register_blueprint(appointments_bp)
+app.register_blueprint(uploads_bp)
+app.register_blueprint(admin_bp)
 
-# Routes
-@app.route('/')
-def index():
+# ---------------------------------------------------------------------------
+# Template helpers
+# ---------------------------------------------------------------------------
+@app.context_processor
+def inject_helpers():
+    """Make utility functions available in every template."""
+
+    def safe_url_for(endpoint, **values):
+        try:
+            return url_for(endpoint, **values)
+        except Exception:
+            return '#'
+
+    return dict(
+        safe_url_for=safe_url_for,
+        current_year=datetime.utcnow().year,
+        is_admin=is_admin(),
+    )
+
+
+@app.template_filter('datefmt')
+def datefmt(value, fmt='%B %d, %Y'):
+    """Format a date value that may be a datetime, an ISO/date string, or None.
+
+    MongoDB stores some records with native datetimes and older/seed records
+    with plain strings. Calling .strftime() directly in templates crashes on
+    the string ones, so route everything through this tolerant filter.
+    """
+    if value is None or value == '':
+        return 'N/A'
+    if isinstance(value, datetime):
+        return value.strftime(fmt)
+    if isinstance(value, str):
+        for parse_fmt in (
+            '%Y-%m-%dT%H:%M:%S.%f',
+            '%Y-%m-%dT%H:%M:%S',
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%d',
+        ):
+            try:
+                return datetime.strptime(value, parse_fmt).strftime(fmt)
+            except ValueError:
+                continue
+        return value  # unparseable string — show it raw rather than crash
+    return str(value)
+
+@app.after_request
+def add_security_headers(response):
+    """Security headers + no-cache for authenticated pages."""
+    # Applies to every response. nosniff stops MIME-confusion attacks on any
+    # served file; DENY blocks clickjacking via framing.
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    # Content-Security-Policy. 'unsafe-inline' is currently required because the
+    # templates use inline <script>/onclick handlers and inline styles; the CDN
+    # host is allowed for Bootstrap/Font Awesome/jQuery. Tightening to remove
+    # 'unsafe-inline' requires moving inline JS to static files (future work).
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "font-src 'self' https://cdnjs.cloudflare.com; "
+        "img-src 'self' data:; "
+        "object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    )
     if 'user_id' in session:
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+        # back-button-after-logout fix
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        data = request.get_json() if request.is_json else request.form
-        email = data.get('email')
-        password = data.get('password')
-        
-        # Validate input
-        if not email or not password:
-            flash('Email and password are required', 'error')
-            return render_template('auth/login.html')
-        
-        try:
-            user = mongo.db.users.find_one({'email': email.lower().strip()})
-            
-            if user and check_password_hash(user['password'], password):
-                session['user_id'] = str(user['_id'])
-                session['user_email'] = user['email']
-                session['user_name'] = user['name']
-                
-                if request.is_json:
-                    return jsonify({'success': True, 'redirect': url_for('dashboard')})
-                flash('Login successful!', 'success')
-                return redirect(url_for('dashboard'))
-            
-            flash('Invalid email or password', 'error')
-        except Exception as e:
-            print(f"Login error: {e}")
-            flash('Login failed. Please try again.', 'error')
-        
-        return render_template('auth/login.html')
-    
-    # GET request
-    if 'user_id' in session:
-        return redirect(url_for('dashboard'))
-    return render_template('auth/login.html')
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        data = request.get_json() if request.is_json else request.form
-        
-        # Get form data
-        name = data.get('name', '').strip()
-        email = data.get('email', '').strip().lower()
-        password = data.get('password', '')
-        confirm_password = data.get('confirm_password', '')
-        license_number = data.get('license_number', '').strip()
-        specialty = data.get('specialty', '').strip()
-        
-        # Basic validation
-        if not all([name, email, password, license_number]):
-            flash('Please fill in all required fields', 'error')
-            return render_template('auth/register.html')
-        
-        if password != confirm_password:
-            flash('Passwords do not match', 'error')
-            return render_template('auth/register.html')
-        
-        if len(password) < 8:
-            flash('Password must be at least 8 characters long', 'error')
-            return render_template('auth/register.html')
-        
-        try:
-            # Check if user already exists
-            if mongo.db.users.find_one({'email': email}):
-                flash('Email already registered', 'error')
-                return render_template('auth/register.html')
-            
-            # Create new user
-            user_data = {
-                'name': name,
-                'email': email,
-                'password': generate_password_hash(password),
-                'license_number': license_number,
-                'specialty': specialty,
-                'created_at': datetime.utcnow(),
-                'updated_at': datetime.utcnow(),
-                'is_active': True
-            }
-            
-            result = mongo.db.users.insert_one(user_data)
-            
-            if request.is_json:
-                return jsonify({'success': True, 'user_id': str(result.inserted_id)})
-            flash('Registration successful! Please login.', 'success')
-            return redirect(url_for('login'))
-            
-        except Exception as e:
-            print(f"Registration error: {e}")
-            flash('Registration failed. Please try again.', 'error')
-            return render_template('auth/register.html')
-    
-    # GET request
-    if 'user_id' in session:
-        return redirect(url_for('dashboard'))
-    return render_template('auth/register.html')
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    flash('You have been logged out.', 'info')
-    return redirect(url_for('login'))
-
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    try:
-        user_id = session['user_id']
-        
-        # Get user's clinics
-        user_clinics = list(mongo.db.clinics.find({
-            'owner_id': user_id,
-            'is_active': True
-        }).sort('name', 1))
-        
-        # Get clinic IDs for querying patients and appointments
-        clinic_ids = [clinic['_id'] for clinic in user_clinics]
-        
-        # Get recent patients (last 10)
-        recent_patients = []
-        if clinic_ids:
-            recent_patients = list(mongo.db.patients.find({
-                'clinic_id': {'$in': clinic_ids},
-                'is_active': True
-            }).sort('created_at', -1).limit(10))
-        
-        # Get today's appointments
-        today = datetime.now().strftime('%Y-%m-%d')
-        today_appointments = []
-        if clinic_ids:
-            today_appointments = list(mongo.db.appointments.find({
-                'clinic_id': {'$in': clinic_ids},
-                'date': today,
-                'is_active': True
-            }).sort('time', 1))
-        
-        # Get upcoming appointments (next 7 days)
-        end_date = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d')
-        upcoming_appointments = []
-        if clinic_ids:
-            upcoming_appointments = list(mongo.db.appointments.find({
-                'clinic_id': {'$in': clinic_ids},
-                'date': {'$gte': today, '$lte': end_date},
-                'is_active': True
-            }).sort([('date', 1), ('time', 1)]).limit(10))
-        
-        # Get some basic statistics
-        stats = {
-            'total_clinics': len(user_clinics),
-            'total_patients': len(recent_patients),
-            'patients_this_month': 0,
-            'appointments_this_week': 0,
-            'today_appointments': len(today_appointments),
-            'upcoming_appointments': len(upcoming_appointments)
-        }
-        
-        # Calculate this month's patients
-        if clinic_ids:
-            today_dt = datetime.utcnow()
-            month_start = datetime(today_dt.year, today_dt.month, 1)
-            stats['patients_this_month'] = mongo.db.patients.count_documents({
-                'clinic_id': {'$in': clinic_ids},
-                'is_active': True,
-                'created_at': {'$gte': month_start}
-            })
-            
-            # Calculate this week's appointments
-            week_start = today_dt - timedelta(days=today_dt.weekday())
-            week_end = week_start + timedelta(days=7)
-            stats['appointments_this_week'] = mongo.db.appointments.count_documents({
-                'clinic_id': {'$in': clinic_ids},
-                'date': {
-                    '$gte': week_start.strftime('%Y-%m-%d'),
-                    '$lt': week_end.strftime('%Y-%m-%d')
-                },
-                'is_active': True
-            })
-        
-        return render_template('dashboard/index.html',
-                             clinics=user_clinics,
-                             recent_patients=recent_patients,
-                             today_appointments=today_appointments,
-                             upcoming_appointments=upcoming_appointments,
-                             stats=stats)
-                             
-    except Exception as e:
-        print(f"Dashboard error: {e}")
-        # Return dashboard with empty data if there's an error
-        return render_template('dashboard/index.html',
-                             clinics=[],
-                             recent_patients=[],
-                             today_appointments=[],
-                             upcoming_appointments=[],
-                             stats={'total_clinics': 0, 'total_patients': 0, 
-                                   'patients_this_month': 0, 'appointments_this_week': 0,
-                                   'today_appointments': 0, 'upcoming_appointments': 0})
-
-# Clinic Management Routes
-@app.route('/clinics_fallback')
-@login_required
-def clinics_fallback():
-    """Fallback clinic route if blueprint fails"""
-    try:
-        clinics = list(mongo.db.clinics.find({
-            'owner_id': session['user_id'],
-            'is_active': True
-        }).sort('name', 1))
-        return render_template('clinics/list.html', clinics=clinics)
-    except Exception as e:
-        print(f"Clinics error: {e}")
-        flash('Error loading clinics', 'error')
-        return render_template('clinics/list.html', clinics=[])
-
-@app.route('/clinics_fallback/create', methods=['GET', 'POST'])
-@login_required
-def create_clinic_fallback():
-    """Fallback create clinic route if blueprint fails"""
-    if request.method == 'POST':
-        data = request.get_json() if request.is_json else request.form
-        
-        clinic_data = {
-            'name': data.get('name', '').strip(),
-            'address': data.get('address', '').strip(),
-            'phone': data.get('phone', '').strip(),
-            'email': data.get('email', '').strip(),
-            'owner_id': session['user_id'],
-            'staff_ids': [session['user_id']],
-            'office_hours': {
-                'monday': {'start': '09:00', 'end': '17:00', 'closed': False},
-                'tuesday': {'start': '09:00', 'end': '17:00', 'closed': False},
-                'wednesday': {'start': '09:00', 'end': '17:00', 'closed': False},
-                'thursday': {'start': '09:00', 'end': '17:00', 'closed': False},
-                'friday': {'start': '09:00', 'end': '17:00', 'closed': False},
-                'saturday': {'start': '09:00', 'end': '13:00', 'closed': False},
-                'sunday': {'start': '09:00', 'end': '17:00', 'closed': True}
-            },
-            'appointment_duration': 30,
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow(),
-            'is_active': True
-        }
-        
-        if not clinic_data['name']:
-            flash('Clinic name is required', 'error')
-            return render_template('clinics/create.html')
-        
-        try:
-            result = mongo.db.clinics.insert_one(clinic_data)
-            flash('Clinic created successfully!', 'success')
-            return redirect(url_for('clinics_fallback'))
-        except Exception as e:
-            print(f"Create clinic error: {e}")
-            flash('Failed to create clinic', 'error')
-    
-    return render_template('clinics/create.html')
-
-# Appointments Routes (Fallback routes if blueprint fails)
-@app.route('/appointments_fallback')
-@login_required
-def appointments_fallback():
-    """Fallback appointments page if blueprint fails"""
-    try:
-        # Get user's clinics
-        user_clinics = list(mongo.db.clinics.find({
-            'owner_id': session['user_id'],
-            'is_active': True
-        }))
-        
-        if not user_clinics:
-            flash('You need to create a clinic first before managing appointments.', 'warning')
-            return redirect(url_for('create_clinic_fallback'))
-        
-        # Get patients for the sidebar
-        clinic_ids = [clinic['_id'] for clinic in user_clinics]
-        patients = list(mongo.db.patients.find({
-            'clinic_id': {'$in': clinic_ids},
-            'is_active': True
-        }).sort('personal_info.first_name', 1))
-        
-        # Format patients for the template
-        formatted_patients = []
-        for patient in patients:
-            full_name = f"{patient['personal_info']['first_name']} {patient['personal_info']['last_name']}"
-            formatted_patients.append({
-                'id': str(patient['_id']),
-                'name': full_name,
-                'phone': patient['contact_info'].get('cell_phone', patient['contact_info'].get('home_phone', '')),
-                'last_visit': 'New patient'
-            })
-        
-        return render_template('appointments.html', 
-                             clinics=user_clinics, 
-                             patients=formatted_patients)
-    except Exception as e:
-        print(f"Appointments error: {e}")
-        flash('Error loading appointments page', 'error')
-        return redirect(url_for('dashboard'))
-
-# API Routes for Appointments (Fallback)
-@app.route('/api/appointments', methods=['GET'])
-@login_required
-def get_appointments_api():
-    """Get appointments for calendar view"""
-    try:
-        clinic_id = request.args.get('clinic_id')
-        start_date = request.args.get('start_date')
-        end_date = request.args.get('end_date')
-        
-        # Get user's clinics
-        user_clinics = list(mongo.db.clinics.find({
-            'owner_id': session['user_id'],
-            'is_active': True
-        }))
-        clinic_ids = [str(clinic['_id']) for clinic in user_clinics]
-        
-        # Build query
-        query = {'is_active': True}
-        
-        if clinic_id and clinic_id in clinic_ids:
-            query['clinic_id'] = ObjectId(clinic_id)
-        else:
-            query['clinic_id'] = {'$in': [ObjectId(cid) for cid in clinic_ids]}
-        
-        if start_date and end_date:
-            query['date'] = {'$gte': start_date, '$lte': end_date}
-        
-        appointments = list(mongo.db.appointments.find(query).sort([('date', 1), ('time', 1)]))
-        
-        # Convert ObjectIds to strings for JSON serialization
-        for appointment in appointments:
-            appointment['_id'] = str(appointment['_id'])
-            appointment['clinic_id'] = str(appointment['clinic_id'])
-            if 'patient_id' in appointment:
-                appointment['patient_id'] = str(appointment['patient_id'])
-        
-        return jsonify({'success': True, 'appointments': appointments})
-        
-    except Exception as e:
-        print(f"Get appointments error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/appointments', methods=['POST'])
-@login_required
-def create_appointment_api():
-    """Create a new appointment"""
-    try:
-        data = request.get_json()
-        
-        # Validate required fields
-        required_fields = ['patient_name', 'date', 'time']
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({'success': False, 'error': f'{field} is required'}), 400
-        
-        # Get clinic_id
-        clinic_id = data.get('clinic_id')
-        if not clinic_id:
-            user_clinic = mongo.db.clinics.find_one({
-                'owner_id': session['user_id'],
-                'is_active': True
-            })
-            if not user_clinic:
-                return jsonify({'success': False, 'error': 'No clinic found'}), 403
-            clinic_id = str(user_clinic['_id'])
-        
-        # Verify clinic ownership
-        clinic = mongo.db.clinics.find_one({
-            '_id': ObjectId(clinic_id),
-            'owner_id': session['user_id']
-        })
-        
-        if not clinic:
-            return jsonify({'success': False, 'error': 'Invalid clinic'}), 403
-        
-        # Check for time conflicts
-        existing_appointment = mongo.db.appointments.find_one({
-            'clinic_id': ObjectId(clinic_id),
-            'date': data['date'],
-            'time': data['time'],
-            'is_active': True
-        })
-        
-        if existing_appointment:
-            return jsonify({'success': False, 'error': 'Time slot already booked'}), 409
-        
-        # Create appointment
-        appointment_data = {
-            'clinic_id': ObjectId(clinic_id),
-            'patient_name': data['patient_name'].strip(),
-            'date': data['date'],
-            'time': data['time'],
-            'duration': int(data.get('duration', 30)),
-            'type': data.get('type', 'checkup'),
-            'priority': data.get('priority', 'normal'),
-            'notes': data.get('notes', '').strip(),
-            'status': 'scheduled',
-            'created_by': session['user_id'],
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow(),
-            'is_active': True
-        }
-        
-        # Add patient_id if provided
-        if data.get('patient_id'):
-            appointment_data['patient_id'] = ObjectId(data['patient_id'])
-        
-        result = mongo.db.appointments.insert_one(appointment_data)
-        
-        return jsonify({
-            'success': True, 
-            'appointment_id': str(result.inserted_id),
-            'message': 'Appointment created successfully'
-        })
-        
-    except Exception as e:
-        print(f"Create appointment error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-# Patient Management Routes (keeping your existing code)
-@app.route('/patients_fallback/create', methods=['GET', 'POST'])
-@login_required
-def create_patient_fallback():
-    print(f"DEBUG: create_patient called with method: {request.method}")
-    
-    if request.method == 'POST':
-        print("DEBUG: Processing POST request")
-        data = request.get_json() if request.is_json else request.form
-        print(f"DEBUG: Form data keys: {list(data.keys())}")
-        
-        # Validate clinic ownership
-        clinic_id = data.get('clinic_id')
-        print(f"DEBUG: Selected clinic_id: {clinic_id}")
-        
-        if not clinic_id:
-            print("DEBUG: No clinic selected")
-            flash('Please select a clinic', 'error')
-            user_clinics = list(mongo.db.clinics.find({'owner_id': session['user_id'], 'is_active': True}))
-            return render_template('patients/create.html', clinics=user_clinics, form_data=data)
-        
-        try:
-            clinic = mongo.db.clinics.find_one({
-                '_id': ObjectId(clinic_id),
-                'owner_id': session['user_id']
-            })
-            print(f"DEBUG: Found clinic: {clinic['name'] if clinic else 'None'}")
-        except Exception as e:
-            print(f"DEBUG: Error finding clinic: {e}")
-            flash('Invalid clinic selected', 'error')
-            user_clinics = list(mongo.db.clinics.find({'owner_id': session['user_id'], 'is_active': True}))
-            return render_template('patients/create.html', clinics=user_clinics, form_data=data)
-        
-        if not clinic:
-            print("DEBUG: Clinic not found or not owned by user")
-            flash('Invalid clinic selected', 'error')
-            user_clinics = list(mongo.db.clinics.find({'owner_id': session['user_id'], 'is_active': True}))
-            return render_template('patients/create.html', clinics=user_clinics, form_data=data)
-        
-        # Enhanced validation with conditional guardian requirements for minors
-        required_fields = [
-            'first_name', 'last_name', 'gender', 'birthdate', 'age',
-            'home_address', 'home_phone', 'emergency_name', 
-            'emergency_relationship', 'emergency_phone', 'good_health',
-            'under_treatment', 'current_medications', 'clinic_id'
-        ]
-
-        missing_fields = []
-
-        # Validate base required fields
-        for field in required_fields:
-            value = data.get(field, '')
-            
-            if field in ['good_health', 'under_treatment']:
-                if value not in ['yes', 'no']:
-                    missing_fields.append(field.replace('_', ' ').title())
-            else:
-                if not value or not value.strip():
-                    missing_fields.append(field.replace('_', ' ').title())
-
-        # Check if patient is a minor
-        patient_age = None
-        try:
-            age_value = data.get('age', '').strip()
-            if age_value:
-                patient_age = int(age_value)
-        except (ValueError, TypeError):
-            pass
-
-        # Additional validation for minors
-        if patient_age is not None and patient_age < 18:
-            if not data.get('guardian_name', '').strip():
-                missing_fields.append('Guardian/Parent Name')
-
-        if missing_fields:
-            flash(f'Please fill in required fields: {", ".join(missing_fields)}', 'error')
-            user_clinics = list(mongo.db.clinics.find({'owner_id': session['user_id'], 'is_active': True}))
-            return render_template('patients/create.html', clinics=user_clinics, form_data=data)
-        
-        try:
-            # Create patient document
-            patient_data = {
-                'clinic_id': ObjectId(clinic_id),
-                'personal_info': {
-                    'first_name': data.get('first_name', '').strip(),
-                    'middle_name': data.get('middle_name', '').strip(),
-                    'last_name': data.get('last_name', '').strip(),
-                    'nickname': data.get('nickname', '').strip(),
-                    'gender': data.get('gender', '').strip(),
-                    'birthdate': data.get('birthdate', '').strip(),
-                    'age': int(data.get('age', 0)) if data.get('age', '').strip() else None,
-                    'religion': data.get('religion', '').strip(),
-                    'nationality': data.get('nationality', '').strip(),
-                    'home_address': data.get('home_address', '').strip(),
-                    'occupation': data.get('occupation', '').strip(),
-                    'dental_insurance': data.get('dental_insurance', '').strip()
-                },
-                'contact_info': {
-                    'home_phone': data.get('home_phone', '').strip(),
-                    'cell_phone': data.get('cell_phone', '').strip(),
-                    'office_phone': data.get('office_phone', '').strip(),
-                    'fax': data.get('fax', '').strip(),
-                    'email': data.get('email', '').strip()
-                },
-                'emergency_contact': {
-                    'name': data.get('emergency_name', '').strip(),
-                    'relationship': data.get('emergency_relationship', '').strip(),
-                    'phone': data.get('emergency_phone', '').strip()
-                },
-                'guardian_info': {
-                    'name': data.get('guardian_name', '').strip(),
-                    'occupation': data.get('guardian_occupation', '').strip()
-                },
-                'referral_info': {
-                    'referred_by': data.get('referred_by', '').strip(),
-                    'consultation_reason': data.get('consultation_reason', '').strip()
-                },
-                'dental_history': {
-                    'previous_dentist': data.get('previous_dentist', '').strip(),
-                    'last_visit': data.get('last_dental_visit', '').strip()
-                },
-                'medical_history': {
-                    'physician_info': {
-                        'name': data.get('physician_name', '').strip(),
-                        'specialty': data.get('physician_specialty', '').strip(),
-                        'office_address': data.get('physician_address', '').strip(),
-                        'office_number': data.get('physician_phone', '').strip()
-                    },
-                    'general_health': {
-                        'good_health': data.get('good_health') == 'yes',
-                        'under_treatment': data.get('under_treatment') == 'yes',
-                        'treatment_condition': data.get('treatment_condition', '').strip(),
-                        'serious_illness': data.get('serious_illness') == 'yes',
-                        'illness_details': data.get('illness_details', '').strip(),
-                        'hospitalized': data.get('hospitalized') == 'yes',
-                        'hospitalization_details': data.get('hospitalization_details', '').strip(),
-                        'current_medications': data.get('current_medications', '').strip(),
-                        'tobacco_use': data.get('tobacco_use') == 'yes',
-                        'alcohol_drugs': data.get('alcohol_drugs') == 'yes'
-                    },
-                    'allergies': {
-                        'local_anesthetic': data.get('allergy_anesthetic') == 'yes',
-                        'penicillin': data.get('allergy_penicillin') == 'yes',
-                        'sulfa_drugs': data.get('allergy_sulfa') == 'yes',
-                        'aspirin': data.get('allergy_aspirin') == 'yes',
-                        'latex': data.get('allergy_latex') == 'yes',
-                        'others': data.get('allergy_others', '').strip()
-                    },
-                    'women_health': {
-                        'pregnant': data.get('pregnant') == 'yes',
-                        'nursing': data.get('nursing') == 'yes',
-                        'birth_control': data.get('birth_control') == 'yes'
-                    },
-                    'vital_signs': {
-                        'blood_type': data.get('blood_type', '').strip(),
-                        'blood_pressure': data.get('blood_pressure', '').strip(),
-                        'bleeding_time': data.get('bleeding_time', '').strip()
-                    },
-                    'medical_conditions': create_medical_conditions_from_form(data)
-                },
-                'created_at': datetime.utcnow(),
-                'updated_at': datetime.utcnow(),
-                'is_active': True
-            }
-            
-            result = mongo.db.patients.insert_one(patient_data)
-            create_default_dental_chart(str(result.inserted_id))
-            
-            if request.is_json:
-                return jsonify({'success': True, 'patient_id': str(result.inserted_id)})
-            
-            patient_name = f'{patient_data["personal_info"]["first_name"]} {patient_data["personal_info"]["last_name"]}'
-            flash(f'Patient {patient_name} added successfully!', 'success')
-            return redirect(url_for('patients_fallback'))
-            
-        except Exception as e:
-            print(f"DEBUG: Error creating patient: {e}")
-            flash('Failed to create patient. Please try again.', 'error')
-            user_clinics = list(mongo.db.clinics.find({'owner_id': session['user_id'], 'is_active': True}))
-            return render_template('patients/create.html', clinics=user_clinics, form_data=data)
-    
-    # GET request - show form
-    user_clinics = list(mongo.db.clinics.find({'owner_id': session['user_id'], 'is_active': True}))
-    
-    if not user_clinics:
-        flash('You need to create a clinic first before adding patients.', 'warning')
-        return redirect(url_for('create_clinic_fallback'))
-    
-    return render_template('patients/create.html', clinics=user_clinics, form_data={})
-
-def create_medical_conditions_from_form(data):
-    """Extract medical conditions from form data"""
-    conditions = [
-        'high_blood_pressure', 'heart_disease', 'cancer_tumors',
-        'low_blood_pressure', 'heart_murmur', 'anemia',
-        'epilepsy', 'hepatitis_liver', 'angina',
-        'aids_hiv', 'rheumatic_fever', 'asthma',
-        'std', 'allergies_general', 'emphysema',
-        'stomach_ulcer', 'respiratory', 'bleeding_problems',
-        'fainting_seizures', 'hepatitis_jaundice', 'blood_disease',
-        'weight_loss', 'tuberculosis', 'head_injuries',
-        'radiation_therapy', 'swollen_ankles', 'arthritis',
-        'joint_replacement', 'kidney_disease', 'heart_surgery',
-        'diabetes', 'heart_attack', 'chest_pain',
-        'thyroid_problem', 'stroke'
-    ]
-    
-    medical_conditions = {}
-    for condition in conditions:
-        medical_conditions[condition] = data.get(f'condition_{condition}') == 'yes'
-    
-    medical_conditions['other'] = data.get('condition_other', '').strip()
-    return medical_conditions
-
-def create_default_dental_chart(patient_id):
-    """Create a default dental chart for a new patient"""
-    try:
-        teeth_status = {}
-        
-        # Adult teeth (1-32)
-        for i in range(1, 33):
-            teeth_status[str(i)] = {
-                "buccal": "",
-                "lingual": "",
-                "mesial": "",
-                "distal": "",
-                "occlusal": "",
-                "colors": {
-                    "buccal": "",
-                    "lingual": "",
-                    "mesial": "",
-                    "distal": "",
-                    "occlusal": "",
-                    "center": ""
-                }
-            }
-        
-        # Temporary teeth
-        temp_teeth = [55, 54, 53, 52, 51, 61, 62, 63, 64, 65, 85, 84, 83, 82, 81, 71, 72, 73, 74, 75]
-        for tooth_num in temp_teeth:
-            teeth_status[f"temp_{tooth_num}"] = {
-                "general": "",
-                "colors": {
-                    "center": ""
-                }
-            }
-        
-        chart_data = {
-            "patient_id": ObjectId(patient_id),
-            "chart_date": datetime.utcnow(),
-            "teeth_status": teeth_status,
-            "periodontal_screening": {
-                "gingivitis": False,
-                "early_periodontitis": False,
-                "moderate_periodontitis": False,
-                "advanced_periodontitis": False
-            },
-            "occlusion": {
-                "class_molar": "",
-                "overjet": "",
-                "overbite": "",
-                "midline_deviation": "",
-                "crossbite": False
-            },
-            "appliances": {
-                "orthodontic": False,
-                "stayplate": False,
-                "others": ""
-            },
-            "tmd_assessment": {
-                "clenching": False,
-                "clicking": False,
-                "trismus": False,
-                "muscle_spasm": False
-            },
-            "xray_taken": {
-                "periapical": {"taken": False, "tooth_number": "", "date": ""},
-                "panoramic": {"taken": False, "date": ""},
-                "cephalometric": {"taken": False, "date": ""},
-                "occlusal": {"taken": False, "upper_lower": "", "date": ""},
-                "others": {"taken": False, "type": "", "date": ""}
-            },
-            "created_by": session['user_id'],
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
-        }
-        
-        mongo.db.dental_charts.insert_one(chart_data)
-        
-    except Exception as e:
-        print(f"Error creating dental chart: {e}")
-
-@app.route('/chart/patient/<patient_id>')
-@login_required
-def dental_chart_fallback(patient_id):
-    """Fallback dental chart route if blueprint fails"""
-    try:
-        # Verify patient access
-        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
-        if not patient:
-            flash('Patient not found', 'error')
-            return redirect(url_for('patients_fallback'))
-        
-        clinic = mongo.db.clinics.find_one({
-            '_id': patient['clinic_id'],
-            'owner_id': session['user_id']
-        })
-        
-        if not clinic:
-            flash('Access denied', 'error')
-            return redirect(url_for('patients_fallback'))
-        
-        # Get or create dental chart
-        dental_chart = mongo.db.dental_charts.find_one({'patient_id': ObjectId(patient_id)})
-        
-        if not dental_chart:
-            # Create default chart structure
-            chart_data = create_default_dental_chart(patient_id)
-            result = mongo.db.dental_charts.insert_one(chart_data)
-            dental_chart = mongo.db.dental_charts.find_one({'_id': result.inserted_id})
-        
-        # Prepare chart data for template (ensure JSON serializable)
-        chart_data_json = {}
-        if dental_chart:
-            chart_data_copy = dental_chart.copy()
-            if '_id' in chart_data_copy:
-                chart_data_copy['_id'] = str(chart_data_copy['_id'])
-            if 'patient_id' in chart_data_copy:
-                chart_data_copy['patient_id'] = str(chart_data_copy['patient_id'])
-            chart_data_json = chart_data_copy
-        
-        return render_template('charts/dental_chart.html', 
-                             patient=patient, 
-                             dental_chart=dental_chart,
-                             chart_data=chart_data_json,
-                             clinic=clinic)
-                             
-    except Exception as e:
-        print(f"Dental chart fallback error: {e}")
-        flash('Error loading dental chart', 'error')
-        return redirect(url_for('patients_fallback'))
-
-@app.route('/chart/update/<patient_id>', methods=['POST'])
-@login_required
-def update_dental_chart_fallback(patient_id):
-    """Fallback route to update dental chart"""
-    try:
-        # Verify patient access
-        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
-        if not patient:
-            return jsonify({'success': False, 'error': 'Patient not found'}), 404
-        
-        clinic = mongo.db.clinics.find_one({
-            '_id': patient['clinic_id'],
-            'owner_id': session['user_id']
-        })
-        
-        if not clinic:
-            return jsonify({'success': False, 'error': 'Access denied'}), 403
-        
-        data = request.get_json()
-        
-        # Update or create dental chart
-        update_data = {
-            'patient_id': ObjectId(patient_id),
-            'updated_at': datetime.utcnow(),
-            'updated_by': session['user_id']
-        }
-        
-        # Add all the chart data
-        if 'teeth_status' in data:
-            update_data['teeth_status'] = data['teeth_status']
-        if 'periodontal_screening' in data:
-            update_data['periodontal_screening'] = data['periodontal_screening']
-        if 'occlusion' in data:
-            update_data['occlusion'] = data['occlusion']
-        if 'appliances' in data:
-            update_data['appliances'] = data['appliances']
-        if 'tmd_assessment' in data:
-            update_data['tmd_assessment'] = data['tmd_assessment']
-        if 'xray_taken' in data:
-            update_data['xray_taken'] = data['xray_taken']
-        
-        # Upsert the dental chart
-        result = mongo.db.dental_charts.update_one(
-            {'patient_id': ObjectId(patient_id)},
-            {'$set': update_data},
-            upsert=True
-        )
-        
-        return jsonify({'success': True, 'message': 'Dental chart updated successfully'})
-        
-    except Exception as e:
-        print(f"Update dental chart error: {e}")
-        return jsonify({'success': False, 'error': 'Failed to update dental chart'}), 500
-    
-    
-def create_default_dental_chart_fallback(patient_id):
-    """Create a default dental chart structure for a new patient"""
-    teeth_status = {}
-    
-    # Adult teeth numbers
-    permanent_teeth = [
-        # Upper right: 18-11
-        18, 17, 16, 15, 14, 13, 12, 11,
-        # Upper left: 21-28  
-        21, 22, 23, 24, 25, 26, 27, 28,
-        # Lower left: 38-31
-        38, 37, 36, 35, 34, 33, 32, 31,
-        # Lower right: 41-48
-        41, 42, 43, 44, 45, 46, 47, 48
-    ]
-    
-    for tooth_num in permanent_teeth:
-        teeth_status[str(tooth_num)] = {
-            "buccal": "",
-            "mesial": "",
-            "distal": "",
-            "lingual": "",
-            "occlusal": "",
-            "colors": {}
-        }
-    
-    # Temporary teeth
-    temporary_teeth = [55, 54, 53, 52, 51, 61, 62, 63, 64, 65, 85, 84, 83, 82, 81, 71, 72, 73, 74, 75]
-    for tooth_num in temporary_teeth:
-        teeth_status[f"temp_{tooth_num}"] = {
-            "general": "",
-            "colors": {}
-        }
-    
-    return {
-        "patient_id": ObjectId(patient_id),
-        "chart_date": datetime.utcnow(),
-        "teeth_status": teeth_status,
-        "periodontal_screening": {
-            "gingivitis": False,
-            "early_periodontitis": False,
-            "moderate_periodontitis": False,
-            "advanced_periodontitis": False
-        },
-        "occlusion": {
-            "class_molar": "",
-            "overjet": "",
-            "overbite": "",
-            "midline_deviation": "",
-            "crossbite": False
-        },
-        "appliances": {
-            "orthodontic": False,
-            "stayplate": False,
-            "others": ""
-        },
-        "tmd_assessment": {
-            "clenching": False,
-            "clicking": False,
-            "trismus": False,
-            "muscle_spasm": False
-        },
-        "xray_taken": {
-            "periapical": {"taken": False, "tooth_number": "", "date": ""},
-            "panoramic": {"taken": False, "date": ""},
-            "cephalometric": {"taken": False, "date": ""},
-            "occlusal": {"taken": False, "upper_lower": "", "date": ""},
-            "others": {"taken": False, "type": "", "date": ""}
-        },
-        "created_by": session['user_id'],
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
-    }
-
-@app.route('/chart/update/<patient_id>', methods=['POST'])
-@login_required
-def update_chart_fallback(patient_id):
-    """Update dental chart data - fallback route"""
-    # Verify patient access
-    patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
-    if not patient:
-        return jsonify({'success': False, 'error': 'Patient not found'}), 404
-    
-    clinic = mongo.db.clinics.find_one({
-        '_id': patient['clinic_id'],
-        'owner_id': session['user_id']
-    })
-    
-    if not clinic:
-        return jsonify({'success': False, 'error': 'Access denied'}), 403
-    
-    data = request.get_json()
-    
-    try:
-        # Update the entire chart data
-        mongo.db.dental_charts.update_one(
-            {'patient_id': ObjectId(patient_id)},
-            {
-                '$set': {
-                    **data,
-                    'updated_at': datetime.utcnow(),
-                    'updated_by': session['user_id']
-                }
-            },
-            upsert=True
-        )
-        
-        return jsonify({'success': True, 'message': 'Chart updated successfully'})
-        
-    except Exception as e:
-        print(f"Chart update error: {e}")
-        return jsonify({'success': False, 'error': 'Failed to update chart'}), 500
-    
-
-
-@app.route('/patients_fallback/<patient_id>')
-@login_required
-def patient_detail_fallback(patient_id):
-    """View patient details - fallback route"""
-    try:
-        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
-        
-        if not patient:
-            flash('Patient not found', 'error')
-            return redirect(url_for('patients_fallback'))
-        
-        # Verify clinic ownership
-        clinic = mongo.db.clinics.find_one({
-            '_id': patient['clinic_id'],
-            'owner_id': session['user_id']
-        })
-        
-        if not clinic:
-            flash('Access denied', 'error')
-            return redirect(url_for('patients_fallback'))
-        
-        # Ensure all required data structures exist
-        if 'personal_info' not in patient:
-            patient['personal_info'] = {}
-        if 'contact_info' not in patient:
-            patient['contact_info'] = {}
-        if 'emergency_contact' not in patient:
-            patient['emergency_contact'] = {}
-        if 'medical_history' not in patient:
-            patient['medical_history'] = {
-                'allergies': {},
-                'medical_conditions': {},
-                'general_health': {},
-                'physician_info': {},
-                'women_health': {},
-                'vital_signs': {}
-            }
-        
-        # Get dental chart
-        dental_chart = mongo.db.dental_charts.find_one({'patient_id': ObjectId(patient_id)})
-        
-        # Get treatment records
-        treatment_records = list(mongo.db.treatment_records.find({
-            'patient_id': ObjectId(patient_id)
-        }).sort('date', -1).limit(10))
-        
-        # Get patient's appointments
-        patient_appointments = list(mongo.db.appointments.find({
-            'patient_id': ObjectId(patient_id),
-            'is_active': True
-        }).sort([('date', -1), ('time', -1)]).limit(10))
-        
-        return render_template('patients/detail.html', 
-                             patient=patient, 
-                             clinic=clinic,
-                             dental_chart=dental_chart,
-                             treatment_records=treatment_records,
-                             appointments=patient_appointments)
-                             
-    except Exception as e:
-        print(f"Patient detail error: {e}")
-        flash('Error loading patient details', 'error')
-        return redirect(url_for('patients_fallback'))
-
-# Create route aliases for easier template usage
-@app.route('/patients')
-@login_required
-def patients():
-    return patients_fallback()
-
-@app.route('/patients/create', methods=['GET', 'POST'])
-@login_required
-def create_patient():
-    return create_patient_fallback()
-
-@app.route('/patients/<patient_id>')
-@login_required
-def patient_detail(patient_id):
-    return patient_detail_fallback(patient_id)
-
-@app.route('/clinics')
-@login_required
-def clinics():
-    return clinics_fallback()
-
-@app.route('/clinics/create', methods=['GET', 'POST'])
-@login_required
-def create_clinic():
-    return create_clinic_fallback()
-
-@app.route('/appointments')
-@login_required
-def appointments():
-    return appointments_fallback()
-
-
-@app.route('/patients_fallback')
-@login_required
-def patients_fallback():
-    """Fallback patients list route"""
-    try:
-        # Get user's clinics
-        user_clinics = list(mongo.db.clinics.find({
-            'owner_id': session['user_id'],
-            'is_active': True
-        }))
-        clinic_ids = [clinic['_id'] for clinic in user_clinics]
-        
-        # Get search parameters
-        search_query = request.args.get('search', '')
-        clinic_id = request.args.get('clinic_id')
-        
-        # Build query
-        query = {'is_active': True}
-        if clinic_id:
-            query['clinic_id'] = ObjectId(clinic_id)
-        else:
-            query['clinic_id'] = {'$in': clinic_ids}
-        
-        # Add search functionality
-        if search_query:
-            query['$or'] = [
-                {'personal_info.first_name': {'$regex': search_query, '$options': 'i'}},
-                {'personal_info.last_name': {'$regex': search_query, '$options': 'i'}},
-                {'personal_info.nickname': {'$regex': search_query, '$options': 'i'}},
-                {'contact_info.cell_phone': {'$regex': search_query, '$options': 'i'}}
-            ]
-        
-        patients = list(mongo.db.patients.find(query).sort('created_at', -1).limit(50))
-        
-        return render_template('patients/list.html',
-                             patients=patients,
-                             clinics=user_clinics,
-                             current_page=1,
-                             total_pages=1,
-                             selected_clinic=clinic_id,
-                             search_query=search_query)
-    except Exception as e:
-        print(f"Patients error: {e}")
-        flash('Error loading patients', 'error')
-        return render_template('patients/list.html',
-                             patients=[],
-                             clinics=[],
-                             current_page=1,
-                             total_pages=1,
-                             selected_clinic=None,
-                             search_query='')
-
+# ---------------------------------------------------------------------------
 # Error handlers
+# ---------------------------------------------------------------------------
+def _safe_referrer_redirect():
+    """Redirect back to the referring page only if it is same-origin.
+
+    Prevents an open-redirect: request.referrer is attacker-controllable, so we
+    only honour it when its host matches ours, otherwise fall back to a safe page.
+    """
+    from urllib.parse import urlparse
+    from flask import request, redirect, url_for, session
+    ref = request.referrer
+    if ref and urlparse(ref).netloc == urlparse(request.host_url).netloc:
+        return redirect(ref)
+    fallback = 'main.dashboard' if 'user_id' in session else 'auth.login'
+    return redirect(url_for(fallback))
+
 @app.errorhandler(404)
 def not_found(error):
+    from flask import render_template
     return render_template('errors/404.html'), 404
+
+@app.errorhandler(403)
+def forbidden(error):
+    from flask import flash, redirect, url_for, session
+    if 'user_id' in session:
+        flash('You do not have permission to access that page.', 'error')
+        return redirect(url_for('main.dashboard'))
+    return redirect(url_for('auth.login'))
 
 @app.errorhandler(500)
 def internal_error(error):
+    from flask import render_template
     return render_template('errors/500.html'), 500
 
-# Initialize database function
-def init_database():
-    """Initialize database with indexes and default admin user"""
-    try:
-        # Create indexes
-        mongo.db.users.create_index("email", unique=True)
-        mongo.db.users.create_index("license_number")
-        mongo.db.clinics.create_index("owner_id")
-        mongo.db.patients.create_index("clinic_id")
-        mongo.db.appointments.create_index([("clinic_id", 1), ("date", 1), ("time", 1)])
-        mongo.db.appointments.create_index("patient_id")
-        mongo.db.dental_charts.create_index("patient_id")
-        
-        # Create default admin user if none exists
-        if mongo.db.users.count_documents({}) == 0:
-            admin_user = {
-                "name": "Admin User",
-                "email": "admin@dental.com",
-                "password": generate_password_hash("admin123"),
-                "license_number": "ADMIN001",
-                "specialty": "General Dentistry",
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow(),
-                "is_active": True
-            }
-            
-            result = mongo.db.users.insert_one(admin_user)
-            print(f"Created admin user with ID: {result.inserted_id}")
-            print("Login with: admin@dental.com / admin123")
-            
-    except Exception as e:
-        print(f"Database initialization error: {e}")
+@app.errorhandler(CSRFError)
+def handle_csrf_error(error):
+    """Invalid/missing CSRF token — JSON for fetch calls, redirect for form posts."""
+    from flask import request, jsonify, flash
+    if request.is_json:
+        return jsonify({'success': False, 'error': 'CSRF token missing or invalid'}), 400
+    flash('Your session expired or the form was invalid. Please try again.', 'error')
+    return _safe_referrer_redirect(), 303
 
-# Health check route
+@app.errorhandler(413)
+def request_too_large(error):
+    """Uploaded file exceeded MAX_CONTENT_LENGTH — return to the form with a message."""
+    from flask import flash
+    mb = app.config.get('MAX_CONTENT_LENGTH', 0) // (1024 * 1024)
+    flash(f'File too large. The maximum upload size is {mb} MB.', 'error')
+    return _safe_referrer_redirect(), 303
+
+# ---------------------------------------------------------------------------
+# Health check (used by Render to confirm the service is up)
+# ---------------------------------------------------------------------------
 @app.route('/health')
 def health_check():
-    """Health check endpoint"""
+    from flask import jsonify
     try:
-        # Test database connection
         mongo.db.command('ping')
         return jsonify({"status": "healthy", "database": "connected"}), 200
     except Exception as e:
         return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
-@app.context_processor
-def inject_route_helpers():
-    """Inject helper functions into all templates"""
-    
-    def safe_url_for(endpoint, **values):
-        """Safely generate URLs with fallback routes"""
-        try:
-            return url_for(endpoint, **values)
-        except:
-            # Try fallback routes
-            fallback_map = {
-                'create_clinic': 'create_clinic_fallback',
-                'clinics': 'clinics_fallback', 
-                'patients': 'patients_fallback',
-                'create_patient': 'create_patient_fallback',
-                'appointments': 'appointments_fallback',
-                'patient_detail': 'patient_detail_fallback',
-                'charts.view_chart': 'chart_fallback' 
-            }
-            
-            fallback_endpoint = fallback_map.get(endpoint)
-            if fallback_endpoint:
-                try:
-                    return url_for(fallback_endpoint, **values)
-                except:
-                    pass
-            
-            # If all else fails, return a safe default
-            return '#'
-    
-    def check_blueprint_available(blueprint_name):
-        """Check if a blueprint is available"""
-        return blueprint_name in app.blueprints
-    
-    return dict(
-        safe_url_for=safe_url_for,
-        check_blueprint_available=check_blueprint_available
-    )
+# ---------------------------------------------------------------------------
+# Database initialisation
+# ---------------------------------------------------------------------------
+def init_database():
+    """Create indexes and a default admin user (first run only)."""
+    try:
+        mongo.db.users.create_index("email", unique=True)
+        mongo.db.users.create_index("license_number")
+        mongo.db.clinics.create_index("owner_id")
+        mongo.db.patients.create_index("clinic_id")
+        mongo.db.dental_charts.create_index("patient_id")
+        mongo.db.treatment_records.create_index("patient_id")
+        mongo.db.prescriptions.create_index("patient_id")
+        mongo.db.patient_files.create_index("patient_id")
+        mongo.db.appointments.create_index([("clinic_id", 1), ("date", 1)])
+        mongo.db.appointments.create_index("patient_id")
 
+        if mongo.db.users.count_documents({}) == 0:
+            mongo.db.users.insert_one({
+                "name": "Admin User",
+                "email": "admin@dental.com",
+                "password": generate_password_hash("admin123"),
+                "license_number": "ADMIN001",
+                "specialty": "General Dentistry",
+                "role": "admin",
+                "status": "approved",
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+                "is_active": True,
+            })
+            print(">>> Default admin created  |  admin@dental.com / admin123")
+    except Exception as e:
+        print(f"Database init error: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 if __name__ == '__main__':
     with app.app_context():
         init_database()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Debug is opt-out via env and force-disabled in production, so the
+    # interactive Werkzeug debugger can never accidentally run on a prod host.
+    debug = (
+        os.environ.get('FLASK_DEBUG', '1') == '1'
+        and os.environ.get('FLASK_ENV', 'development') != 'production'
+    )
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=debug, host='0.0.0.0', port=port)

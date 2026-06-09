@@ -1,0 +1,143 @@
+# File: MyDentalPortal/app/routes/auth.py
+# Authentication routes — login, register, logout
+
+from flask import (
+    Blueprint, request, jsonify, session,
+    render_template, redirect, url_for, flash,
+)
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
+import re
+
+from extensions import mongo, limiter
+
+auth_bp = Blueprint('auth', __name__)
+
+
+# ── helpers ──────────────────────────────────────────────────────────────
+def _valid_email(email):
+    return bool(re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email))
+
+
+# ── routes ───────────────────────────────────────────────────────────────
+@auth_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit(
+    '10 per minute; 50 per hour',
+    methods=['POST'],
+    error_message='Too many login attempts. Please wait a minute and try again.',
+)
+def login():
+    if request.method == 'POST':
+        data = request.get_json() if request.is_json else request.form
+        email = (data.get('email') or '').strip().lower()
+        password = data.get('password') or ''
+
+        if not email or not password:
+            flash('Email and password are required', 'error')
+            return render_template('auth/login.html')
+
+        try:
+            user = mongo.db.users.find_one({'email': email})
+            if user and check_password_hash(user['password'], password):
+                # Account approval gate. Users created before this feature have
+                # no 'status' field and are grandfathered in as approved.
+                status = user.get('status', 'approved')
+                if status == 'pending':
+                    flash('Your account is awaiting administrator approval.', 'warning')
+                    return render_template('auth/login.html')
+                if status == 'rejected':
+                    flash('Your registration was not approved. Please contact the clinic.', 'error')
+                    return render_template('auth/login.html')
+
+                session['user_id'] = str(user['_id'])
+                session['user_email'] = user['email']
+                session['user_name'] = user['name']
+                session['user_role'] = user.get('role', 'dentist')
+                session.permanent = True
+
+                if request.is_json:
+                    return jsonify({'success': True, 'redirect': url_for('main.dashboard')})
+                flash('Login successful!', 'success')
+                return redirect(url_for('main.dashboard'))
+
+            flash('Invalid email or password', 'error')
+        except Exception as e:
+            print(f"Login error: {e}")
+            flash('Login failed. Please try again.', 'error')
+
+        return render_template('auth/login.html')
+
+    # GET
+    if 'user_id' in session:
+        return redirect(url_for('main.dashboard'))
+    return render_template('auth/login.html')
+
+
+@auth_bp.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        data = request.get_json() if request.is_json else request.form
+
+        name = (data.get('name') or '').strip()
+        email = (data.get('email') or '').strip().lower()
+        password = data.get('password') or ''
+        confirm_password = data.get('confirm_password') or ''
+        license_number = (data.get('license_number') or '').strip()
+        specialty = (data.get('specialty') or '').strip()
+
+        # Validation
+        if not all([name, email, password, license_number]):
+            flash('Please fill in all required fields', 'error')
+            return render_template('auth/register.html')
+        if password != confirm_password:
+            flash('Passwords do not match', 'error')
+            return render_template('auth/register.html')
+        if len(password) < 8:
+            flash('Password must be at least 8 characters long', 'error')
+            return render_template('auth/register.html')
+        if not _valid_email(email):
+            flash('Invalid email address', 'error')
+            return render_template('auth/register.html')
+
+        try:
+            if mongo.db.users.find_one({'email': email}):
+                flash('Email already registered', 'error')
+                return render_template('auth/register.html')
+
+            user_data = {
+                'name': name,
+                'email': email,
+                'password': generate_password_hash(password),
+                'license_number': license_number,
+                'specialty': specialty,
+                'role': 'dentist',           # future: admin, staff
+                'status': 'pending',         # must be approved by an admin
+                'created_at': datetime.utcnow(),
+                'updated_at': datetime.utcnow(),
+                'is_active': True,
+            }
+            mongo.db.users.insert_one(user_data)
+
+            if request.is_json:
+                return jsonify({'success': True, 'pending': True})
+            flash('Registration submitted. An administrator must approve your '
+                  'account before you can log in.', 'success')
+            return redirect(url_for('auth.login'))
+
+        except Exception as e:
+            print(f"Registration error: {e}")
+            flash('Registration failed. Please try again.', 'error')
+            return render_template('auth/register.html')
+
+    # GET
+    if 'user_id' in session:
+        return redirect(url_for('main.dashboard'))
+    return render_template('auth/register.html')
+
+
+@auth_bp.route('/logout', methods=['POST'])
+def logout():
+    # POST + CSRF token so a malicious page can't force-logout a user.
+    session.clear()
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('auth.login'))

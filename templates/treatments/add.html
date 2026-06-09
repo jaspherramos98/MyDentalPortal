@@ -1,0 +1,135 @@
+<!-- File: MyDentalPortal/templates/treatments/add.html -->
+{% extends "base.html" %}
+
+{% block title %}Add Treatment - {{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4><i class="fas fa-procedures me-2"></i>Add Treatment Record</h4>
+        <a href="{{ url_for('patients.patient_detail', patient_id=patient._id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Back to Patient
+        </a>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-info text-white">
+            <strong>Patient:</strong> {{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}
+            &nbsp;|&nbsp;
+            <strong>Clinic:</strong> {{ clinic.name }}
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('treatments.add_treatment', patient_id=patient._id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="date" class="form-label">Date *</label>
+                        <input type="date" class="form-control" id="date" name="date"
+                               value="{{ today }}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="procedure" class="form-label">Procedure *</label>
+                        <select class="form-select" id="procedure" name="procedure" required>
+                            <option value="">Select procedure</option>
+                            <option value="Oral Prophylaxis">Oral Prophylaxis</option>
+                            <option value="Tooth Extraction">Tooth Extraction</option>
+                            <option value="Restoration (Filling)">Restoration (Filling)</option>
+                            <option value="Root Canal Treatment">Root Canal Treatment</option>
+                            <option value="Crown / Bridge">Crown / Bridge</option>
+                            <option value="Denture">Denture</option>
+                            <option value="Orthodontic Adjustment">Orthodontic Adjustment</option>
+                            <option value="Tooth Whitening">Tooth Whitening</option>
+                            <option value="Fluoride Treatment">Fluoride Treatment</option>
+                            <option value="Sealant">Sealant</option>
+                            <option value="Consultation">Consultation</option>
+                            <option value="X-ray">X-ray</option>
+                            <option value="Surgery">Surgery</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="tooth_numbers" class="form-label">Tooth Number(s)</label>
+                        <input type="text" class="form-control" id="tooth_numbers" name="tooth_numbers"
+                               placeholder="e.g. 11, 12, 21" title="Comma-separated FDI tooth numbers">
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="dentist" class="form-label">Dentist</label>
+                        <input type="text" class="form-control" id="dentist" name="dentist"
+                               value="{{ session.get('user_name', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="status" class="form-label">Status</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="completed">Completed</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="scheduled">Scheduled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="next_appointment" class="form-label">Next Appointment</label>
+                        <input type="date" class="form-control" id="next_appointment" name="next_appointment">
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="amount_charged" class="form-label">Amount Charged ({{ clinic.get('currency', 'PHP') }})</label>
+                        <input type="number" class="form-control" id="amount_charged" name="amount_charged"
+                               step="0.01" min="0" value="0">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="amount_paid" class="form-label">Amount Paid ({{ clinic.get('currency', 'PHP') }})</label>
+                        <input type="number" class="form-control" id="amount_paid" name="amount_paid"
+                               step="0.01" min="0" value="0">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Balance</label>
+                        <input type="text" class="form-control" id="balance_display" readonly
+                               value="0.00">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <textarea class="form-control" id="description" name="description" rows="2"
+                              placeholder="Brief description of the procedure"></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label for="notes" class="form-label">Notes</label>
+                    <textarea class="form-control" id="notes" name="notes" rows="2"
+                              placeholder="Additional clinical notes"></textarea>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('patients.patient_detail', patient_id=patient._id) }}" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save me-1"></i> Save Treatment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-calculate balance
+const charged = document.getElementById('amount_charged');
+const paid = document.getElementById('amount_paid');
+const balance = document.getElementById('balance_display');
+
+function updateBalance() {
+    const c = parseFloat(charged.value) || 0;
+    const p = parseFloat(paid.value) || 0;
+    balance.value = (c - p).toFixed(2);
+}
+charged.addEventListener('input', updateBalance);
+paid.addEventListener('input', updateBalance);
+</script>
+{% endblock %}

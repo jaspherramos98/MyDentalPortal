@@ -1,0 +1,68 @@
+<!-- File: MyDentalPortal/templates/admin/registrations.html -->
+<!-- Admin: review and approve/reject pending account registrations -->
+
+{% extends "base.html" %}
+
+{% block title %}Pending Registrations - Dental Portal{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex align-items-center mb-4">
+        <h1 class="mb-0"><i class="fas fa-user-shield"></i> Pending Registrations</h1>
+        <span class="badge bg-warning text-dark ms-3 fs-6">{{ pending|length }} pending</span>
+    </div>
+
+    {% if pending %}
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>License #</th>
+                        <th>Specialty</th>
+                        <th>Requested</th>
+                        <th class="text-end">Decision</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in pending %}
+                    <tr>
+                        <td>{{ u.name }}</td>
+                        <td>{{ u.email }}</td>
+                        <td>{{ u.license_number or 'N/A' }}</td>
+                        <td>{{ u.specialty or 'N/A' }}</td>
+                        <td>{{ u.created_at | datefmt('%b %d, %Y') }}</td>
+                        <td class="text-end">
+                            <form method="POST" class="d-inline"
+                                  action="{{ url_for('admin.approve', user_id=u._id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-success">
+                                    <i class="fas fa-check"></i> Approve
+                                </button>
+                            </form>
+                            <form method="POST" class="d-inline"
+                                  action="{{ url_for('admin.reject', user_id=u._id) }}"
+                                  onsubmit="return confirm('Reject this registration?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="fas fa-times"></i> Reject
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+        <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+        <h5>No pending registrations</h5>
+        <p class="text-muted">New sign-ups awaiting approval will appear here.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

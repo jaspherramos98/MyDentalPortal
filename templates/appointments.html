@@ -8,7 +8,27 @@ Description: Dental practice appointments calendar with drag-and-drop functional
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Dental Appointments Calendar</title>
+
+    <!-- Attach the CSRF token to every state-changing fetch() (standalone page). -->
+    <script>
+        (function () {
+            const _fetch = window.fetch;
+            window.fetch = function (resource, options) {
+                options = options || {};
+                const method = (options.method || 'GET').toUpperCase();
+                if (['POST', 'PUT', 'PATCH', 'DELETE'].indexOf(method) !== -1) {
+                    const meta = document.querySelector('meta[name="csrf-token"]');
+                    const token = meta && meta.getAttribute('content');
+                    const headers = new Headers(options.headers || {});
+                    if (token && !headers.has('X-CSRFToken')) headers.set('X-CSRFToken', token);
+                    options.headers = headers;
+                }
+                return _fetch.call(this, resource, options);
+            };
+        })();
+    </script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -275,6 +295,11 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             border: 1px solid #9c27b0;
         }
 
+        .appointment-card.extraction {
+            background: linear-gradient(135deg, #efebe9, #d7ccc8);
+            border: 1px solid #795548;
+        }
+
         .appointment-time {
             font-weight: bold;
             margin-bottom: 2px;
@@ -299,6 +324,22 @@ Description: Dental practice appointments calendar with drag-and-drop functional
         .appointment-type.surgery { background: var(--warning-color); }
         .appointment-type.cleaning { background: #009688; }
         .appointment-type.filling { background: #9c27b0; }
+        .appointment-type.extraction { background: #795548; }
+
+        .appointment-card.cancelled {
+            opacity: 0.55;
+            filter: grayscale(0.6);
+        }
+        .appointment-card.cancelled .appointment-patient {
+            text-decoration: line-through;
+        }
+        .appointment-cancelled-badge {
+            font-size: 10px;
+            font-weight: bold;
+            color: var(--danger-color);
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
 
         .search-box {
             position: sticky;
@@ -411,12 +452,12 @@ Description: Dental practice appointments calendar with drag-and-drop functional
     <!-- Top Navigation Bar -->
     <nav class="top-nav-bar">
         <div class="container-fluid">
-            <div class="d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center">
-                    <h4 class="mb-0 me-4">
+            <div class="d-flex align-items-center">
+                <a href="/dashboard" class="text-white text-decoration-none me-4">
+                    <h4 class="mb-0">
                         <i class="fas fa-tooth"></i> Dental Portal
                     </h4>
-                </div>
+                </a>
                 
                 <ul class="nav">
                     <li class="nav-item">
@@ -425,24 +466,27 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/clinics_fallback">
-                            <i class="fas fa-building"></i> Clinics
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/patients_fallback">
-                            <i class="fas fa-users"></i> Patients
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/appointments_fallback">
+                        <a class="nav-link active" href="/appointments">
                             <i class="fas fa-calendar-alt"></i> Appointments
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/logout">
-                            <i class="fas fa-sign-out-alt"></i> Logout
+                        <a class="nav-link" href="/patients">
+                            <i class="fas fa-users"></i> Patients
                         </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/clinics">
+                            <i class="fas fa-building"></i> Clinics
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <form method="POST" action="/logout" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="nav-link border-0 bg-transparent">
+                                <i class="fas fa-sign-out-alt"></i> Logout
+                            </button>
+                        </form>
                     </li>
                 </ul>
             </div>
@@ -484,6 +528,7 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                         <option value="checkup">Checkup</option>
                         <option value="cleaning">Cleaning</option>
                         <option value="filling">Filling</option>
+                        <option value="extraction">Tooth Extraction</option>
                         <option value="emergency">Emergency</option>
                         <option value="follow-up">Follow-up</option>
                         <option value="surgery">Surgery</option>
@@ -538,6 +583,10 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                     <div class="legend-color" style="background: linear-gradient(135deg, #f3e5f5, #e1bee7);"></div>
                     <span>Filling</span>
                 </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #efebe9, #d7ccc8);"></div>
+                    <span>Tooth Extraction</span>
+                </div>
             </div>
 
             <!-- Patient List -->
@@ -545,36 +594,21 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                 <div class="px-3">
                     <h6><i class="fas fa-users"></i> Available Patients</h6>
                     
-                    <!-- Sample patients -->
-                    <div class="patient-card" draggable="true" data-patient-id="1" data-patient-name="John Doe" data-patient-phone="(555) 123-4567">
-                        <div class="patient-name">John Doe</div>
-                        <div class="patient-phone"><i class="fas fa-phone"></i> (555) 123-4567</div>
-                        <small class="text-muted">Last visit: 2 weeks ago</small>
+                    {% for p in patients %}
+                    <div class="patient-card" draggable="true"
+                         data-patient-id="{{ p.id }}"
+                         data-patient-name="{{ p.name }}"
+                         data-patient-phone="{{ p.phone }}">
+                        <div class="patient-name">{{ p.name }}</div>
+                        {% if p.phone %}
+                        <div class="patient-phone"><i class="fas fa-phone"></i> {{ p.phone }}</div>
+                        {% endif %}
                     </div>
+                    {% endfor %}
 
-                    <div class="patient-card" draggable="true" data-patient-id="2" data-patient-name="Jane Smith" data-patient-phone="(555) 987-6543">
-                        <div class="patient-name">Jane Smith</div>
-                        <div class="patient-phone"><i class="fas fa-phone"></i> (555) 987-6543</div>
-                        <small class="text-muted">New patient</small>
-                    </div>
-
-                    <div class="patient-card" draggable="true" data-patient-id="3" data-patient-name="Mike Johnson" data-patient-phone="(555) 456-7890">
-                        <div class="patient-name">Mike Johnson</div>
-                        <div class="patient-phone"><i class="fas fa-phone"></i> (555) 456-7890</div>
-                        <small class="text-muted">Last visit: 1 month ago</small>
-                    </div>
-
-                    <div class="patient-card" draggable="true" data-patient-id="4" data-patient-name="Sarah Wilson" data-patient-phone="(555) 321-0987">
-                        <div class="patient-name">Sarah Wilson</div>
-                        <div class="patient-phone"><i class="fas fa-phone"></i> (555) 321-0987</div>
-                        <small class="text-muted">Emergency patient</small>
-                    </div>
-
-                    <div class="patient-card" draggable="true" data-patient-id="5" data-patient-name="Robert Brown" data-patient-phone="(555) 654-3210">
-                        <div class="patient-name">Robert Brown</div>
-                        <div class="patient-phone"><i class="fas fa-phone"></i> (555) 654-3210</div>
-                        <small class="text-muted">Follow-up needed</small>
-                    </div>
+                    {% if not patients %}
+                    <p class="text-muted small">No patients yet. Add patients from the Patients page first.</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -705,6 +739,7 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                                     <option value="checkup">Regular Checkup</option>
                                     <option value="cleaning">Teeth Cleaning</option>
                                     <option value="filling">Dental Filling</option>
+                                    <option value="extraction">Tooth Extraction</option>
                                     <option value="emergency">Emergency</option>
                                     <option value="follow-up">Follow-up</option>
                                     <option value="surgery">Surgery</option>
@@ -726,7 +761,11 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" id="cancelAppointmentBtn" class="btn btn-outline-danger me-auto"
+                            onclick="cancelCurrentAppointment()" style="display:none;">
+                        <i class="fas fa-ban"></i> Cancel Appointment
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     <button type="button" class="btn btn-primary" onclick="saveAppointment()">
                         <i class="fas fa-save"></i> Schedule Appointment
                     </button>
@@ -745,65 +784,70 @@ Description: Dental practice appointments calendar with drag-and-drop functional
         let currentClinic = ''; // Current selected clinic filter
         let userClinics = []; // User's clinics
 
-        // Sample clinic data (replace with real data from your backend)
-        const sampleClinics = [
-            { id: 'clinic1', name: 'Downtown Dental Clinic', address: '123 Main St' },
-            { id: 'clinic2', name: 'Suburban Family Dentistry', address: '456 Oak Ave' },
-            { id: 'clinic3', name: 'Emergency Dental Care', address: '789 Emergency Blvd' }
+        // Real clinic data from database
+        const dbClinics = [
+            {% for clinic in clinics %}
+            { id: '{{ clinic._id }}', name: '{{ clinic.name }}', address: '{{ clinic.address or "" }}' }{{ ',' if not loop.last }}
+            {% endfor %}
         ];
 
-        // Sample appointments with clinic IDs
-        const sampleAppointments = [
-            {
-                id: 1,
-                clinicId: 'clinic1',
-                patientId: 1,
-                patientName: "John Doe",
-                date: "2025-06-06",
-                time: "09:00",
-                duration: 60,
-                type: "checkup",
-                priority: "normal",
-                notes: "Regular checkup"
-            },
-            {
-                id: 2,
-                clinicId: 'clinic2',
-                patientId: 2,
-                patientName: "Jane Smith",
-                date: "2025-06-07",
-                time: "14:00",
-                duration: 30,
-                type: "cleaning",
-                priority: "normal",
-                notes: "First visit"
-            },
-            {
-                id: 3,
-                clinicId: 'clinic1',
-                patientId: 3,
-                patientName: "Mike Johnson",
-                date: "2025-06-06",
-                time: "15:30",
-                duration: 45,
-                type: "filling",
-                priority: "high",
-                notes: "Cavity treatment"
-            }
-        ];
+        // Real patient data from database (tojson escapes for safe <script> embedding)
+        const dbPatients = {{ patients|tojson }};
+
+        // API base URL for appointments
+        const API_URL = '/appointments/api';
 
         // Initialize calendar
         document.addEventListener('DOMContentLoaded', function() {
-            userClinics = [...sampleClinics]; // Load user clinics
-            appointments = [...sampleAppointments]; // Load appointments
-            
-            loadClinics(); // Populate clinic selectors
-            generateWeekView(); // Start with week view
-            setupDragAndDrop();
-            setupSearch();
-            setupClinicFilter();
-            updateStats();
+            userClinics = [...dbClinics];
+            loadClinics();
+            // Load real appointments from API
+            loadAppointmentsFromAPI().then(() => {
+                generateWeekView();
+                setupDragAndDrop();
+                setupSearch();
+                setupClinicFilter();
+                updateStats();
+            });
         });
+
+        // Fetch real appointments from backend API
+        async function loadAppointmentsFromAPI() {
+            try {
+                const today = new Date();
+                const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+                const start = startOfMonth.toISOString().split('T')[0];
+                const end = endOfMonth.toISOString().split('T')[0];
+
+                let url = `${API_URL}?start_date=${start}&end_date=${end}`;
+                if (currentClinic) url += `&clinic_id=${currentClinic}`;
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success) {
+                    appointments = data.appointments.map(a => ({
+                        id: a.id,
+                        clinicId: a.clinic_id,
+                        patientId: a.patient_id,
+                        patientName: a.patient_name,
+                        date: a.date,
+                        time: a.time,
+                        duration: a.duration || 30,
+                        type: a.type || 'checkup',
+                        priority: a.priority || 'normal',
+                        notes: a.notes || '',
+                        status: a.status || 'scheduled'
+                    }));
+                } else {
+                    appointments = [];
+                }
+            } catch (error) {
+                console.error('Failed to load appointments:', error);
+                appointments = [];
+            }
+        }
 
         function showWeekView() {
             currentView = 'week';
@@ -956,12 +1000,13 @@ Description: Dental practice appointments calendar with drag-and-drop functional
         function createAppointmentElement(appointment) {
             const apt = document.createElement('div');
             apt.className = `appointment-card ${appointment.type}`;
+            if (appointment.status === 'cancelled') apt.classList.add('cancelled');
             apt.dataset.appointmentId = appointment.id;
             apt.dataset.clinicId = appointment.clinicId;
             
             const appointmentTime = document.createElement('div');
             appointmentTime.className = 'appointment-time';
-            appointmentTime.textContent = formatTime(appointment.time);
+            appointmentTime.textContent = formatTimeRange(appointment.time, appointment.duration);
             
             const appointmentPatient = document.createElement('div');
             appointmentPatient.className = 'appointment-patient';
@@ -985,7 +1030,14 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             apt.appendChild(appointmentTime);
             apt.appendChild(appointmentPatient);
             apt.appendChild(appointmentType);
-            
+
+            if (appointment.status === 'cancelled') {
+                const cancelledBadge = document.createElement('div');
+                cancelledBadge.className = 'appointment-cancelled-badge';
+                cancelledBadge.textContent = 'Cancelled';
+                apt.appendChild(cancelledBadge);
+            }
+
             // Click to edit
             apt.addEventListener('click', () => editAppointment(appointment));
             
@@ -1078,11 +1130,13 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             // Store dragged patient info
             document.getElementById('appointmentForm').dataset.draggedPatient = JSON.stringify(patient);
             document.getElementById('appointmentForm').dataset.selectedDate = date;
-            
+            document.getElementById('appointmentForm').dataset.editingId = '';
+            hideCancelButton();
+
             modal.show();
         }
 
-        function saveAppointment() {
+        async function saveAppointment() {
             // Validation
             const patientName = document.getElementById('modalPatientName').value.trim();
             const appointmentDate = document.getElementById('modalAppointmentDate').value;
@@ -1094,55 +1148,55 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                 alert('Please fill in all required fields including clinic selection.');
                 return;
             }
+
+            const editingId = document.getElementById('appointmentForm').dataset.editingId;
             
-            // Check for time conflicts in the same clinic
-            const existingAppointment = appointments.find(apt => 
-                apt.date === appointmentDate && 
-                apt.time === appointmentTime && 
-                apt.clinicId === clinicId
-            );
-            
-            if (existingAppointment) {
-                if (!confirm('There is already an appointment at this time in this clinic. Do you want to continue?')) {
-                    return;
-                }
-            }
-            
-            // Create new appointment
-            const newAppointment = {
-                id: Date.now(),
-                clinicId: clinicId,
-                patientId: draggedPatient ? draggedPatient.id : null,
-                patientName: patientName,
-                date: appointmentDate, // This should already be in YYYY-MM-DD format from the input
+            const payload = {
+                patient_name: patientName,
+                date: appointmentDate,
                 time: appointmentTime,
-                duration: parseInt(document.getElementById('modalDuration').value),
                 type: appointmentType,
+                clinic_id: clinicId,
+                duration: parseInt(document.getElementById('modalDuration').value),
                 priority: document.getElementById('modalPriority').value,
-                notes: document.getElementById('modalNotes').value
+                notes: document.getElementById('modalNotes').value || '',
+                patient_id: draggedPatient ? draggedPatient.id : null,
             };
-            
-            console.log('Creating appointment:', newAppointment); // Debug log
-            
-            appointments.push(newAppointment);
-            
-            // Refresh current view
-            if (currentView === 'week') {
-                generateWeekView();
-            } else {
-                generateMonthView();
+
+            try {
+                let response;
+                if (editingId) {
+                    response = await fetch(`${API_URL}/${editingId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+                } else {
+                    response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+                }
+                const data = await response.json();
+
+                if (data.success) {
+                    await loadAppointmentsFromAPI();
+                    if (currentView === 'week') generateWeekView();
+                    else generateMonthView();
+                    updateStats();
+                    apptModalSaved = true;
+                    bootstrap.Modal.getInstance(document.getElementById('appointmentModal')).hide();
+                    const clinicName = userClinics.find(c => c.id === clinicId)?.name || 'Clinic';
+                    showNotification(editingId ? 'Appointment updated!' : `Appointment scheduled at ${clinicName}!`, 'success');
+                    document.getElementById('appointmentForm').dataset.editingId = '';
+                } else {
+                    showNotification(data.error || 'Failed to save appointment', 'danger');
+                }
+            } catch (error) {
+                console.error('Save appointment error:', error);
+                showNotification('Failed to save appointment. Please try again.', 'danger');
             }
-            
-            updateStats();
-            
-            // Close modal
-            bootstrap.Modal.getInstance(document.getElementById('appointmentModal')).hide();
-            
-            // Show success message
-            const clinicName = userClinics.find(c => c.id === clinicId)?.name || 'Selected Clinic';
-            showNotification(`Appointment scheduled successfully at ${clinicName}!`, 'success');
-            
-            // Reset dragged patient
             draggedPatient = null;
         }
 
@@ -1161,22 +1215,86 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             
             // Store appointment ID for updates
             document.getElementById('appointmentForm').dataset.editingId = appointment.id;
-            
+
+            // Show + configure the Cancel/Reactivate button for existing appointments
+            configureCancelButton(appointment.status);
+
             modal.show();
         }
 
-        function deleteAppointment(appointmentId) {
-            if (confirm('Are you sure you want to delete this appointment?')) {
-                appointments = appointments.filter(apt => apt.id !== appointmentId);
-                
-                if (currentView === 'week') {
-                    generateWeekView();
+        function configureCancelButton(status) {
+            const btn = document.getElementById('cancelAppointmentBtn');
+            if (!btn) return;
+            btn.style.display = 'inline-block';
+            if (status === 'cancelled') {
+                btn.className = 'btn btn-outline-success me-auto';
+                btn.innerHTML = '<i class="fas fa-rotate-left"></i> Reactivate Appointment';
+                btn.dataset.targetStatus = 'scheduled';
+            } else {
+                btn.className = 'btn btn-outline-danger me-auto';
+                btn.innerHTML = '<i class="fas fa-ban"></i> Cancel Appointment';
+                btn.dataset.targetStatus = 'cancelled';
+            }
+        }
+
+        function hideCancelButton() {
+            const btn = document.getElementById('cancelAppointmentBtn');
+            if (btn) btn.style.display = 'none';
+        }
+
+        async function cancelCurrentAppointment() {
+            const editingId = document.getElementById('appointmentForm').dataset.editingId;
+            if (!editingId) return;
+            const btn = document.getElementById('cancelAppointmentBtn');
+            const targetStatus = (btn && btn.dataset.targetStatus) || 'cancelled';
+            const verb = targetStatus === 'cancelled' ? 'cancel' : 'reactivate';
+            if (!confirm(`Are you sure you want to ${verb} this appointment?`)) return;
+            try {
+                const response = await fetch(`${API_URL}/${editingId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: targetStatus }),
+                });
+                const data = await response.json();
+                if (data.success) {
+                    await loadAppointmentsFromAPI();
+                    if (currentView === 'week') generateWeekView();
+                    else generateMonthView();
+                    updateStats();
+                    apptModalSaved = true;
+                    bootstrap.Modal.getInstance(document.getElementById('appointmentModal')).hide();
+                    showNotification(
+                        targetStatus === 'cancelled' ? 'Appointment cancelled.' : 'Appointment reactivated.',
+                        'warning'
+                    );
+                    document.getElementById('appointmentForm').dataset.editingId = '';
                 } else {
-                    generateMonthView();
+                    showNotification(data.error || 'Failed to update appointment', 'danger');
                 }
-                
-                updateStats();
-                showNotification('Appointment deleted successfully!', 'warning');
+            } catch (error) {
+                console.error('Cancel appointment error:', error);
+                showNotification('Failed to update appointment', 'danger');
+            }
+        }
+
+        async function deleteAppointment(appointmentId) {
+            if (confirm('Are you sure you want to delete this appointment?')) {
+                try {
+                    const response = await fetch(`${API_URL}/${appointmentId}`, { method: 'DELETE' });
+                    const data = await response.json();
+                    if (data.success) {
+                        await loadAppointmentsFromAPI();
+                        if (currentView === 'week') generateWeekView();
+                        else generateMonthView();
+                        updateStats();
+                        showNotification('Appointment deleted successfully!', 'warning');
+                    } else {
+                        showNotification(data.error || 'Failed to delete', 'danger');
+                    }
+                } catch (error) {
+                    console.error('Delete error:', error);
+                    showNotification('Failed to delete appointment', 'danger');
+                }
             }
         }
 
@@ -1200,13 +1318,15 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             }
         }
 
-        function goToToday() {
+        async function goToToday() {
             currentDate = new Date();
+            await loadAppointmentsFromAPI();
             if (currentView === 'week') {
                 generateWeekView();
             } else {
                 generateMonthView();
             }
+            updateStats();
         }
 
         function setupSearch() {
@@ -1365,13 +1485,26 @@ Description: Dental practice appointments calendar with drag-and-drop functional
 
         function formatTime(timeString) {
             if (!timeString) return '';
-            
+
             const time = timeString.split(':');
             const hours = parseInt(time[0]);
             const minutes = time[1];
             const ampm = hours >= 12 ? 'PM' : 'AM';
             const displayHours = hours % 12 || 12;
             return `${displayHours}:${minutes} ${ampm}`;
+        }
+
+        // Show the booked window, e.g. "2:00 PM – 4:00 PM", from start + duration (minutes).
+        function formatTimeRange(timeString, duration) {
+            if (!timeString) return '';
+            const start = formatTime(timeString);
+            const parts = timeString.split(':');
+            const startMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+            let endMin = startMin + (parseInt(duration) || 30);
+            endMin = ((endMin % 1440) + 1440) % 1440; // wrap within the day
+            const eh = String(Math.floor(endMin / 60)).padStart(2, '0');
+            const em = String(endMin % 60).padStart(2, '0');
+            return `${start} – ${formatTime(eh + ':' + em)}`;
         }
 
         // Handle window resize for mobile
@@ -1391,6 +1524,74 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                 !sidebar.contains(e.target) && 
                 !toggleBtn.contains(e.target)) {
                 sidebar.classList.remove('show');
+            }
+        });
+    </script>
+
+    <!-- Floating Add Appointment Button -->
+    <button class="btn btn-primary shadow-lg"
+            onclick="openNewAppointment()"
+            style="position:fixed; bottom:30px; right:30px; z-index:1050;
+                   width:60px; height:60px; border-radius:50%; font-size:24px;">
+        <i class="fas fa-plus"></i>
+    </button>
+
+    <script>
+    function openNewAppointment() {
+        // Clear form
+        document.getElementById('modalPatientName').value = '';
+        document.getElementById('modalAppointmentDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('modalAppointmentTime').value = '';
+        document.getElementById('modalDuration').value = '30';
+        document.getElementById('modalAppointmentType').value = 'checkup';
+        document.getElementById('modalPriority').value = 'normal';
+        document.getElementById('modalNotes').value = '';
+        document.getElementById('appointmentForm').dataset.editingId = '';
+        hideCancelButton();
+        if (currentClinic) {
+            document.getElementById('modalClinicSelect').value = currentClinic;
+        } else {
+            document.getElementById('modalClinicSelect').value = '';
+        }
+        new bootstrap.Modal(document.getElementById('appointmentModal')).show();
+    }
+    </script>
+
+    <!-- Unsaved-appointment guard: warn if the modal is closed without saving -->
+    <script>
+        var apptModalSaved = false;
+        var apptModalDirty = false;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const modalEl = document.getElementById('appointmentModal');
+            const form = document.getElementById('appointmentForm');
+            if (!modalEl || !form) return;
+
+            const markDirty = function () { apptModalDirty = true; };
+            form.addEventListener('input', markDirty);
+            form.addEventListener('change', markDirty);
+
+            // Reset flags each time the modal opens.
+            modalEl.addEventListener('shown.bs.modal', function () {
+                apptModalDirty = false;
+                apptModalSaved = false;
+            });
+
+            // If it closes with edits and nothing was saved, say so plainly.
+            modalEl.addEventListener('hidden.bs.modal', function () {
+                if (apptModalDirty && !apptModalSaved) {
+                    showNotification('Appointment was not saved — your changes were discarded.', 'warning');
+                }
+                apptModalDirty = false;
+                apptModalSaved = false;
+            });
+        });
+
+        // Catch tab close / navigation while editing an appointment.
+        window.addEventListener('beforeunload', function (e) {
+            if (apptModalDirty && !apptModalSaved) {
+                e.preventDefault();
+                e.returnValue = '';
             }
         });
     </script>

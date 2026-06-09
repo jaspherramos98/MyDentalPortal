@@ -1,0 +1,25 @@
+# File: MyDentalPortal/render.yaml
+# Render deployment configuration
+
+services:
+  - type: web
+    name: dental-portal
+    env: python
+    runtime: python-3.11.5
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: MONGO_URI
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.11.5
+      - key: TIMEZONE
+        value: Asia/Manila
+      - key: DEFAULT_CURRENCY
+        value: PHP

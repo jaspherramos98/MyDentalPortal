@@ -1,6 +1,17 @@
-# .gitignore
-.env
-*.env
-config.py
+# File: MyDentalPortal/.gitignore
 __pycache__/
-*.pyc
+*.py[cod]
+*.so
+.env
+venv/
+.venv/
+env/
+uploads/
+logs/
+*.db
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*.zip

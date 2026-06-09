@@ -6,7 +6,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}Dental Portal{% endblock %}</title>
+
+    <!-- Attach the CSRF token to every same-origin fetch() that changes state.
+         Runs in <head> so it's in place before any later script fires a request. -->
+    <script>
+        (function () {
+            const _fetch = window.fetch;
+            window.fetch = function (resource, options) {
+                options = options || {};
+                const method = (options.method || 'GET').toUpperCase();
+                if (['POST', 'PUT', 'PATCH', 'DELETE'].indexOf(method) !== -1) {
+                    const meta = document.querySelector('meta[name="csrf-token"]');
+                    const token = meta && meta.getAttribute('content');
+                    const headers = new Headers(options.headers || {});
+                    if (token && !headers.has('X-CSRFToken')) headers.set('X-CSRFToken', token);
+                    options.headers = headers;
+                }
+                return _fetch.call(this, resource, options);
+            };
+        })();
+    </script>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
@@ -21,7 +42,7 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+            <a class="navbar-brand" href="{{ url_for('main.dashboard') }}">
                 <i class="fas fa-tooth"></i> Dental Portal
             </a>
             
@@ -33,43 +54,50 @@
                 {% if session.user_id %}
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <a class="nav-link" href="{{ url_for('main.dashboard') }}">
                             <i class="fas fa-tachometer-alt"></i> Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ safe_url_for('appointments') }}">
+                        <a class="nav-link" href="{{ url_for('appointments.appointments') }}">
                             <i class="fas fa-calendar"></i> Appointments
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ safe_url_for('patients') }}">
+                        <a class="nav-link" href="{{ url_for('patients.list_patients') }}">
                             <i class="fas fa-users"></i> Patients
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ safe_url_for('clinics') }}">
+                        <a class="nav-link" href="{{ url_for('clinics.list_clinics') }}">
                             <i class="fas fa-clinic-medical"></i> Clinics
                         </a>
                     </li>
+                    {% if is_admin %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin.registrations') }}">
+                            <i class="fas fa-user-shield"></i> Approvals
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-plus"></i> Add New
                         </a>
                         <ul class="dropdown-menu">
                             <li>
-                                <a class="dropdown-item" href="{{ safe_url_for('create_patient') }}">
+                                <a class="dropdown-item" href="{{ url_for('patients.create_patient') }}">
                                     <i class="fas fa-user-plus"></i> New Patient
                                 </a>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="{{ safe_url_for('create_clinic') }}">
+                                <a class="dropdown-item" href="{{ url_for('clinics.create_clinic') }}">
                                     <i class="fas fa-clinic-medical"></i> New Clinic
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                <a class="dropdown-item" href="{{ safe_url_for('appointments') }}">
+                                <a class="dropdown-item" href="{{ url_for('appointments.appointments') }}">
                                     <i class="fas fa-calendar-plus"></i> New Appointment
                                 </a>
                             </li>
@@ -84,20 +112,23 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li>
-                                <a class="dropdown-item" href="#">
+                                <a class="dropdown-item" href="{{ url_for('main.settings') }}">
                                     <i class="fas fa-user-cog"></i> Profile
                                 </a>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="#">
+                                <a class="dropdown-item" href="{{ url_for('main.settings') }}">
                                     <i class="fas fa-cog"></i> Settings
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                <a class="dropdown-item" href="{{ url_for('logout') }}">
-                                    <i class="fas fa-sign-out-alt"></i> Logout
-                                </a>
+                                <form method="POST" action="{{ url_for('auth.logout') }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="dropdown-item">
+                                        <i class="fas fa-sign-out-alt"></i> Logout
+                                    </button>
+                                </form>
                             </li>
                         </ul>
                     </li>
@@ -129,7 +160,7 @@
     <!-- Footer -->
     <footer class="footer bg-light text-center py-3 mt-auto">
         <div class="container">
-            <span class="text-muted">© 2024 Dental Portal. All rights reserved.</span>
+            <span class="text-muted">© 2025 Dental Portal. All rights reserved.</span>
         </div>
     </footer>
 
@@ -271,6 +302,74 @@
                 });
             });
         });
+
+        // ── Unsaved-changes guard ───────────────────────────────────────────
+        // Warns before leaving a page with unsaved edits in a data-entry form.
+        // We deliberately do NOT cache form values to localStorage: this app
+        // handles patient PHI, and persisting it to the browser would leave
+        // sensitive data at rest on shared clinic machines.
+        (function () {
+            let isDirty = false;
+            let submitting = false;
+
+            window.markFormClean = function () { isDirty = false; };
+
+            function showBanner() {
+                let banner = document.getElementById('unsavedBanner');
+                if (!banner) {
+                    banner = document.createElement('div');
+                    banner.id = 'unsavedBanner';
+                    banner.style.cssText =
+                        'position:fixed;bottom:0;left:0;right:0;z-index:1080;' +
+                        'background:#fff3cd;color:#664d03;border-top:1px solid #ffecb5;' +
+                        'padding:8px 16px;text-align:center;font-size:14px;' +
+                        'box-shadow:0 -2px 6px rgba(0,0,0,.1);';
+                    banner.innerHTML =
+                        '<i class="fas fa-triangle-exclamation"></i> ' +
+                        'You have unsaved changes. Remember to save before leaving this page.';
+                    document.body.appendChild(banner);
+                }
+                banner.style.display = 'block';
+            }
+            function hideBanner() {
+                const banner = document.getElementById('unsavedBanner');
+                if (banner) banner.style.display = 'none';
+            }
+
+            // Shared API so JS-driven pages (e.g. the dental chart, which has no
+            // <form> and saves via fetch) can hook into the same guard + banner.
+            window.UnsavedGuard = {
+                markDirty: function () { if (!isDirty) { isDirty = true; showBanner(); } },
+                markClean: function () { isDirty = false; hideBanner(); },
+            };
+
+            document.addEventListener('DOMContentLoaded', function () {
+                // Guard only data-entry (POST) forms; skip GET search forms and
+                // anything explicitly opted out with data-no-guard.
+                const guarded = document.querySelectorAll(
+                    'form[method="post" i]:not([data-no-guard]), form[method="POST"]:not([data-no-guard])'
+                );
+                guarded.forEach(function (form) {
+                    const touch = function () {
+                        if (!isDirty) { isDirty = true; showBanner(); }
+                    };
+                    form.addEventListener('input', touch);
+                    form.addEventListener('change', touch);
+                    form.addEventListener('submit', function () {
+                        submitting = true;   // intentional navigation
+                        isDirty = false;
+                        hideBanner();
+                    });
+                });
+            });
+
+            window.addEventListener('beforeunload', function (e) {
+                if (isDirty && !submitting) {
+                    e.preventDefault();
+                    e.returnValue = '';   // triggers the browser's native confirm
+                }
+            });
+        })();
     </script>
 </body>
 </html>

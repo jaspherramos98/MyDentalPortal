@@ -11,10 +11,10 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1><i class="fas fa-tachometer-alt text-primary"></i> Dashboard</h1>
         <div>
-            <a href="{{ safe_url_for('create_clinic') }}" class="btn btn-outline-primary me-2">
+            <a href="{{ url_for('clinics.create_clinic') }}" class="btn btn-outline-primary me-2">
                 <i class="fas fa-building"></i> Add Clinic
             </a>
-            <a href="{{ safe_url_for('create_patient') }}" class="btn btn-primary">
+            <a href="{{ url_for('patients.create_patient') }}" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Add Patient
             </a>
         </div>
@@ -35,7 +35,7 @@
     <div class="row mb-4">
         <!-- Clinics Card -->
         <div class="col-md-3 mb-3">
-            <a href="{{ safe_url_for('clinics') }}" class="text-decoration-none">
+            <a href="{{ url_for('clinics.list_clinics') }}" class="text-decoration-none">
                 <div class="stat-card card h-100 bg-gradient-primary text-white shadow-sm hover-lift">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -58,7 +58,7 @@
         
         <!-- Patients Card -->
         <div class="col-md-3 mb-3">
-            <a href="{{ safe_url_for('patients') }}" class="text-decoration-none">
+            <a href="{{ url_for('patients.list_patients') }}" class="text-decoration-none">
                 <div class="stat-card card h-100 bg-gradient-success text-white shadow-sm hover-lift">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -81,7 +81,7 @@
         
         <!-- Appointments Card -->
         <div class="col-md-3 mb-3">
-            <a href="{{ safe_url_for('appointments') }}" class="text-decoration-none">
+            <a href="{{ url_for('appointments.appointments') }}" class="text-decoration-none">
                 <div class="stat-card card h-100 bg-gradient-warning text-white shadow-sm hover-lift">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -104,7 +104,7 @@
         
         <!-- This Week Card -->
         <div class="col-md-3 mb-3">
-            <a href="{{ safe_url_for('appointments') }}" class="text-decoration-none">
+            <a href="{{ url_for('appointments.appointments') }}" class="text-decoration-none">
                 <div class="stat-card card h-100 bg-gradient-info text-white shadow-sm hover-lift">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -133,7 +133,7 @@
             <div class="card shadow-sm h-100">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="fas fa-clinic-medical me-2"></i> Your Clinics</h5>
-                    <a href="{{ safe_url_for('create_clinic') }}" class="btn btn-sm btn-outline-light">
+                    <a href="{{ url_for('clinics.create_clinic') }}" class="btn btn-sm btn-outline-light">
                         <i class="fas fa-plus"></i> Add Clinic
                     </a>
                 </div>
@@ -157,11 +157,11 @@
                                     <div class="text-end">
                                         <small class="text-muted">{{ clinic.created_at.strftime('%m/%d/%Y') }}</small>
                                         <div class="mt-1">
-                                            <a href="{{ safe_url_for('patients') }}?clinic_id={{ clinic._id }}" 
+                                            <a href="{{ url_for('patients.list_patients') }}?clinic_id={{ clinic._id }}" 
                                                class="btn btn-sm btn-outline-primary me-1" title="View Patients">
                                                 <i class="fas fa-users"></i>
                                             </a>
-                                            <a href="{{ safe_url_for('appointments') }}?clinic_id={{ clinic._id }}" 
+                                            <a href="{{ url_for('appointments.appointments') }}?clinic_id={{ clinic._id }}" 
                                                class="btn btn-sm btn-primary" title="View Schedule">
                                                 <i class="fas fa-calendar"></i>
                                             </a>
@@ -172,7 +172,7 @@
                             {% endfor %}
                         </div>
                         <div class="text-center mt-3">
-                            <a href="{{ safe_url_for('clinics') }}" class="btn btn-outline-primary">
+                            <a href="{{ url_for('clinics.list_clinics') }}" class="btn btn-outline-primary">
                                 <i class="fas fa-clinic-medical me-1"></i> Manage All Clinics
                             </a>
                         </div>
@@ -181,7 +181,7 @@
                             <i class="fas fa-clinic-medical fa-4x text-muted mb-3"></i>
                             <h6 class="text-muted">No clinics yet</h6>
                             <p class="text-muted small">Add your first clinic to get started!</p>
-                            <a href="{{ safe_url_for('create_clinic') }}" class="btn btn-primary">
+                            <a href="{{ url_for('clinics.create_clinic') }}" class="btn btn-primary">
                                 <i class="fas fa-plus me-1"></i> Add Your First Clinic
                             </a>
                         </div>
@@ -195,7 +195,7 @@
             <div class="card shadow-sm h-100">
                 <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="fas fa-users me-2"></i> Recent Patients</h5>
-                    <a href="{{ safe_url_for('patients') }}" class="btn btn-sm btn-outline-light">
+                    <a href="{{ url_for('patients.list_patients') }}" class="btn btn-sm btn-outline-light">
                         View All
                     </a>
                 </div>
@@ -212,7 +212,7 @@
                                 </div>
                                 <div class="flex-grow-1">
                                     <h6 class="mb-0">
-                                        <a href="{{ safe_url_for('patient_detail', patient_id=patient._id) }}" 
+                                        <a href="{{ url_for('patients.patient_detail', patient_id=patient._id) }}" 
                                            class="text-decoration-none text-dark">
                                             {{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}
                                         </a>
@@ -224,7 +224,7 @@
                                 <div class="text-end">
                                     <small class="text-muted">{{ patient.created_at.strftime('%m/%d') }}</small>
                                     <div>
-                                        <a href="{{ safe_url_for('patient_detail', patient_id=patient._id) }}" 
+                                        <a href="{{ url_for('patients.patient_detail', patient_id=patient._id) }}" 
                                            class="btn btn-sm btn-outline-success" title="View Patient">
                                             <i class="fas fa-eye"></i>
                                         </a>
@@ -234,7 +234,7 @@
                             {% endfor %}
                         </div>
                         <div class="text-center mt-3">
-                            <a href="{{ safe_url_for('patients') }}" class="btn btn-outline-success">
+                            <a href="{{ url_for('patients.list_patients') }}" class="btn btn-outline-success">
                                 <i class="fas fa-users me-1"></i> View All Patients
                             </a>
                         </div>
@@ -243,7 +243,7 @@
                             <i class="fas fa-user-plus fa-4x text-muted mb-3"></i>
                             <h6 class="text-muted">No patients yet</h6>
                             <p class="text-muted small">Add your first patient to get started!</p>
-                            <a href="{{ safe_url_for('create_patient') }}" class="btn btn-success">
+                            <a href="{{ url_for('patients.create_patient') }}" class="btn btn-success">
                                 <i class="fas fa-plus me-1"></i> Add First Patient
                             </a>
                         </div>
@@ -260,7 +260,7 @@
             <div class="card shadow-sm">
                 <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="fas fa-calendar-day me-2"></i> Today's Appointments</h5>
-                    <a href="{{ safe_url_for('appointments') }}" class="btn btn-sm btn-outline-dark">
+                    <a href="{{ url_for('appointments.appointments') }}" class="btn btn-sm btn-outline-dark">
                         View Calendar
                     </a>
                 </div>
@@ -310,10 +310,10 @@
                                 <li><strong>Schedule Appointments:</strong> Manage your daily schedule</li>
                                 <li><strong>Track Records:</strong> Keep patient histories and treatments</li>
                             </ol>
-                            <a href="{{ safe_url_for('create_clinic') }}" class="btn btn-primary me-2">
+                            <a href="{{ url_for('clinics.create_clinic') }}" class="btn btn-primary me-2">
                                 <i class="fas fa-plus me-1"></i> Create Your First Clinic
                             </a>
-                            <a href="{{ safe_url_for('create_patient') }}" class="btn btn-outline-primary">
+                            <a href="{{ url_for('patients.create_patient') }}" class="btn btn-outline-primary">
                                 <i class="fas fa-user-plus me-1"></i> Add Patient
                             </a>
                         </div>

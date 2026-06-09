@@ -1,0 +1,111 @@
+<!-- File: MyDentalPortal/templates/settings.html -->
+<!-- Account settings: profile info, profile update, change password -->
+
+{% extends "base.html" %}
+
+{% block title %}Settings - Dental Portal{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex align-items-center mb-4">
+        <h1 class="mb-0"><i class="fas fa-cog"></i> Settings</h1>
+    </div>
+
+    <div class="row">
+        <!-- Account Information -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-id-card"></i> Account Information</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm mb-0">
+                        <tr>
+                            <td><strong>Email:</strong></td>
+                            <td>{{ user.email }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>License #:</strong></td>
+                            <td>{{ user.license_number or 'N/A' }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Role:</strong></td>
+                            <td><span class="badge bg-info text-dark">{{ user.role or 'dentist' }}</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Member Since:</strong></td>
+                            <td>{{ user.created_at | datefmt('%B %d, %Y') }}</td>
+                        </tr>
+                    </table>
+                    <p class="text-muted small mt-3 mb-0">
+                        <i class="fas fa-info-circle"></i>
+                        Email and license number cannot be changed here.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Update Profile -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-user-edit"></i> Update Profile</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('main.settings') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="action" value="profile">
+                        <div class="mb-3">
+                            <label class="form-label" for="name">Full Name</label>
+                            <input type="text" class="form-control" id="name" name="name"
+                                   value="{{ user.name or '' }}" required maxlength="120">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="specialty">Specialty</label>
+                            <input type="text" class="form-control" id="specialty" name="specialty"
+                                   value="{{ user.specialty or '' }}" maxlength="120">
+                        </div>
+                        <button type="submit" class="btn btn-info text-white">
+                            <i class="fas fa-save"></i> Save Profile
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Change Password -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-key"></i> Change Password</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('main.settings') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="action" value="password">
+                        <div class="mb-3">
+                            <label class="form-label" for="current_password">Current Password</label>
+                            <input type="password" class="form-control" id="current_password"
+                                   name="current_password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="new_password">New Password</label>
+                            <input type="password" class="form-control" id="new_password"
+                                   name="new_password" minlength="8" required>
+                            <div class="form-text">At least 8 characters.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="confirm_password">Confirm New Password</label>
+                            <input type="password" class="form-control" id="confirm_password"
+                                   name="confirm_password" minlength="8" required>
+                        </div>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-key"></i> Change Password
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

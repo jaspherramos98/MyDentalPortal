@@ -1,0 +1,57 @@
+<!-- File: MyDentalPortal/templates/clinics/edit.html -->
+{% extends "base.html" %}
+{% block title %}Edit Clinic - {{ clinic.name }}{% endblock %}
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4><i class="fas fa-clinic-medical me-2"></i>Edit Clinic</h4>
+        <a href="{{ url_for('clinics.list_clinics') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Back to Clinics
+        </a>
+    </div>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('clinics.edit_clinic', clinic_id=clinic._id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-3">
+                    <label for="name" class="form-label">Clinic Name *</label>
+                    <input type="text" class="form-control" id="name" name="name"
+                           value="{{ clinic.name }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="address" class="form-label">Address</label>
+                    <textarea class="form-control" id="address" name="address" rows="2">{{ clinic.address or '' }}</textarea>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="phone" class="form-label">Phone</label>
+                        <input type="text" class="form-control" id="phone" name="phone"
+                               value="{{ clinic.phone or '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email"
+                               value="{{ clinic.email or '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="currency" class="form-label">Currency</label>
+                        <select class="form-select" id="currency" name="currency">
+                            <option value="PHP" {{ 'selected' if clinic.get('currency') == 'PHP' }}>₱ PHP (Philippine Peso)</option>
+                            <option value="USD" {{ 'selected' if clinic.get('currency') == 'USD' }}>$ USD (US Dollar)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="operating_hours" class="form-label">Operating Hours</label>
+                    <input type="text" class="form-control" id="operating_hours" name="operating_hours"
+                           value="{{ clinic.operating_hours or '' }}" placeholder="e.g. Mon-Sat 9:00AM-5:00PM">
+                </div>
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('clinics.list_clinics') }}" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Update Clinic</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

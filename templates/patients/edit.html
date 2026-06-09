@@ -1,0 +1,131 @@
+<!-- File: MyDentalPortal/templates/patients/edit.html -->
+{% extends "base.html" %}
+{% block title %}Edit Patient - {{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4><i class="fas fa-user-edit me-2"></i>Edit Patient</h4>
+        <a href="{{ url_for('patients.patient_detail', patient_id=patient._id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Back to Patient
+        </a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <strong>{{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}</strong>
+            — {{ clinic.name }}
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('patients.edit_patient', patient_id=patient._id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <h5 class="mb-3 text-primary"><i class="fas fa-user me-1"></i> Personal Information</h5>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">First Name *</label>
+                        <input type="text" class="form-control" name="first_name"
+                               value="{{ patient.personal_info.first_name or '' }}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Middle Name</label>
+                        <input type="text" class="form-control" name="middle_name"
+                               value="{{ patient.personal_info.get('middle_name', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Last Name *</label>
+                        <input type="text" class="form-control" name="last_name"
+                               value="{{ patient.personal_info.last_name or '' }}" required>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Nickname</label>
+                        <input type="text" class="form-control" name="nickname"
+                               value="{{ patient.personal_info.get('nickname', '') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Gender</label>
+                        <select class="form-select" name="gender">
+                            <option value="M" {{ 'selected' if patient.personal_info.get('gender') == 'M' }}>Male</option>
+                            <option value="F" {{ 'selected' if patient.personal_info.get('gender') == 'F' }}>Female</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Birthday</label>
+                        <input type="date" class="form-control" name="birthday"
+                               value="{{ patient.personal_info.get('birthday', '') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Age</label>
+                        <input type="text" class="form-control" name="age"
+                               value="{{ patient.personal_info.get('age', '') }}">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Religion</label>
+                        <input type="text" class="form-control" name="religion"
+                               value="{{ patient.personal_info.get('religion', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Nationality</label>
+                        <input type="text" class="form-control" name="nationality"
+                               value="{{ patient.personal_info.get('nationality', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Occupation</label>
+                        <input type="text" class="form-control" name="occupation"
+                               value="{{ patient.personal_info.get('occupation', '') }}">
+                    </div>
+                </div>
+
+                <hr>
+                <h5 class="mb-3 text-primary"><i class="fas fa-phone me-1"></i> Contact Information</h5>
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <label class="form-label">Home Address</label>
+                        <textarea class="form-control" name="home_address" rows="2">{{ patient.contact_info.get('home_address', '') }}</textarea>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Landline</label>
+                        <input type="text" class="form-control" name="landline"
+                               value="{{ patient.contact_info.get('landline', '') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Cell Phone</label>
+                        <input type="text" class="form-control" name="cell_phone"
+                               value="{{ patient.contact_info.get('cell_phone', '') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Office No.</label>
+                        <input type="text" class="form-control" name="office_number"
+                               value="{{ patient.contact_info.get('office_number', '') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" name="patient_email"
+                               value="{{ patient.contact_info.get('email', '') }}">
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Dental Insurance</label>
+                        <input type="text" class="form-control" name="dental_insurance"
+                               value="{{ patient.insurance_info.get('dental_insurance', '') }}">
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <a href="{{ url_for('patients.patient_detail', patient_id=patient._id) }}" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,77 @@
+<!-- File: MyDentalPortal/templates/treatments/edit.html -->
+{% extends "base.html" %}
+{% block title %}Edit Treatment{% endblock %}
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4><i class="fas fa-edit me-2"></i>Edit Treatment Record</h4>
+        <a href="{{ url_for('patients.patient_detail', patient_id=treatment.patient_id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Back to Patient
+        </a>
+    </div>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('treatments.edit_treatment', treatment_id=treatment._id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="date" class="form-label">Date *</label>
+                        <input type="date" class="form-control" id="date" name="date"
+                               value="{{ treatment.date }}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="procedure" class="form-label">Procedure *</label>
+                        <input type="text" class="form-control" id="procedure" name="procedure"
+                               value="{{ treatment.procedure }}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="tooth_numbers" class="form-label">Tooth Number(s)</label>
+                        <input type="text" class="form-control" id="tooth_numbers" name="tooth_numbers"
+                               value="{{ treatment.tooth_numbers|join(', ') if treatment.tooth_numbers else '' }}">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="dentist" class="form-label">Dentist</label>
+                        <input type="text" class="form-control" id="dentist" name="dentist"
+                               value="{{ treatment.dentist }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="status" class="form-label">Status</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="completed" {{ 'selected' if treatment.status == 'completed' }}>Completed</option>
+                            <option value="in_progress" {{ 'selected' if treatment.status == 'in_progress' }}>In Progress</option>
+                            <option value="scheduled" {{ 'selected' if treatment.status == 'scheduled' }}>Scheduled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="next_appointment" class="form-label">Next Appointment</label>
+                        <input type="date" class="form-control" id="next_appointment" name="next_appointment"
+                               value="{{ treatment.next_appointment }}">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="amount_charged" class="form-label">Amount Charged</label>
+                        <input type="number" class="form-control" id="amount_charged" name="amount_charged"
+                               step="0.01" min="0" value="{{ treatment.amount_charged }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="amount_paid" class="form-label">Amount Paid</label>
+                        <input type="number" class="form-control" id="amount_paid" name="amount_paid"
+                               step="0.01" min="0" value="{{ treatment.amount_paid }}">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="notes" class="form-label">Notes</label>
+                    <textarea class="form-control" id="notes" name="notes" rows="3">{{ treatment.notes }}</textarea>
+                </div>
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('patients.patient_detail', patient_id=treatment.patient_id) }}" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
