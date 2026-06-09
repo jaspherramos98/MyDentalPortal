@@ -591,12 +591,9 @@
         },
 
         formatPhoneNumber: function(value) {
-            const cleaned = value.replace(/\D/g, '');
-            if (cleaned.length === 10) {
-                return `(${cleaned.substring(0,3)}) ${cleaned.substring(3,6)}-${cleaned.substring(6,10)}`;
-            } else if (cleaned.length === 11 && cleaned[0] === '1') {
-                return `+1 (${cleaned.substring(1,4)}) ${cleaned.substring(4,7)}-${cleaned.substring(7,11)}`;
-            }
+            // Leave phone numbers exactly as entered. PH numbers vary widely
+            // (mobile 09xx / +639xx, landlines with 2- or 3-digit area codes),
+            // so we don't force any single format.
             return value;
         },
 
@@ -762,9 +759,9 @@
             phoneInputs.forEach(input => {
                 if (input.value && input.value.length > 0) {
                     const cleaned = input.value.replace(/\D/g, '');
-                    if (cleaned.length < 10) {
+                    if (cleaned.length < 7) {
                         input.classList.add('is-invalid');
-                        errors.push('Phone numbers must have at least 10 digits.');
+                        errors.push('Phone numbers must have at least 7 digits.');
                         isValid = false;
                     } else {
                         input.classList.remove('is-invalid');

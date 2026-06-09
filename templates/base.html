@@ -287,18 +287,31 @@
             });
         });
 
-        // Add loading state to buttons
+        // Add loading state to submit buttons (prevents double-submit) without
+        // ever locking the user out.
         document.addEventListener('DOMContentLoaded', function() {
             const forms = document.querySelectorAll('form');
             forms.forEach(function(form) {
-                form.addEventListener('submit', function() {
+                form.addEventListener('submit', function(e) {
+                    // If validation (native or a custom handler) blocked the
+                    // submit, do NOT show loading — otherwise the button stays
+                    // stuck on "Loading..." and can't be clicked again.
+                    if (e.defaultPrevented) return;
+                    if (typeof form.checkValidity === 'function' && !form.checkValidity()) return;
+
                     const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
-                    if (submitBtn) {
-                        submitBtn.disabled = true;
-                        const originalText = submitBtn.textContent || submitBtn.value;
-                        submitBtn.textContent = 'Loading...';
-                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
-                    }
+                    if (!submitBtn) return;
+
+                    const originalHTML = submitBtn.innerHTML;
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+
+                    // Safety net: if the page hasn't navigated away (slow/failed/
+                    // blocked submit), restore the button so the user isn't locked.
+                    setTimeout(function() {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalHTML;
+                    }, 10000);
                 });
             });
         });
