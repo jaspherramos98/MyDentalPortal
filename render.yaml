@@ -5,7 +5,7 @@ services:
   - type: web
     name: dental-portal
     env: python
-    runtime: python-3.11.5
+    runtime: python-3.11.9
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
@@ -18,7 +18,7 @@ services:
       - key: ADMIN_EMAILS
         sync: false
       - key: PYTHON_VERSION
-        value: 3.11.5
+        value: 3.11.9
       - key: TIMEZONE
         value: Asia/Manila
       - key: DEFAULT_CURRENCY
