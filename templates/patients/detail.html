@@ -81,10 +81,9 @@
                               enctype="multipart/form-data" class="mt-2" data-no-guard>
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="file" name="photo" accept="image/*"
-                                   class="form-control form-control-sm mb-2" required
-                                   onchange="this.form.querySelector('button[type=submit]').disabled = !this.files.length;">
+                                   class="form-control form-control-sm mb-2" required>
                             <div class="d-flex justify-content-center gap-2">
-                                <button type="submit" class="btn btn-sm btn-outline-primary" disabled>
+                                <button type="submit" class="btn btn-sm btn-outline-primary">
                                     <i class="fas fa-upload"></i> {{ 'Replace' if patient.get('photo_file_id') else 'Upload' }} Photo
                                 </button>
                             </div>
