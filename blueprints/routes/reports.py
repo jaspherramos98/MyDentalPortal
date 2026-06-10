@@ -83,9 +83,15 @@ def reports():
     symbol = CURRENCY_SYMBOLS.get(currency_code, '')
 
     # ── period ──
-    rng = request.args.get('range', '12m')
+    # Default to "all time" so a clinic's older treatments are never silently
+    # hidden behind a rolling window — the user narrows down with the selector.
+    rng = request.args.get('range', 'all')
     if rng not in RANGES:
-        rng = '12m'
+        rng = 'all'
+    period_label = {
+        'thismonth': 'This month', '6m': 'Last 6 months',
+        '12m': 'Last 12 months', 'all': 'All time',
+    }[rng]
     today = datetime.now()
     this_month = datetime(today.year, today.month, 1)
     months_back = RANGES[rng]
@@ -96,7 +102,7 @@ def reports():
     if not scope_ids:
         return render_template(
             'reports/index.html', clinics=clinics, selected_clinic=sel,
-            selected_range=rng, has_data=False, symbol=symbol,
+            selected_range=rng, period_label=period_label, has_data=False, symbol=symbol,
             mixed_currency=mixed_currency, kpis={}, charts={},
         )
 
@@ -227,6 +233,7 @@ def reports():
         clinics=clinics,
         selected_clinic=sel,
         selected_range=rng,
+        period_label=period_label,
         has_data=(treatment_count > 0 or new_patients > 0),
         symbol=symbol,
         mixed_currency=mixed_currency,
