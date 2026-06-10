@@ -32,6 +32,9 @@
                 <a href="{{ url_for('charts.view_chart', patient_id=patient._id) }}" class="btn btn-outline-info">
                     <i class="fas fa-tooth"></i> Dental Chart
                 </a>
+                <a href="{{ url_for('patients.patient_pdf', patient_id=patient._id) }}" class="btn btn-outline-dark">
+                    <i class="fas fa-file-pdf"></i> Export PDF
+                </a>
                 <a href="{{ url_for('treatments.add_treatment', patient_id=patient._id) }}" class="btn btn-outline-success">
                     <i class="fas fa-plus"></i> Add Treatment
                 </a>
@@ -742,10 +745,6 @@
                                             <tr>
                                                 <td><strong>Last Updated:</strong></td>
                                                 <td>{{ patient.updated_at | datefmt('%B %d, %Y at %I:%M %p') }}</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>Patient ID:</strong></td>
-                                                <td class="font-monospace">{{ patient._id }}</td>
                                             </tr>
                                         </table>
                                     </div>

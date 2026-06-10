@@ -3,14 +3,17 @@
 
 from flask import (
     Blueprint, render_template, request, session,
-    redirect, url_for, flash, jsonify,
+    redirect, url_for, flash, jsonify, send_file,
 )
 from bson.objectid import ObjectId
 from datetime import datetime
 import traceback
 
 from extensions import mongo
-from blueprints.utils import login_required, user_clinic_ids as _get_user_clinic_ids
+from blueprints.utils import (
+    login_required, user_clinic_ids as _get_user_clinic_ids, verify_patient_access,
+)
+from werkzeug.utils import secure_filename
 
 patients_bp = Blueprint('patients', __name__)
 
@@ -301,6 +304,33 @@ def patient_detail(patient_id):
         traceback.print_exc()
         flash(f'Error loading patient details: {e}', 'error')
         return redirect(url_for('patients.list_patients'))
+
+
+# ── PDF EXPORT ───────────────────────────────────────────────────────────
+@patients_bp.route('/patients/<patient_id>/pdf')
+@login_required
+def patient_pdf(patient_id):
+    patient, clinic = verify_patient_access(patient_id)
+    if not clinic:
+        flash('Patient not found', 'error')
+        return redirect(url_for('patients.list_patients'))
+    try:
+        _ensure_nested(patient)
+        from blueprints.utils.pdf import build_patient_pdf
+        buf = build_patient_pdf(patient, clinic)
+        pi = patient.get('personal_info', {})
+        fname = secure_filename(
+            'patient_%s_%s' % (pi.get('first_name', ''), pi.get('last_name', ''))
+        ) or 'patient_record'
+        resp = send_file(buf, mimetype='application/pdf',
+                         as_attachment=True, download_name=fname + '.pdf')
+        resp.headers['X-Content-Type-Options'] = 'nosniff'
+        return resp
+    except Exception as e:
+        print(f"[ERROR] Patient PDF: {e}")
+        traceback.print_exc()
+        flash('Could not generate the PDF.', 'error')
+        return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
 
 # ── EDIT ─────────────────────────────────────────────────────────────────

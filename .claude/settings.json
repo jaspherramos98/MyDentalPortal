@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -q -m ' *)",
+      "Bash(./venv/Scripts/python.exe -m py_compile blueprints/routes/patients.py)",
+      "Bash(./venv/Scripts/python.exe -c ' *)",
+      "Bash(./venv/Scripts/python.exe -m pip install \"reportlab==4.2.2\")"
+    ]
+  }
+}

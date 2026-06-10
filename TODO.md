@@ -116,3 +116,11 @@ Still owed (need the live host / your action):
    - 2.1 Use as many beneficial AWS services as possible within the **free tier**
          (target: Elastic Beanstalk or ECS Fargate, MongoDB Atlas, S3 for files,
           CloudFront, SES for email).
+
+3. **Multi-staff shared clinic (far future).**
+   - Today every account is data-isolated by `owner_id`: clinics belong to the
+     account that created them, and patients belong to clinics, so accounts can't
+     share data. For a clinic with multiple staff logins (dentist + assistants)
+     sharing the same patients, replace single-owner with **clinic membership**
+     (a clinic has many member users; access is by membership, not ownership).
+     Larger architectural change; revisit only when multiple staff logins are needed.
