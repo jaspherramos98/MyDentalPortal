@@ -61,7 +61,7 @@
                     </p>
                 </div>
                 <div class="card-footer bg-transparent d-flex justify-content-between align-items-center">
-                    <small class="text-muted">Created {{ clinic.created_at.strftime('%m/%d/%Y') }}</small>
+                    <small class="text-muted">Created {{ clinic.created_at | datefmt('%m/%d/%Y') }}</small>
                     <div class="btn-group" role="group">
                         <a href="{{ url_for('patients.list_patients') }}?clinic_id={{ clinic._id }}"
                            class="btn btn-outline-primary btn-sm" title="View Patients">

@@ -155,7 +155,7 @@
                                         </p>
                                     </div>
                                     <div class="text-end">
-                                        <small class="text-muted">{{ clinic.created_at.strftime('%m/%d/%Y') }}</small>
+                                        <small class="text-muted">{{ clinic.created_at | datefmt('%m/%d/%Y') }}</small>
                                         <div class="mt-1">
                                             <a href="{{ url_for('patients.list_patients') }}?clinic_id={{ clinic._id }}" 
                                                class="btn btn-sm btn-outline-primary me-1" title="View Patients">
