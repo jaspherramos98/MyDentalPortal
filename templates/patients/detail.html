@@ -76,14 +76,20 @@
                         {% endif %}
 
                         <!-- Photo upload / replace / remove -->
+                        <!-- One-click: the button opens the file picker and the
+                             form auto-submits as soon as an image is chosen. The
+                             native file input is hidden to avoid a confusing
+                             two-step "Choose File" + "Upload" flow. -->
                         <form method="POST"
                               action="{{ url_for('uploads.set_photo', patient_id=patient._id) }}"
                               enctype="multipart/form-data" class="mt-2" data-no-guard>
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="file" name="photo" accept="image/*"
-                                   class="form-control form-control-sm mb-2" required>
+                            <input type="file" name="photo" id="patientPhotoInput" accept="image/*"
+                                   class="d-none"
+                                   onchange="if (this.files.length) { this.form.submit(); }">
                             <div class="d-flex justify-content-center gap-2">
-                                <button type="submit" class="btn btn-sm btn-outline-primary">
+                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                        onclick="document.getElementById('patientPhotoInput').click();">
                                     <i class="fas fa-upload"></i> {{ 'Replace' if patient.get('photo_file_id') else 'Upload' }} Photo
                                 </button>
                             </div>
