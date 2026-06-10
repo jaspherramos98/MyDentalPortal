@@ -104,6 +104,7 @@
                 <div class="kpi-label">Outstanding</div><i class="fas fa-hourglass-half kpi-icon"></i>
             </div>
             <div class="kpi-value mt-2">{{ kpis.total_outstanding }}</div>
+            <div class="kpi-label mt-1">total unpaid (all time)</div>
         </div></div>
     </div>
     <div class="col-6 col-md-4 col-lg-2">
@@ -143,7 +144,7 @@
     </div>
     <div class="col-lg-4">
         <div class="card chart-card h-100">
-            <div class="card-header"><i class="fas fa-coins text-warning"></i> Collected vs Outstanding</div>
+            <div class="card-header"><i class="fas fa-coins text-warning"></i> Collected vs Outstanding <small class="text-muted fw-normal">(all time)</small></div>
             <div class="card-body"><div class="chart-box"><canvas id="collectionChart"></canvas></div></div>
         </div>
     </div>

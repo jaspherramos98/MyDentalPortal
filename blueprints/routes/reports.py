@@ -109,7 +109,8 @@ def reports():
         'procedure': 1, 'status': 1,
     }))
 
-    total_billed = total_paid = total_outstanding = 0.0
+    # Period-scoped figures (revenue/billed in the selected window + time series).
+    total_billed = total_paid = 0.0
     monthly_paid = defaultdict(float)
     monthly_billed = defaultdict(float)
     proc_rev = defaultdict(float)
@@ -119,12 +120,8 @@ def reports():
     for t in treatments:
         charged = float(t.get('amount_charged') or 0)
         paid = float(t.get('amount_paid') or 0)
-        bal = t.get('balance')
-        bal = float(bal) if bal is not None else (charged - paid)
         total_billed += charged
         total_paid += paid
-        if bal > 0:
-            total_outstanding += bal
 
         d = (t.get('date') or '')[:7]   # 'YYYY-MM'
         if len(d) == 7:
@@ -136,6 +133,24 @@ def reports():
         proc = (t.get('procedure') or '').strip() or 'Unspecified'
         proc_rev[proc] += paid
         status_count[(t.get('status') or 'completed').strip().lower()] += 1
+
+    # ── all-time accounts-receivable (point in time, NOT period-scoped) ──
+    # Outstanding balance and lifetime collections are "as of now" figures: an
+    # old unpaid treatment is still owed today, and clearing any balance must
+    # always reduce it regardless of the selected period. So these are summed
+    # across every treatment in scope, ignoring the date filter.
+    all_collected = all_outstanding = 0.0
+    for t in mongo.db.treatment_records.find(
+        {'clinic_id': {'$in': scope_ids}},
+        {'amount_charged': 1, 'amount_paid': 1, 'balance': 1},
+    ):
+        charged = float(t.get('amount_charged') or 0)
+        paid = float(t.get('amount_paid') or 0)
+        bal = t.get('balance')
+        bal = float(bal) if bal is not None else (charged - paid)
+        all_collected += paid
+        if bal > 0:
+            all_outstanding += bal
 
     # ── new patients (created_at is a real datetime) ──
     pq = {'clinic_id': {'$in': scope_ids}, 'is_active': True}
@@ -154,9 +169,14 @@ def reports():
 
     # ── month axis ──
     if start_dt is None:
+        # "All time": start at the earliest data month, but cap the axis to a
+        # trailing 24-month window so stray/old dates can't render a giant chart.
         try:
-            first = datetime.strptime((earliest or this_month.strftime('%Y-%m')) + '-01', '%Y-%m-%d')
+            earliest_dt = datetime.strptime((earliest or this_month.strftime('%Y-%m')) + '-01', '%Y-%m-%d')
         except ValueError:
+            earliest_dt = this_month
+        first = max(earliest_dt, _add_months(this_month, -23))
+        if first > this_month:
             first = this_month
     else:
         first = start_dt
@@ -181,7 +201,7 @@ def reports():
     kpis = {
         'total_paid': _fmt(symbol, total_paid),
         'total_billed': _fmt(symbol, total_billed),
-        'total_outstanding': _fmt(symbol, total_outstanding),
+        'total_outstanding': _fmt(symbol, all_outstanding),
         'treatment_count': treatment_count,
         'new_patients': new_patients,
         'avg_per': _fmt(symbol, avg_per),
@@ -197,8 +217,8 @@ def reports():
         'proc_values': proc_values,
         'status_labels': [s.title() for s in status_count.keys()],
         'status_values': list(status_count.values()),
-        'collected': round(total_paid, 2),
-        'outstanding': round(total_outstanding, 2),
+        'collected': round(all_collected, 2),
+        'outstanding': round(all_outstanding, 2),
         'symbol': symbol,
     }
 
