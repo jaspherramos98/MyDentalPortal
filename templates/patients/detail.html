@@ -513,6 +513,7 @@
                                                 <th>Dentist</th>
                                                 <th>Amount</th>
                                                 <th>Status</th>
+                                                <th class="text-end">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -536,6 +537,33 @@
                                                     <span class="badge bg-{{ 'success' if treatment.balance == 0 else 'warning' }}">
                                                         {{ 'Paid' if treatment.balance == 0 else 'Outstanding' }}
                                                     </span>
+                                                </td>
+                                                <td class="text-end text-nowrap">
+                                                    <div class="btn-group btn-group-sm" role="group">
+                                                        {% if treatment.balance > 0 %}
+                                                        <form method="POST" class="d-inline"
+                                                              action="{{ url_for('treatments.mark_paid', treatment_id=treatment._id) }}"
+                                                              onsubmit="return confirm('Mark this treatment as fully paid? This sets Amount Paid to {{ clinic.get('currency', 'PHP') }} {{ '%.2f'|format(treatment.amount_charged) }} and clears the balance.');">
+                                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                            <button type="submit" class="btn btn-outline-success" title="Mark fully paid">
+                                                                <i class="fas fa-check"></i> Mark Paid
+                                                            </button>
+                                                        </form>
+                                                        {% endif %}
+                                                        <a class="btn btn-outline-primary"
+                                                           href="{{ url_for('treatments.edit_treatment', treatment_id=treatment._id) }}"
+                                                           title="Edit treatment (for partial payments)">
+                                                            <i class="fas fa-edit"></i>
+                                                        </a>
+                                                        <form method="POST" class="d-inline"
+                                                              action="{{ url_for('treatments.delete_treatment', treatment_id=treatment._id) }}"
+                                                              onsubmit="return confirm('Delete this treatment record? This cannot be undone.');">
+                                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                            <button type="submit" class="btn btn-outline-danger" title="Delete treatment">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                        </form>
+                                                    </div>
                                                 </td>
                                             </tr>
                                             {% endfor %}

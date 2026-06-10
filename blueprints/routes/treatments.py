@@ -125,6 +125,36 @@ def edit_treatment(treatment_id):
         return redirect(url_for('patients.list_patients'))
 
 
+# ── MARK FULLY PAID ──────────────────────────────────────────────────────
+@treatments_bp.route('/treatments/<treatment_id>/mark-paid', methods=['POST'])
+@login_required
+def mark_paid(treatment_id):
+    """Clear a treatment's outstanding balance by setting amount_paid = charged."""
+    try:
+        treatment = mongo.db.treatment_records.find_one({'_id': ObjectId(treatment_id)})
+        if treatment:
+            patient, clinic = _verify_patient_access(str(treatment['patient_id']))
+            if clinic:
+                charged = float(treatment.get('amount_charged') or 0)
+                mongo.db.treatment_records.update_one(
+                    {'_id': treatment['_id']},
+                    {'$set': {
+                        'amount_paid': charged,
+                        'balance': 0.0,
+                        'updated_at': datetime.utcnow(),
+                    }},
+                )
+                flash('Treatment marked as fully paid.', 'success')
+                return redirect(url_for('patients.patient_detail',
+                                        patient_id=str(treatment['patient_id'])))
+        flash('Access denied or treatment not found', 'error')
+    except Exception as e:
+        print(f"[ERROR] Mark paid: {e}")
+        traceback.print_exc()
+        flash('Error updating payment', 'error')
+    return redirect(url_for('patients.list_patients'))
+
+
 # ── DELETE TREATMENT ─────────────────────────────────────────────────────
 @treatments_bp.route('/treatments/<treatment_id>/delete', methods=['POST'])
 @login_required
