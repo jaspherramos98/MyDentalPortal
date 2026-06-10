@@ -1,0 +1,271 @@
+<!-- File: MyDentalPortal/templates/reports/index.html -->
+<!-- Sales / performance dashboard with Chart.js visualisations. -->
+
+{% extends "base.html" %}
+
+{% block title %}Performance - Dental Portal{% endblock %}
+
+{% block extra_css %}
+<style>
+.kpi-card {
+    border: none;
+    border-radius: 14px;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(0,0,0,.12);
+    overflow: hidden;
+}
+.kpi-card .kpi-icon {
+    font-size: 1.6rem;
+    opacity: .85;
+}
+.kpi-card .kpi-value { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
+.kpi-card .kpi-label { font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; opacity: .9; }
+.kpi-revenue   { background: linear-gradient(135deg,#1e9e6a,#0f7a4d); }
+.kpi-billed    { background: linear-gradient(135deg,#0d6efd,#0a58ca); }
+.kpi-out       { background: linear-gradient(135deg,#e0a800,#c69500); }
+.kpi-rate      { background: linear-gradient(135deg,#6f42c1,#59359a); }
+.kpi-treat     { background: linear-gradient(135deg,#20c4d4,#1399a6); }
+.kpi-patients  { background: linear-gradient(135deg,#fd7e14,#dc6502); }
+.chart-card { border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+.chart-card .card-header { background:#fff; border-bottom:1px solid #eef0f2; font-weight:600; }
+.chart-box { position: relative; height: 320px; }
+.chart-box-sm { position: relative; height: 280px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h1 class="mb-0"><i class="fas fa-chart-line text-primary"></i> Performance</h1>
+        <p class="text-muted mb-0">Sales, collections and clinic activity</p>
+    </div>
+    <form method="GET" action="{{ url_for('reports.reports') }}" class="d-flex flex-wrap gap-2"
+          data-no-guard>
+        {% if clinics|length > 1 %}
+        <select name="clinic" class="form-select form-select-sm" style="width:auto"
+                onchange="this.form.submit()">
+            <option value="">All clinics</option>
+            {% for c in clinics %}
+            <option value="{{ c._id }}" {{ 'selected' if selected_clinic == (c._id|string) else '' }}>
+                {{ c.name }}
+            </option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <select name="range" class="form-select form-select-sm" style="width:auto"
+                onchange="this.form.submit()">
+            <option value="thismonth" {{ 'selected' if selected_range=='thismonth' else '' }}>This month</option>
+            <option value="6m"  {{ 'selected' if selected_range=='6m'  else '' }}>Last 6 months</option>
+            <option value="12m" {{ 'selected' if selected_range=='12m' else '' }}>Last 12 months</option>
+            <option value="all" {{ 'selected' if selected_range=='all' else '' }}>All time</option>
+        </select>
+        <noscript><button class="btn btn-sm btn-primary">Apply</button></noscript>
+    </form>
+</div>
+
+{% if mixed_currency %}
+<div class="alert alert-warning py-2">
+    <i class="fas fa-exclamation-triangle"></i>
+    Your clinics use different currencies. Totals shown without a symbol may mix currencies — pick a single clinic for accurate figures.
+</div>
+{% endif %}
+
+{% if not has_data %}
+<div class="card chart-card">
+    <div class="card-body text-center text-muted py-5">
+        <i class="fas fa-chart-pie fa-3x mb-3 opacity-50"></i>
+        <h5>No data for this period</h5>
+        <p class="mb-0">Add treatment records (with amounts) to see sales and performance here.</p>
+    </div>
+</div>
+{% else %}
+
+<!-- KPI cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card kpi-card kpi-revenue h-100"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="kpi-label">Revenue</div><i class="fas fa-sack-dollar kpi-icon"></i>
+            </div>
+            <div class="kpi-value mt-2">{{ kpis.total_paid }}</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card kpi-card kpi-billed h-100"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="kpi-label">Billed</div><i class="fas fa-file-invoice-dollar kpi-icon"></i>
+            </div>
+            <div class="kpi-value mt-2">{{ kpis.total_billed }}</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card kpi-card kpi-out h-100"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="kpi-label">Outstanding</div><i class="fas fa-hourglass-half kpi-icon"></i>
+            </div>
+            <div class="kpi-value mt-2">{{ kpis.total_outstanding }}</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card kpi-card kpi-rate h-100"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="kpi-label">Collection</div><i class="fas fa-percent kpi-icon"></i>
+            </div>
+            <div class="kpi-value mt-2">{{ kpis.collection_rate }}</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card kpi-card kpi-treat h-100"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="kpi-label">Treatments</div><i class="fas fa-tooth kpi-icon"></i>
+            </div>
+            <div class="kpi-value mt-2">{{ kpis.treatment_count }}</div>
+            <div class="kpi-label mt-1">avg {{ kpis.avg_per }}</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card kpi-card kpi-patients h-100"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="kpi-label">New Patients</div><i class="fas fa-user-plus kpi-icon"></i>
+            </div>
+            <div class="kpi-value mt-2">{{ kpis.new_patients }}</div>
+        </div></div>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card chart-card h-100">
+            <div class="card-header"><i class="fas fa-chart-area text-success"></i> Revenue Over Time</div>
+            <div class="card-body"><div class="chart-box"><canvas id="revenueChart"></canvas></div></div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card chart-card h-100">
+            <div class="card-header"><i class="fas fa-coins text-warning"></i> Collected vs Outstanding</div>
+            <div class="card-body"><div class="chart-box"><canvas id="collectionChart"></canvas></div></div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card chart-card h-100">
+            <div class="card-header"><i class="fas fa-list-ol text-primary"></i> Top Procedures by Revenue</div>
+            <div class="card-body"><div class="chart-box-sm"><canvas id="procChart"></canvas></div></div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card chart-card h-100">
+            <div class="card-header"><i class="fas fa-clipboard-check text-info"></i> Treatments by Status</div>
+            <div class="card-body"><div class="chart-box-sm"><canvas id="statusChart"></canvas></div></div>
+        </div>
+    </div>
+    <div class="col-12">
+        <div class="card chart-card">
+            <div class="card-header"><i class="fas fa-user-plus text-warning"></i> New Patients Per Month</div>
+            <div class="card-body"><div class="chart-box-sm"><canvas id="patientsChart"></canvas></div></div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if has_data %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(function () {
+    const D = {{ charts|tojson }};
+    const sym = D.symbol || '';
+    const money = (v) => sym + Number(v).toLocaleString(undefined, {maximumFractionDigits: 0});
+    const palette = ['#0d6efd','#1e9e6a','#fd7e14','#6f42c1','#20c4d4','#dc3545','#e0a800','#59359a','#1399a6'];
+
+    Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+    Chart.defaults.color = '#5a6473';
+
+    // Revenue over time (billed line + paid filled area)
+    new Chart(document.getElementById('revenueChart'), {
+        type: 'line',
+        data: {
+            labels: D.month_labels,
+            datasets: [
+                {
+                    label: 'Collected', data: D.monthly_paid,
+                    borderColor: '#1e9e6a', backgroundColor: 'rgba(30,158,106,.15)',
+                    fill: true, tension: .35, borderWidth: 2, pointRadius: 3,
+                },
+                {
+                    label: 'Billed', data: D.monthly_billed,
+                    borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,.05)',
+                    fill: false, tension: .35, borderWidth: 2, borderDash: [5,4], pointRadius: 2,
+                },
+            ],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: { tooltip: { callbacks: { label: (c) => c.dataset.label + ': ' + money(c.parsed.y) } } },
+            scales: { y: { beginAtZero: true, ticks: { callback: (v) => money(v) } } },
+        },
+    });
+
+    // Collected vs Outstanding doughnut
+    new Chart(document.getElementById('collectionChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Collected', 'Outstanding'],
+            datasets: [{ data: [D.collected, D.outstanding], backgroundColor: ['#1e9e6a','#e0a800'], borderWidth: 0 }],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, cutout: '62%',
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: { callbacks: { label: (c) => c.label + ': ' + money(c.parsed) } },
+            },
+        },
+    });
+
+    // Top procedures (horizontal bar)
+    new Chart(document.getElementById('procChart'), {
+        type: 'bar',
+        data: {
+            labels: D.proc_labels,
+            datasets: [{ label: 'Revenue', data: D.proc_values, backgroundColor: '#0d6efd', borderRadius: 5 }],
+        },
+        options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false },
+                tooltip: { callbacks: { label: (c) => money(c.parsed.x) } } },
+            scales: { x: { beginAtZero: true, ticks: { callback: (v) => money(v) } } },
+        },
+    });
+
+    // Treatments by status (doughnut)
+    new Chart(document.getElementById('statusChart'), {
+        type: 'doughnut',
+        data: {
+            labels: D.status_labels,
+            datasets: [{ data: D.status_values, backgroundColor: palette, borderWidth: 0 }],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, cutout: '58%',
+            plugins: { legend: { position: 'bottom' } },
+        },
+    });
+
+    // New patients per month (bar)
+    new Chart(document.getElementById('patientsChart'), {
+        type: 'bar',
+        data: {
+            labels: D.month_labels,
+            datasets: [{ label: 'New patients', data: D.monthly_new, backgroundColor: '#fd7e14', borderRadius: 5 }],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+        },
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

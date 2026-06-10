@@ -44,6 +44,7 @@ from blueprints.routes.treatments import treatments_bp
 from blueprints.routes.appointments import appointments_bp
 from blueprints.routes.uploads import uploads_bp
 from blueprints.routes.admin import admin_bp
+from blueprints.routes.reports import reports_bp
 from blueprints.utils import is_admin
 
 app.register_blueprint(auth_bp)
@@ -55,6 +56,7 @@ app.register_blueprint(treatments_bp)
 app.register_blueprint(appointments_bp)
 app.register_blueprint(uploads_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(reports_bp)
 
 # ---------------------------------------------------------------------------
 # Template helpers
