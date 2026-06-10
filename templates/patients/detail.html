@@ -67,7 +67,7 @@
                             </tr>
                             <tr>
                                 <td><strong>Birthdate:</strong></td>
-                                <td>{{ patient.personal_info.birthdate or 'N/A' }}</td>
+                                <td>{{ patient.personal_info.birthday or 'N/A' }}</td>
                             </tr>
                             <tr>
                                 <td><strong>Occupation:</strong></td>
@@ -75,7 +75,7 @@
                             </tr>
                             <tr>
                                 <td><strong>Insurance:</strong></td>
-                                <td>{{ patient.personal_info.dental_insurance or 'None' }}</td>
+                                <td>{{ patient.insurance_info.get('dental_insurance') or 'None' }}</td>
                             </tr>
                             <tr>
                                 <td><strong>Patient Since:</strong></td>
@@ -154,12 +154,13 @@
                     <div class="card-body">
                         <!-- Allergies -->
                         {% set allergies = [] %}
-                        {% if patient.medical_history.allergies.get('local_anesthetic') %}{% set _ = allergies.append('Local Anesthetic') %}{% endif %}
+                        {% if patient.medical_history.allergies.get('local_anesthesia') %}{% set _ = allergies.append('Local Anesthetic') %}{% endif %}
                         {% if patient.medical_history.allergies.get('penicillin') %}{% set _ = allergies.append('Penicillin') %}{% endif %}
+                        {% if patient.medical_history.allergies.get('antibiotics') %}{% set _ = allergies.append('Antibiotics') %}{% endif %}
                         {% if patient.medical_history.allergies.get('sulfa_drugs') %}{% set _ = allergies.append('Sulfa Drugs') %}{% endif %}
                         {% if patient.medical_history.allergies.get('aspirin') %}{% set _ = allergies.append('Aspirin') %}{% endif %}
                         {% if patient.medical_history.allergies.get('latex') %}{% set _ = allergies.append('Latex') %}{% endif %}
-                        {% if patient.medical_history.allergies.get('others') %}{% set _ = allergies.append(patient.medical_history.allergies.others) %}{% endif %}
+                        {% if patient.medical_history.allergies.get('other') %}{% set _ = allergies.append(patient.medical_history.allergies.other) %}{% endif %}
 
                         {% if allergies %}
                         <div class="mb-3">
@@ -172,10 +173,10 @@
 
                        <!-- Medical Conditions -->
                         {% set conditions = [] %}
-                        {% if patient.medical_history.medical_conditions.get('diabetes') %}{% set _ = conditions.append('Diabetes') %}{% endif %}
-                        {% if patient.medical_history.medical_conditions.get('high_blood_pressure') %}{% set _ = conditions.append('High Blood Pressure') %}{% endif %}
-                        {% if patient.medical_history.medical_conditions.get('heart_disease') %}{% set _ = conditions.append('Heart Disease') %}{% endif %}
-                        {% if patient.medical_history.medical_conditions.get('asthma') %}{% set _ = conditions.append('Asthma') %}{% endif %}
+                        {% if patient.medical_history.conditions.get('diabetes') %}{% set _ = conditions.append('Diabetes') %}{% endif %}
+                        {% if patient.medical_history.conditions.get('high_blood_pressure') %}{% set _ = conditions.append('High Blood Pressure') %}{% endif %}
+                        {% if patient.medical_history.conditions.get('heart_disease') %}{% set _ = conditions.append('Heart Disease') %}{% endif %}
+                        {% if patient.medical_history.conditions.get('asthma') %}{% set _ = conditions.append('Asthma') %}{% endif %}
 
                         {% if conditions %}
                         <div class="mb-3">
@@ -187,28 +188,28 @@
                         {% endif %}
 
                         <!-- Current Medications -->
-                        {% if patient.medical_history.general_health.current_medications %}
+                        {% if patient.medical_history.current_medications %}
                         <div class="mb-3">
                             <h6><i class="fas fa-pills"></i> Current Medications</h6>
-                            <p class="small">{{ patient.medical_history.general_health.current_medications }}</p>
+                            <p class="small">{{ patient.medical_history.current_medications }}</p>
                         </div>
                         {% endif %}
 
                         <!-- Women's Health Alerts -->
                         {% if patient.personal_info.gender == 'F' %}
-                        {% if patient.medical_history.women_health.pregnant %}
+                        {% if patient.medical_history.women_health.pregnant == 'yes' %}
                         <div class="alert alert-info py-2 px-3 mb-2">
                             <small><i class="fas fa-baby"></i> Pregnant</small>
                         </div>
                         {% endif %}
-                        {% if patient.medical_history.women_health.nursing %}
+                        {% if patient.medical_history.women_health.nursing == 'yes' %}
                         <div class="alert alert-info py-2 px-3 mb-2">
                             <small><i class="fas fa-baby"></i> Nursing</small>
                         </div>
                         {% endif %}
                         {% endif %}
 
-                        {% if not allergies and not conditions and not patient.medical_history.general_health.current_medications %}
+                        {% if not allergies and not conditions and not patient.medical_history.current_medications %}
                         <p class="text-muted text-center">
                             <i class="fas fa-check-circle text-success"></i><br>
                             No medical alerts on file
@@ -265,22 +266,22 @@
                                     <!-- Physician Information -->
                                     <div class="col-md-6 mb-4">
                                         <h6><i class="fas fa-user-md"></i> Physician Information</h6>
-                                        {% if patient.medical_history.physician_info.name %}
+                                        {% if patient.medical_history.physician_name %}
                                         <table class="table table-sm">
                                             <tr>
                                                 <td><strong>Name:</strong></td>
-                                                <td>Dr. {{ patient.medical_history.physician_info.name }}</td>
+                                                <td>Dr. {{ patient.medical_history.physician_name }}</td>
                                             </tr>
-                                            {% if patient.medical_history.physician_info.specialty %}
+                                            {% if patient.medical_history.physician_specialty %}
                                             <tr>
                                                 <td><strong>Specialty:</strong></td>
-                                                <td>{{ patient.medical_history.physician_info.specialty }}</td>
+                                                <td>{{ patient.medical_history.physician_specialty }}</td>
                                             </tr>
                                             {% endif %}
-                                            {% if patient.medical_history.physician_info.office_number %}
+                                            {% if patient.medical_history.physician_address %}
                                             <tr>
                                                 <td><strong>Office:</strong></td>
-                                                <td>{{ patient.medical_history.physician_info.office_number }}</td>
+                                                <td>{{ patient.medical_history.physician_address }}</td>
                                             </tr>
                                             {% endif %}
                                         </table>
@@ -296,38 +297,38 @@
                                             <tr>
                                                 <td><strong>Good Health:</strong></td>
                                                 <td>
-                                                    <span class="badge bg-{{ 'success' if patient.medical_history.general_health.good_health else 'secondary' }}">
-                                                        {{ 'Yes' if patient.medical_history.general_health.good_health else 'No' }}
+                                                    <span class="badge bg-{{ 'success' if patient.medical_history.q1_good_health == 'yes' else 'secondary' }}">
+                                                        {{ 'Yes' if patient.medical_history.q1_good_health == 'yes' else 'No' }}
                                                     </span>
                                                 </td>
                                             </tr>
                                             <tr>
                                                 <td><strong>Under Treatment:</strong></td>
                                                 <td>
-                                                    <span class="badge bg-{{ 'warning' if patient.medical_history.general_health.under_treatment else 'success' }}">
-                                                        {{ 'Yes' if patient.medical_history.general_health.under_treatment else 'No' }}
+                                                    <span class="badge bg-{{ 'warning' if patient.medical_history.q2_under_treatment == 'yes' else 'success' }}">
+                                                        {{ 'Yes' if patient.medical_history.q2_under_treatment == 'yes' else 'No' }}
                                                     </span>
                                                 </td>
                                             </tr>
-                                            {% if patient.medical_history.general_health.treatment_condition %}
+                                            {% if patient.medical_history.q2_condition %}
                                             <tr>
                                                 <td><strong>Condition:</strong></td>
-                                                <td>{{ patient.medical_history.general_health.treatment_condition }}</td>
+                                                <td>{{ patient.medical_history.q2_condition }}</td>
                                             </tr>
                                             {% endif %}
                                             <tr>
                                                 <td><strong>Tobacco Use:</strong></td>
                                                 <td>
-                                                    <span class="badge bg-{{ 'danger' if patient.medical_history.general_health.tobacco_use else 'success' }}">
-                                                        {{ 'Yes' if patient.medical_history.general_health.tobacco_use else 'No' }}
+                                                    <span class="badge bg-{{ 'danger' if patient.medical_history.q6_tobacco == 'yes' else 'success' }}">
+                                                        {{ 'Yes' if patient.medical_history.q6_tobacco == 'yes' else 'No' }}
                                                     </span>
                                                 </td>
                                             </tr>
                                             <tr>
                                                 <td><strong>Alcohol/Drugs:</strong></td>
                                                 <td>
-                                                    <span class="badge bg-{{ 'warning' if patient.medical_history.general_health.alcohol_drugs else 'success' }}">
-                                                        {{ 'Yes' if patient.medical_history.general_health.alcohol_drugs else 'No' }}
+                                                    <span class="badge bg-{{ 'warning' if patient.medical_history.q7_dangerous_drugs == 'yes' else 'success' }}">
+                                                        {{ 'Yes' if patient.medical_history.q7_dangerous_drugs == 'yes' else 'No' }}
                                                     </span>
                                                 </td>
                                             </tr>
@@ -341,13 +342,13 @@
                                         <h6><i class="fas fa-chart-line"></i> Vital Signs</h6>
                                         <div class="row">
                                             <div class="col-md-3">
-                                                <strong>Blood Type:</strong> {{ patient.medical_history.vital_signs.blood_type or 'Unknown' }}
+                                                <strong>Blood Type:</strong> {{ patient.medical_history.blood_type or 'Unknown' }}
                                             </div>
                                             <div class="col-md-3">
-                                                <strong>Blood Pressure:</strong> {{ patient.medical_history.vital_signs.blood_pressure or 'Not recorded' }}
+                                                <strong>Blood Pressure:</strong> {{ patient.medical_history.blood_pressure or 'Not recorded' }}
                                             </div>
                                             <div class="col-md-6">
-                                                <strong>Bleeding Time:</strong> {{ patient.medical_history.vital_signs.bleeding_time or 'Not recorded' }}
+                                                <strong>Bleeding Time:</strong> {{ patient.medical_history.bleeding_time or 'Not recorded' }}
                                             </div>
                                         </div>
                                     </div>
@@ -365,25 +366,25 @@
                                                 'asthma': 'Asthma',
                                                 'cancer_tumors': 'Cancer/Tumors',
                                                 'heart_murmur': 'Heart Murmur',
-                                                'epilepsy': 'Epilepsy',
+                                                'epilepsy_convulsions': 'Epilepsy',
                                                 'hepatitis_liver': 'Hepatitis/Liver Disease',
                                                 'kidney_disease': 'Kidney Disease',
-                                                'arthritis': 'Arthritis',
+                                                'arthritis_rheumatism': 'Arthritis',
                                                 'thyroid_problem': 'Thyroid Problem',
                                                 'bleeding_problems': 'Bleeding Problems'
                                             } %}
 
                                             {% for condition, label in condition_labels.items() %}
-                                            {% if patient.medical_history.medical_conditions[condition] %}
+                                            {% if patient.medical_history.conditions[condition] %}
                                             <div class="col-md-3 mb-2">
                                                 <span class="badge bg-warning text-dark">{{ label }}</span>
                                             </div>
                                             {% endif %}
                                             {% endfor %}
 
-                                            {% if patient.medical_history.medical_conditions.other %}
+                                            {% if patient.medical_history.conditions.other %}
                                             <div class="col-md-12 mt-3">
-                                                <strong>Other Conditions:</strong> {{ patient.medical_history.medical_conditions.other }}
+                                                <strong>Other Conditions:</strong> {{ patient.medical_history.conditions.other }}
                                             </div>
                                             {% endif %}
                                         </div>
@@ -704,17 +705,17 @@
                                         </table>
                                     </div>
                                     <div class="col-md-6">
-                                        {% if patient.guardian_info.name %}
+                                        {% if patient.minor_info.guardian_name %}
                                         <h6><i class="fas fa-users"></i> Guardian Information</h6>
                                         <table class="table table-sm">
                                             <tr>
                                                 <td><strong>Guardian:</strong></td>
-                                                <td>{{ patient.guardian_info.name }}</td>
+                                                <td>{{ patient.minor_info.guardian_name }}</td>
                                             </tr>
-                                            {% if patient.guardian_info.occupation %}
+                                            {% if patient.minor_info.guardian_occupation %}
                                             <tr>
                                                 <td><strong>Occupation:</strong></td>
-                                                <td>{{ patient.guardian_info.occupation }}</td>
+                                                <td>{{ patient.minor_info.guardian_occupation }}</td>
                                             </tr>
                                             {% endif %}
                                         </table>
