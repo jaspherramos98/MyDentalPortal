@@ -9,7 +9,7 @@ from reportlab.lib.units import inch
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image,
 )
 
 _GENDER = {'M': 'Male', 'F': 'Female'}
@@ -21,7 +21,32 @@ def _yesno(v):
     return 'Yes' if v == 'yes' else 'No'
 
 
-def build_patient_pdf(patient, clinic):
+def _photo_flowable(photo_bytes):
+    """Return a square Image flowable for the patient photo, or None.
+
+    Pillow normalises the bytes to PNG so reportlab never chokes on an exotic
+    format (HEIC/WEBP) and any embedded badness is dropped in re-encoding.
+    """
+    if not photo_bytes:
+        return None
+    try:
+        from PIL import Image as PILImage
+        im = PILImage.open(io.BytesIO(photo_bytes))
+        im = im.convert('RGB')
+        # Centre-crop to a square so it sits neatly in the corner.
+        w, h = im.size
+        side = min(w, h)
+        im = im.crop(((w - side) // 2, (h - side) // 2,
+                      (w - side) // 2 + side, (h - side) // 2 + side))
+        out = io.BytesIO()
+        im.save(out, format='PNG')
+        out.seek(0)
+        return Image(out, width=1.1 * inch, height=1.1 * inch)
+    except Exception:
+        return None
+
+
+def build_patient_pdf(patient, clinic, photo_bytes=None):
     """Return a BytesIO PDF of the patient record. All values are XML-escaped."""
     styles = getSampleStyleSheet()
     normal = styles['Normal']
@@ -54,13 +79,29 @@ def build_patient_pdf(patient, clinic):
     wh = mh.get('women_health', {})
 
     story = []
-    story.append(Paragraph('Patient Record', title))
-    story.append(P(clinic.get('name', '')))
     full = ('%s %s' % (pi.get('first_name', ''), pi.get('last_name', ''))).strip()
     if pi.get('nickname'):
         full += ' "%s"' % pi.get('nickname')
-    story.append(Spacer(1, 6))
-    story.append(Paragraph(escape(full), name_style))
+
+    header_cell = [
+        Paragraph('Patient Record', title),
+        P(clinic.get('name', '')),
+        Spacer(1, 6),
+        Paragraph(escape(full), name_style),
+    ]
+    photo = _photo_flowable(photo_bytes)
+    if photo is not None:
+        head = Table([[header_cell, photo]], colWidths=[5.4 * inch, 1.2 * inch])
+        head.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (0, 0), 'TOP'),
+            ('VALIGN', (1, 0), (1, 0), 'TOP'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        story.append(head)
+    else:
+        story.extend(header_cell)
 
     story.append(Paragraph('Personal Information', section))
     story.append(kv([

@@ -317,7 +317,15 @@ def patient_pdf(patient_id):
     try:
         _ensure_nested(patient)
         from blueprints.utils.pdf import build_patient_pdf
-        buf = build_patient_pdf(patient, clinic)
+        # Pull the patient photo (if any) so it can be embedded in the PDF.
+        photo_bytes = None
+        if patient.get('photo_file_id'):
+            try:
+                from gridfs import GridFS
+                photo_bytes = GridFS(mongo.db).get(patient['photo_file_id']).read()
+            except Exception:
+                photo_bytes = None
+        buf = build_patient_pdf(patient, clinic, photo_bytes=photo_bytes)
         pi = patient.get('personal_info', {})
         fname = secure_filename(
             'patient_%s_%s' % (pi.get('first_name', ''), pi.get('last_name', ''))

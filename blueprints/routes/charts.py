@@ -4,8 +4,9 @@
 
 from flask import (
     Blueprint, render_template, request, jsonify,
-    session, redirect, url_for, flash,
+    session, redirect, url_for, flash, send_file,
 )
+from werkzeug.utils import secure_filename
 from bson.objectid import ObjectId
 from datetime import datetime
 import traceback
@@ -133,6 +134,49 @@ def view_chart(patient_id):
         traceback.print_exc()
         flash('Error loading dental chart', 'error')
         return redirect(url_for('patients.list_patients'))
+
+
+# ── PDF EXPORT ───────────────────────────────────────────────────────────────
+# Additive only: renders the saved chart to a PDF. Does NOT touch the chart's
+# data model, save/load flow, or the interactive template.
+@charts_bp.route('/chart/patient/<patient_id>/pdf')
+@login_required
+def chart_pdf(patient_id):
+    """Export the patient's dental chart as a PDF."""
+    try:
+        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
+        if not patient:
+            flash('Patient not found', 'error')
+            return redirect(url_for('patients.list_patients'))
+
+        clinic = mongo.db.clinics.find_one({
+            '_id': patient['clinic_id'],
+            'owner_id': session['user_id'],
+        })
+        if not clinic:
+            flash('Patient not found', 'error')
+            return redirect(url_for('patients.list_patients'))
+
+        chart = mongo.db.dental_charts.find_one({'patient_id': ObjectId(patient_id)})
+        if not chart:
+            # No chart yet — export a blank one from the default structure.
+            chart = create_default_dental_chart(patient_id)
+
+        from blueprints.utils.chart_pdf import build_chart_pdf
+        buf = build_chart_pdf(patient, clinic, chart)
+        pi = patient.get('personal_info', {})
+        fname = secure_filename(
+            'dental_chart_%s_%s' % (pi.get('first_name', ''), pi.get('last_name', ''))
+        ) or 'dental_chart'
+        resp = send_file(buf, mimetype='application/pdf',
+                         as_attachment=True, download_name=fname + '.pdf')
+        resp.headers['X-Content-Type-Options'] = 'nosniff'
+        return resp
+    except Exception as e:
+        print(f"[ERROR] Chart PDF: {e}")
+        traceback.print_exc()
+        flash('Could not generate the dental chart PDF.', 'error')
+        return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
 
 @charts_bp.route('/charts/update/<patient_id>', methods=['POST'])

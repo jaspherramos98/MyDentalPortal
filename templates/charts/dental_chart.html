@@ -366,6 +366,9 @@
                 <p class="mb-0">{{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}</p>
             </div>
             <div>
+                <a href="{{ url_for('charts.chart_pdf', patient_id=patient._id) }}" class="btn btn-outline-light">
+                    <i class="fas fa-file-pdf"></i> Export PDF
+                </a>
                 <a href="{{ url_for('patients.patient_detail', patient_id=patient._id) }}" class="btn btn-outline-light">
                     <i class="fas fa-arrow-left"></i> Back to Patient
                 </a>

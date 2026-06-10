@@ -109,6 +109,96 @@ def _store(data, original_name, ext):
     )
 
 
+# ── PATIENT PHOTO ────────────────────────────────────────────────────────────
+# A single profile photo per patient. Stored in GridFS like every other upload
+# (validated image only) and referenced by patient.photo_file_id. Served inline
+# but locked to its image content-type with nosniff so it can never execute.
+@uploads_bp.route('/patients/<patient_id>/photo', methods=['POST'])
+@login_required
+def set_photo(patient_id):
+    patient, clinic = _verify_patient_access(patient_id)
+    if not clinic:
+        flash('Access denied or patient not found', 'error')
+        return redirect(url_for('patients.list_patients'))
+
+    upload = request.files.get('photo')
+    if not upload or not upload.filename:
+        flash('Choose an image to upload.', 'error')
+        return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+
+    ext = _ext(upload.filename)
+    data = upload.read()
+    ok, err = _validate(data, ext, IMAGE_EXTS)
+    if not ok:
+        flash(f'{err} Allowed image types: {IMAGE_EXTS_LABEL}.', 'error')
+        return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+
+    # Replace any existing photo (delete the old GridFS blob first).
+    old_id = patient.get('photo_file_id')
+    if old_id:
+        try:
+            _fs().delete(old_id)
+        except Exception:
+            pass
+
+    mongo.db.patients.update_one(
+        {'_id': ObjectId(patient_id)},
+        {'$set': {
+            'photo_file_id': _store(data, upload.filename, ext),
+            'photo_ext': ext,
+            'photo_content_type': CONTENT_TYPES.get(ext, 'application/octet-stream'),
+        }},
+    )
+    flash('Patient photo updated.', 'success')
+    return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+
+
+@uploads_bp.route('/patients/<patient_id>/photo')
+@login_required
+def patient_photo(patient_id):
+    _, clinic = _verify_patient_access(patient_id)
+    if not clinic:
+        abort(403)
+    try:
+        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
+    except (InvalidId, TypeError):
+        abort(404)
+    if not patient or not patient.get('photo_file_id'):
+        abort(404)
+    try:
+        gf = _fs().get(patient['photo_file_id'])
+    except Exception:
+        abort(404)
+    resp = send_file(
+        io.BytesIO(gf.read()),
+        mimetype=patient.get('photo_content_type') or getattr(gf, 'contentType', 'image/jpeg'),
+        as_attachment=False,
+        download_name='patient_photo',
+    )
+    resp.headers['X-Content-Type-Options'] = 'nosniff'
+    return resp
+
+
+@uploads_bp.route('/patients/<patient_id>/photo/delete', methods=['POST'])
+@login_required
+def delete_photo(patient_id):
+    patient, clinic = _verify_patient_access(patient_id)
+    if not clinic:
+        flash('Access denied or patient not found', 'error')
+        return redirect(url_for('patients.list_patients'))
+    if patient.get('photo_file_id'):
+        try:
+            _fs().delete(patient['photo_file_id'])
+        except Exception:
+            pass
+    mongo.db.patients.update_one(
+        {'_id': ObjectId(patient_id)},
+        {'$unset': {'photo_file_id': '', 'photo_ext': '', 'photo_content_type': ''}},
+    )
+    flash('Patient photo removed.', 'success')
+    return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+
+
 # ── PRESCRIPTIONS ────────────────────────────────────────────────────────────
 @uploads_bp.route('/patients/<patient_id>/prescriptions/add', methods=['POST'])
 @login_required

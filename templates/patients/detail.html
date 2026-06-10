@@ -35,6 +35,9 @@
                 <a href="{{ url_for('patients.patient_pdf', patient_id=patient._id) }}" class="btn btn-outline-dark">
                     <i class="fas fa-file-pdf"></i> Export PDF
                 </a>
+                <a href="{{ url_for('charts.chart_pdf', patient_id=patient._id) }}" class="btn btn-outline-dark">
+                    <i class="fas fa-file-pdf"></i> Export Chart
+                </a>
                 <a href="{{ url_for('treatments.add_treatment', patient_id=patient._id) }}" class="btn btn-outline-success">
                     <i class="fas fa-plus"></i> Add Treatment
                 </a>
@@ -58,12 +61,44 @@
                     </div>
                     <div class="card-body">
                         <div class="text-center mb-3">
+                            {% if patient.get('photo_file_id') %}
+                            <img src="{{ url_for('uploads.patient_photo', patient_id=patient._id) }}"
+                                 alt="Patient photo" class="rounded-circle mx-auto mb-3 d-block"
+                                 style="width: 110px; height: 110px; object-fit: cover; border: 3px solid #0d6efd;">
+                            {% else %}
                             <div class="patient-avatar mx-auto mb-3" style="width: 80px; height: 80px; font-size: 2rem;">
                             {{ (patient.personal_info.first_name or 'U')[0] }}{{ (patient.personal_info.last_name or 'U')[0] }}
                         </div>
+                            {% endif %}
                         <h6>{{ patient.personal_info.first_name or 'Unknown' }} {{ patient.personal_info.last_name or 'Unknown' }}</h6>
                         {% if patient.personal_info.get('nickname') %}
                         <p class="text-muted">"{{ patient.personal_info.nickname }}"</p>
+                        {% endif %}
+
+                        <!-- Photo upload / replace / remove -->
+                        <form method="POST"
+                              action="{{ url_for('uploads.set_photo', patient_id=patient._id) }}"
+                              enctype="multipart/form-data" class="mt-2" data-no-guard>
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="file" name="photo" accept="image/*"
+                                   class="form-control form-control-sm mb-2" required
+                                   onchange="this.form.querySelector('button[type=submit]').disabled = !this.files.length;">
+                            <div class="d-flex justify-content-center gap-2">
+                                <button type="submit" class="btn btn-sm btn-outline-primary" disabled>
+                                    <i class="fas fa-upload"></i> {{ 'Replace' if patient.get('photo_file_id') else 'Upload' }} Photo
+                                </button>
+                            </div>
+                        </form>
+                        {% if patient.get('photo_file_id') %}
+                        <form method="POST"
+                              action="{{ url_for('uploads.delete_photo', patient_id=patient._id) }}"
+                              class="mt-1" data-no-guard
+                              onsubmit="return confirm('Remove this patient photo?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-link text-danger">
+                                <i class="fas fa-trash"></i> Remove photo
+                            </button>
+                        </form>
                         {% endif %}
                         </div>
 
