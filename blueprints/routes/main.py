@@ -47,10 +47,13 @@ def dashboard():
         }
 
         if clinic_ids:
+            from blueprints.routes.patients import _ensure_nested
             recent_patients = list(
                 mongo.db.patients.find({'clinic_id': {'$in': clinic_ids}, 'is_active': True})
                 .sort('created_at', -1).limit(10)
             )
+            for rp in recent_patients:
+                _ensure_nested(rp)
             stats['total_patients'] = mongo.db.patients.count_documents(
                 {'clinic_id': {'$in': clinic_ids}, 'is_active': True}
             )

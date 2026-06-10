@@ -218,11 +218,11 @@
                                         </a>
                                     </h6>
                                     <small class="text-muted">
-                                        {{ patient.contact_info.cell_phone or patient.contact_info.home_phone or 'No phone' }}
+                                        {{ patient.contact_info.cell_phone or patient.contact_info.landline or 'No phone' }}
                                     </small>
                                 </div>
                                 <div class="text-end">
-                                    <small class="text-muted">{{ patient.created_at.strftime('%m/%d') }}</small>
+                                    <small class="text-muted">{{ patient.created_at | datefmt('%m/%d') }}</small>
                                     <div>
                                         <a href="{{ url_for('patients.patient_detail', patient_id=patient._id) }}" 
                                            class="btn btn-sm btn-outline-success" title="View Patient">
