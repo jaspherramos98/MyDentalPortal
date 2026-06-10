@@ -851,12 +851,28 @@
                     if (!form.checkValidity() || !formValid) {
                         event.preventDefault();
                         event.stopPropagation();
-                    } else {
-                        // Clear any existing error messages on successful validation
-                        const errorContainer = document.getElementById('validation-errors');
-                        if (errorContainer) errorContainer.innerHTML = '';
+                        form.classList.add('was-validated');
+                        // Critical on long/mobile forms: make the block obvious by
+                        // jumping to and focusing the first invalid field, plus a
+                        // visible message (otherwise the submit silently does nothing).
+                        const firstInvalid = form.querySelector(':invalid, .is-invalid');
+                        if (firstInvalid) {
+                            firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            try { firstInvalid.focus({ preventScroll: true }); } catch (e) {}
+                        }
+                        const ec = document.getElementById('validation-errors')
+                                   || ValidationHandler.createErrorContainer();
+                        if (ec) {
+                            ec.innerHTML = '<div class="alert alert-danger mb-3">'
+                                + '<i class="fas fa-exclamation-triangle"></i> '
+                                + 'Please complete the required fields highlighted in red, then Save again.'
+                                + '</div>';
+                        }
+                        return;
                     }
-                    
+                    // Valid — clear any prior error message.
+                    const errorContainer = document.getElementById('validation-errors');
+                    if (errorContainer) errorContainer.innerHTML = '';
                     form.classList.add('was-validated');
                 }, false);
             });
