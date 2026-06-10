@@ -35,6 +35,14 @@
                 <a href="{{ url_for('treatments.add_treatment', patient_id=patient._id) }}" class="btn btn-outline-success">
                     <i class="fas fa-plus"></i> Add Treatment
                 </a>
+                <form method="POST" action="{{ url_for('patients.delete_patient', patient_id=patient._id) }}"
+                      class="d-inline"
+                      onsubmit="return confirm('Delete {{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}? The record is removed from the active list.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-danger">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </form>
             </div>
         </div>
 

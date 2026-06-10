@@ -131,6 +131,268 @@
                 </div>
 
                 <hr>
+                <h5 class="mb-3 text-primary"><i class="fas fa-users me-1"></i> Guardian (for minors)</h5>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Guardian Name</label>
+                        <input type="text" class="form-control" name="guardian_name"
+                               value="{{ patient.minor_info.get('guardian_name', '') }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Guardian Occupation</label>
+                        <input type="text" class="form-control" name="guardian_occupation"
+                               value="{{ patient.minor_info.get('guardian_occupation', '') }}">
+                    </div>
+                </div>
+
+                <hr>
+                <h5 class="mb-3 text-primary"><i class="fas fa-handshake me-1"></i> Referral &amp; Dental History</h5>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Referred By</label>
+                        <input type="text" class="form-control" name="referred_by"
+                               value="{{ patient.referral_info.get('referred_by', '') }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Consultation Reason</label>
+                        <input type="text" class="form-control" name="consultation_reason"
+                               value="{{ patient.referral_info.get('consultation_reason', '') }}">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Previous Dentist</label>
+                        <input type="text" class="form-control" name="previous_dentist"
+                               value="{{ patient.dental_history.get('previous_dentist', '') }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Last Dental Visit</label>
+                        <input type="text" class="form-control" name="last_dental_visit"
+                               value="{{ patient.dental_history.get('last_visit', '') }}">
+                    </div>
+                </div>
+
+                <hr>
+                <h5 class="mb-3 text-primary"><i class="fas fa-user-md me-1"></i> Physician Information</h5>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Physician Name</label>
+                        <input type="text" class="form-control" name="physician_name"
+                               value="{{ patient.medical_history.get('physician_name', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Specialty</label>
+                        <input type="text" class="form-control" name="physician_specialty"
+                               value="{{ patient.medical_history.get('physician_specialty', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Office Number</label>
+                        <input type="text" class="form-control" name="physician_address"
+                               value="{{ patient.medical_history.get('physician_address', '') }}">
+                    </div>
+                </div>
+
+                <hr>
+                <h5 class="mb-3 text-primary"><i class="fas fa-heartbeat me-1"></i> General Health</h5>
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label d-block">In good health?</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="good_health" value="yes" id="gh_yes" {{ 'checked' if patient.medical_history.q1_good_health == 'yes' }}>
+                            <label class="form-check-label" for="gh_yes">Yes</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="good_health" value="no" id="gh_no" {{ 'checked' if patient.medical_history.q1_good_health != 'yes' }}>
+                            <label class="form-check-label" for="gh_no">No</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label d-block">Under treatment?</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="under_treatment" value="yes" id="ut_yes" {{ 'checked' if patient.medical_history.q2_under_treatment == 'yes' }}>
+                            <label class="form-check-label" for="ut_yes">Yes</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="under_treatment" value="no" id="ut_no" {{ 'checked' if patient.medical_history.q2_under_treatment != 'yes' }}>
+                            <label class="form-check-label" for="ut_no">No</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">If under treatment, condition</label>
+                        <input type="text" class="form-control" name="treatment_condition"
+                               value="{{ patient.medical_history.get('q2_condition', '') }}">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label d-block">Tobacco use?</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="tobacco" value="yes" id="tob_yes" {{ 'checked' if patient.medical_history.q6_tobacco == 'yes' }}>
+                            <label class="form-check-label" for="tob_yes">Yes</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="tobacco" value="no" id="tob_no" {{ 'checked' if patient.medical_history.q6_tobacco != 'yes' }}>
+                            <label class="form-check-label" for="tob_no">No</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label d-block">Alcohol / Drugs?</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="dangerous_drugs" value="yes" id="dd_yes" {{ 'checked' if patient.medical_history.q7_dangerous_drugs == 'yes' }}>
+                            <label class="form-check-label" for="dd_yes">Yes</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="dangerous_drugs" value="no" id="dd_no" {{ 'checked' if patient.medical_history.q7_dangerous_drugs != 'yes' }}>
+                            <label class="form-check-label" for="dd_no">No</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Current Medications</label>
+                        <input type="text" class="form-control" name="current_medications"
+                               value="{{ patient.medical_history.get('current_medications', '') }}">
+                    </div>
+                </div>
+
+                <hr>
+                <h5 class="mb-3 text-primary"><i class="fas fa-chart-line me-1"></i> Vital Signs</h5>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Blood Type</label>
+                        <input type="text" class="form-control" name="blood_type"
+                               value="{{ patient.medical_history.get('blood_type', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Blood Pressure</label>
+                        <input type="text" class="form-control" name="blood_pressure"
+                               value="{{ patient.medical_history.get('blood_pressure', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Bleeding Time</label>
+                        <input type="text" class="form-control" name="bleeding_time"
+                               value="{{ patient.medical_history.get('bleeding_time', '') }}">
+                    </div>
+                </div>
+
+                <hr>
+                <h5 class="mb-3 text-primary"><i class="fas fa-exclamation-circle me-1"></i> Allergies</h5>
+                {% set al = patient.medical_history.allergies %}
+                <div class="row mb-2">
+                    <div class="col-md-3 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="allergy_anesthetic" id="al_an" {{ 'checked' if al.local_anesthesia }}>
+                            <label class="form-check-label" for="al_an">Local Anesthetic</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="allergy_penicillin" id="al_pen" {{ 'checked' if al.penicillin }}>
+                            <label class="form-check-label" for="al_pen">Penicillin</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="allergy_sulfa" id="al_sul" {{ 'checked' if al.sulfa_drugs }}>
+                            <label class="form-check-label" for="al_sul">Sulfa Drugs</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="allergy_aspirin" id="al_asp" {{ 'checked' if al.aspirin }}>
+                            <label class="form-check-label" for="al_asp">Aspirin</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="allergy_latex" id="al_lat" {{ 'checked' if al.latex }}>
+                            <label class="form-check-label" for="al_lat">Latex</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Other Allergies</label>
+                        <input type="text" class="form-control" name="allergy_others"
+                               value="{{ al.get('other', '') }}">
+                    </div>
+                </div>
+
+                {% if patient.personal_info.gender == 'F' %}
+                <hr>
+                <h5 class="mb-3 text-primary"><i class="fas fa-venus me-1"></i> Women's Health</h5>
+                {% set wh = patient.medical_history.women_health %}
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label d-block">Pregnant?</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="pregnant" value="yes" {{ 'checked' if wh.pregnant == 'yes' }}>
+                            <label class="form-check-label">Yes</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="pregnant" value="no" {{ 'checked' if wh.pregnant != 'yes' }}>
+                            <label class="form-check-label">No</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label d-block">Nursing?</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="nursing" value="yes" {{ 'checked' if wh.nursing == 'yes' }}>
+                            <label class="form-check-label">Yes</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="nursing" value="no" {{ 'checked' if wh.nursing != 'yes' }}>
+                            <label class="form-check-label">No</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label d-block">Birth Control?</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="birth_control" value="yes" {{ 'checked' if wh.birth_control == 'yes' }}>
+                            <label class="form-check-label">Yes</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="birth_control" value="no" {{ 'checked' if wh.birth_control != 'yes' }}>
+                            <label class="form-check-label">No</label>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <hr>
+                <h5 class="mb-3 text-primary"><i class="fas fa-list-check me-1"></i> Medical Conditions</h5>
+                {% set cond = patient.medical_history.conditions %}
+                {% set cond_fields = [
+                    ('condition_high_blood_pressure', 'high_blood_pressure', 'High Blood Pressure'),
+                    ('condition_heart_disease', 'heart_disease', 'Heart Disease'),
+                    ('condition_diabetes', 'diabetes', 'Diabetes'),
+                    ('condition_asthma', 'asthma', 'Asthma'),
+                    ('condition_cancer_tumors', 'cancer_tumors', 'Cancer/Tumors'),
+                    ('condition_heart_murmur', 'heart_murmur', 'Heart Murmur'),
+                    ('condition_epilepsy', 'epilepsy_convulsions', 'Epilepsy'),
+                    ('condition_hepatitis_liver', 'hepatitis_liver', 'Hepatitis/Liver Disease'),
+                    ('condition_kidney_disease', 'kidney_disease', 'Kidney Disease'),
+                    ('condition_arthritis', 'arthritis_rheumatism', 'Arthritis'),
+                    ('condition_thyroid_problem', 'thyroid_problem', 'Thyroid Problem'),
+                    ('condition_bleeding_problems', 'bleeding_problems', 'Bleeding Problems')
+                ] %}
+                <div class="row mb-2">
+                    {% for fname, key, label in cond_fields %}
+                    <div class="col-md-3 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="{{ fname }}" id="{{ fname }}" {{ 'checked' if cond[key] }}>
+                            <label class="form-check-label" for="{{ fname }}">{{ label }}</label>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Other Conditions</label>
+                        <input type="text" class="form-control" name="condition_other"
+                               value="{{ cond.get('other', '') }}">
+                    </div>
+                </div>
+
+                <hr>
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <label class="form-label">Dental Insurance</label>

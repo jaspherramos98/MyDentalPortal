@@ -255,13 +255,10 @@ def patient_detail(patient_id):
             'owner_id': session['user_id'],
         })
         if not clinic:
-            # Maybe clinic_id is stored as string in old data
-            clinic = mongo.db.clinics.find_one({'_id': patient['clinic_id']})
-            if not clinic:
-                print(f"[ERROR] Clinic not found for patient. clinic_id={patient.get('clinic_id')}")
-                flash('Clinic not found for this patient', 'error')
-                return redirect(url_for('patients.list_patients'))
-            print(f"[DEBUG] Clinic found (owner mismatch, allowing): {clinic['name']}")
+            # Owner mismatch or missing clinic — deny access (don't leak existence).
+            print(f"[ERROR] Access denied for patient {patient_id} (not owner)")
+            flash('Patient not found', 'error')
+            return redirect(url_for('patients.list_patients'))
 
         # Ensure nested dicts
         _ensure_nested(patient)
@@ -318,9 +315,13 @@ def edit_patient(patient_id):
 
         _ensure_nested(patient)
 
-        clinic = mongo.db.clinics.find_one({'_id': patient['clinic_id']})
+        # Enforce ownership: only the clinic owner may edit this patient.
+        clinic = mongo.db.clinics.find_one({
+            '_id': patient['clinic_id'],
+            'owner_id': session['user_id'],
+        })
         if not clinic:
-            flash('Clinic not found', 'error')
+            flash('Patient not found', 'error')
             return redirect(url_for('patients.list_patients'))
 
         user_clinics = list(
@@ -349,6 +350,46 @@ def edit_patient(patient_id):
                 'emergency_contact.relationship': (f.get('emergency_relationship') or '').strip(),
                 'emergency_contact.phone': (f.get('emergency_phone') or '').strip(),
                 'insurance_info.dental_insurance': (f.get('dental_insurance') or '').strip(),
+                'minor_info.guardian_name': (f.get('guardian_name') or '').strip(),
+                'minor_info.guardian_occupation': (f.get('guardian_occupation') or '').strip(),
+                'referral_info.referred_by': (f.get('referred_by') or '').strip(),
+                'referral_info.consultation_reason': (f.get('consultation_reason') or '').strip(),
+                'dental_history.previous_dentist': (f.get('previous_dentist') or '').strip(),
+                'dental_history.last_visit': (f.get('last_dental_visit') or '').strip(),
+                'medical_history.physician_name': (f.get('physician_name') or '').strip(),
+                'medical_history.physician_specialty': (f.get('physician_specialty') or '').strip(),
+                'medical_history.physician_address': (f.get('physician_address') or '').strip(),
+                'medical_history.q1_good_health': f.get('good_health', 'no'),
+                'medical_history.q2_under_treatment': f.get('under_treatment', 'no'),
+                'medical_history.q2_condition': (f.get('treatment_condition') or '').strip(),
+                'medical_history.q6_tobacco': f.get('tobacco', 'no'),
+                'medical_history.q7_dangerous_drugs': f.get('dangerous_drugs', 'no'),
+                'medical_history.current_medications': (f.get('current_medications') or '').strip(),
+                'medical_history.blood_type': (f.get('blood_type') or '').strip(),
+                'medical_history.blood_pressure': (f.get('blood_pressure') or '').strip(),
+                'medical_history.bleeding_time': (f.get('bleeding_time') or '').strip(),
+                'medical_history.allergies.local_anesthesia': 'allergy_anesthetic' in f,
+                'medical_history.allergies.penicillin': 'allergy_penicillin' in f,
+                'medical_history.allergies.sulfa_drugs': 'allergy_sulfa' in f,
+                'medical_history.allergies.aspirin': 'allergy_aspirin' in f,
+                'medical_history.allergies.latex': 'allergy_latex' in f,
+                'medical_history.allergies.other': (f.get('allergy_others') or '').strip(),
+                'medical_history.women_health.pregnant': f.get('pregnant', 'no'),
+                'medical_history.women_health.nursing': f.get('nursing', 'no'),
+                'medical_history.women_health.birth_control': f.get('birth_control', 'no'),
+                'medical_history.conditions.high_blood_pressure': 'condition_high_blood_pressure' in f,
+                'medical_history.conditions.heart_disease': 'condition_heart_disease' in f,
+                'medical_history.conditions.diabetes': 'condition_diabetes' in f,
+                'medical_history.conditions.asthma': 'condition_asthma' in f,
+                'medical_history.conditions.cancer_tumors': 'condition_cancer_tumors' in f,
+                'medical_history.conditions.heart_murmur': 'condition_heart_murmur' in f,
+                'medical_history.conditions.epilepsy_convulsions': 'condition_epilepsy' in f,
+                'medical_history.conditions.hepatitis_liver': 'condition_hepatitis_liver' in f,
+                'medical_history.conditions.kidney_disease': 'condition_kidney_disease' in f,
+                'medical_history.conditions.arthritis_rheumatism': 'condition_arthritis' in f,
+                'medical_history.conditions.thyroid_problem': 'condition_thyroid_problem' in f,
+                'medical_history.conditions.bleeding_problems': 'condition_bleeding_problems' in f,
+                'medical_history.conditions.other': (f.get('condition_other') or '').strip(),
                 'updated_at': datetime.utcnow(),
             }
             mongo.db.patients.update_one(
@@ -373,7 +414,14 @@ def edit_patient(patient_id):
 def delete_patient(patient_id):
     try:
         patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
+        # Only the owner of the patient's clinic may delete the record.
+        clinic = None
         if patient:
+            clinic = mongo.db.clinics.find_one({
+                '_id': patient['clinic_id'],
+                'owner_id': session['user_id'],
+            })
+        if patient and clinic:
             mongo.db.patients.update_one(
                 {'_id': ObjectId(patient_id)},
                 {'$set': {'is_active': False, 'updated_at': datetime.utcnow()}},
