@@ -100,8 +100,8 @@
                     </div>
                     <div class="col-md-3 mb-3">
                         <label for="birthdate" class="form-label">Birthdate <span class="required">*</span></label>
-                        <input type="date" class="form-control" id="birthdate" name="birthdate" 
-                            value="{{ form_data.get('birthdate', '') }}" required>
+                        <input type="date" class="form-control" id="birthdate" name="birthdate"
+                            value="{{ form_data.get('birthdate', '') }}" max="{{ today }}" min="{{ min_birth_date }}" required>
                         <div class="invalid-feedback">Please provide a birthdate.</div>
                     </div>
                     <div class="col-md-3 mb-3">
@@ -242,8 +242,8 @@
                     </div>
                     <div class="col-md-6 mb-3">
                         <label for="last_dental_visit" class="form-label">Last Dental Visit</label>
-                        <input type="date" class="form-control" id="last_dental_visit" name="last_dental_visit" 
-                               value="{{ form_data.get('last_dental_visit', '') }}">
+                        <input type="date" class="form-control" id="last_dental_visit" name="last_dental_visit"
+                               value="{{ form_data.get('last_dental_visit', '') }}" max="{{ today }}">
                     </div>
                 </div>
             </div>

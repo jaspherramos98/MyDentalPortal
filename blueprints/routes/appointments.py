@@ -22,6 +22,17 @@ ALLOWED_STATUSES = {'scheduled', 'cancelled', 'completed', 'no-show'}
 ALLOWED_PRIORITIES = {'normal', 'high', 'urgent'}
 
 
+def _today_str():
+    """Today's date as 'YYYY-MM-DD' in the clinic's timezone (for date bounds)."""
+    try:
+        from zoneinfo import ZoneInfo
+        from flask import current_app
+        tz = ZoneInfo(current_app.config.get('TIMEZONE', 'Asia/Manila'))
+        return datetime.now(tz).strftime('%Y-%m-%d')
+    except Exception:
+        return datetime.now().strftime('%Y-%m-%d')
+
+
 def _to_minutes(time_str):
     """'HH:MM' -> minutes since midnight, or None if unparseable."""
     try:
@@ -159,6 +170,10 @@ def create_appointment():
         missing = [f for f in required if not data.get(f)]
         if missing:
             return jsonify({'success': False, 'error': f'Missing: {", ".join(missing)}'}), 400
+
+        # Appointments can't be booked in the past (UI also enforces min=today).
+        if str(data['date']) < _today_str():
+            return jsonify({'success': False, 'error': 'The appointment date cannot be in the past.'}), 400
 
         clinic = mongo.db.clinics.find_one({
             '_id': ObjectId(data['clinic_id']),

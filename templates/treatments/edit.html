@@ -17,7 +17,7 @@
                     <div class="col-md-4">
                         <label for="date" class="form-label">Date *</label>
                         <input type="date" class="form-control" id="date" name="date"
-                               value="{{ treatment.date }}" required>
+                               value="{{ treatment.date }}" max="{{ today }}" required>
                     </div>
                     <div class="col-md-4">
                         <label for="procedure" class="form-label">Procedure *</label>
@@ -45,9 +45,12 @@
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label for="next_appointment" class="form-label">Next Appointment</label>
-                        <input type="date" class="form-control" id="next_appointment" name="next_appointment"
-                               value="{{ treatment.next_appointment }}">
+                        <label class="form-label">Next Appointment</label>
+                        <button type="button" class="btn btn-outline-primary w-100" id="scheduleApptBtn"
+                                data-bs-toggle="modal" data-bs-target="#nextApptModal">
+                            <i class="fas fa-calendar-plus me-1"></i> Schedule Next Appointment
+                        </button>
+                        <small id="apptScheduledNote" class="text-success fw-semibold mt-1 d-none"></small>
                     </div>
                 </div>
                 <div class="row mb-3">
@@ -74,4 +77,6 @@
         </div>
     </div>
 </div>
+
+{% include 'partials/_next_appointment_modal.html' %}
 {% endblock %}

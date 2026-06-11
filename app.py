@@ -71,10 +71,19 @@ def inject_helpers():
         except Exception:
             return '#'
 
+    # "today" (in the clinic's timezone) for date-input min/max bounds.
+    try:
+        from zoneinfo import ZoneInfo
+        _today = datetime.now(ZoneInfo(app.config.get('TIMEZONE', 'Asia/Manila'))).strftime('%Y-%m-%d')
+    except Exception:
+        _today = datetime.now().strftime('%Y-%m-%d')
+
     return dict(
         safe_url_for=safe_url_for,
         current_year=datetime.utcnow().year,
         is_admin=is_admin(),
+        today=_today,
+        min_birth_date='1900-01-01',
     )
 
 
