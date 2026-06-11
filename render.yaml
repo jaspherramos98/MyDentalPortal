@@ -7,7 +7,12 @@ services:
     env: python
     runtime: python-3.11.9
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    # Tuned for Render's 512 MB instance:
+    #  --threads gives concurrency so one slow photo request doesn't freeze the
+    #    whole site (sync workers block); 2 workers x 4 threads = 8 concurrent.
+    #  --timeout 120 (default is 30) so large photo/GridFS transfers aren't killed.
+    #  --max-requests recycles workers periodically to bound memory growth.
+    startCommand: gunicorn app:app --workers 2 --threads 4 --timeout 120 --max-requests 400 --max-requests-jitter 50
     envVars:
       - key: FLASK_ENV
         value: production

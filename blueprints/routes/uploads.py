@@ -169,13 +169,20 @@ def patient_photo(patient_id):
         gf = _fs().get(patient['photo_file_id'])
     except Exception:
         abort(404)
+    # Stream the GridFS object directly instead of buffering the whole file into
+    # memory (io.BytesIO(gf.read())). A 2.4 MB iPad photo loaded fully into RAM
+    # on every request is what was OOM-killing workers on the 512 MB instance.
     resp = send_file(
-        io.BytesIO(gf.read()),
+        gf,
         mimetype=patient.get('photo_content_type') or getattr(gf, 'contentType', 'image/jpeg'),
         as_attachment=False,
         download_name='patient_photo',
     )
     resp.headers['X-Content-Type-Options'] = 'nosniff'
+    # The photo is stable until it's replaced, so let the browser cache it
+    # privately. Without this, the patient-detail page re-downloads the full
+    # image on every view. PHI -> private (never shared/proxy caches).
+    resp.headers['Cache-Control'] = 'private, max-age=300'
     return resp
 
 
