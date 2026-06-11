@@ -21,6 +21,10 @@ test.exe
 
 # Claude Code local memory (never commit)
 .claude/projects/
+
+# Data backups (contain PHI — never commit)
+backups/
+*.backup.zip
 # Elastic Beanstalk Files
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml
