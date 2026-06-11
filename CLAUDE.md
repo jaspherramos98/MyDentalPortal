@@ -145,9 +145,15 @@ Created on first run if no users exist:
 - render.yaml is included for service definition
 - Health check endpoint: GET /health
 
-### AWS (planned)
-- Target: Elastic Beanstalk or ECS Fargate + MongoDB Atlas + S3 + CloudFront
-- Dockerfile and docker-compose.yml to be created
+### AWS (LIVE)
+- **Platform:** Elastic Beanstalk, Docker platform — config in `.elasticbeanstalk/config.yml`
+- **Application:** `mydentalportal`  |  **Environment:** `mydentalportal-env`  |  **Region:** `ap-southeast-1` (Singapore)
+- **Database:** MongoDB Atlas (`dental-portal-cluster`)
+- **Deploy command:** `eb deploy mydentalportal-env` (run from project root; deploys the current git HEAD, so commit first)
+- **Container:** `Dockerfile` builds the image; gunicorn binds `0.0.0.0:8000` (EB reads the `EXPOSE 8000` line). Runs as unprivileged `appuser`.
+- **Env vars for the container:** `.env.docker` (git-ignored — holds SECRET_KEY + Atlas MONGO_URI; NEVER commit it). `.dockerignore` keeps `.env*` and secrets out of the image build context.
+- Requires the EB CLI (installed) and AWS credentials configured on the deploying machine.
+- Future (not yet done): ECS Fargate / App Runner migration, S3 + CloudFront for static/photos.
 
 ## How to Run Locally
 ```bash
