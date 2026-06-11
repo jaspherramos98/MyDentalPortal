@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *.so
 .env
+.env.docker
+.env.*.local
 venv/
 .venv/
 env/
@@ -15,3 +17,7 @@ logs/
 *.swp
 *.swo
 *.zip
+test.exe
+
+# Claude Code local memory (never commit)
+.claude/projects/
