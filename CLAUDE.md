@@ -22,7 +22,6 @@ MyDentalPortal/
 ├── app.py              # Slim entry point (~120 lines) — creates Flask app, registers blueprints
 ├── extensions.py       # mongo = PyMongo() singleton — ALL blueprints import from here
 ├── config.py           # Config classes (Dev/Prod), get_config()
-├── models.py           # (legacy, not actively used)
 ├── requirements.txt    # Clean deps — NO bson package (conflicts with pymongo)
 ├── Procfile            # web: gunicorn app:app
 ├── runtime.txt         # python-3.11.5
@@ -48,8 +47,7 @@ MyDentalPortal/
 ├── static/
 │   ├── css/main.css
 │   └── js/
-│       ├── main.js
-│       └── appointments-api.js  # (legacy, not used — inline JS in template)
+│       └── main.js
 └── templates/
     ├── base.html               # Main layout with navbar
     ├── auth/login.html
@@ -138,8 +136,6 @@ Created on first run if no users exist:
 - Patient detail may fail on legacy data with flat (non-nested) structures — `_ensure_nested()` handles this
 - `appointments.html` has its own nav bar separate from `base.html` — should eventually be unified
 - Role-based access (dentist vs staff vs admin) is prepared in the user model but not enforced yet
-- AWS deployment config (Dockerfile, docker-compose.yml) not yet created
-- `static/js/appointments-api.js` is dead code (inline JS in template is used instead)
 - Profile and Settings pages in the user dropdown are placeholder links (#)
 
 ## Deployment

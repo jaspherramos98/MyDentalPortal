@@ -4,7 +4,40 @@
       "Bash(git commit -q -m ' *)",
       "Bash(./venv/Scripts/python.exe -m py_compile blueprints/routes/patients.py)",
       "Bash(./venv/Scripts/python.exe -c ' *)",
-      "Bash(./venv/Scripts/python.exe -m pip install \"reportlab==4.2.2\")"
+      "Bash(./venv/Scripts/python.exe -m pip install \"reportlab==4.2.2\")",
+      "Bash(git commit -m '@ *)",
+      "Bash(git commit *)",
+      "Bash(cat > *)",
+      "Bash(docker --version)",
+      "Bash(aws --version)",
+      "Bash(eb --version)",
+      "PowerShell($tools = \"docker\",\"aws\",\"eb\",\"python\",\"git\"; foreach \\($t in $tools\\) { $c = Get-Command $t -ErrorAction SilentlyContinue; if \\($c\\) { \"{0}: {1}\" -f $t, $c.Source } else { \"{0}: NOT INSTALLED\" -f $t } })",
+      "PowerShell($py = \"C:\\\\Users\\\\jasph\\\\.virtualenvs\\\\API-pphlYMJB\\\\Scripts\\\\python.exe\"; & $py -c \"import flask, pymongo, gridfs; print\\('flask', flask.__version__\\); print\\('pymongo', pymongo.__version__\\)\")",
+      "PowerShell($py = \".\\\\venv\\\\Scripts\\\\python.exe\"; if \\(Test-Path $py\\) { & $py -c \"import flask, pymongo, gridfs; print\\('OK flask', flask.__version__, '| pymongo', pymongo.__version__\\)\" } else { \"project venv python not found\" })",
+      "Bash(grep -nE \"^\\\\.env|env$|\\\\.env\" .gitignore)",
+      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe -c \"import dns; print\\('dnspython OK', dns.__version__\\)\")",
+      "PowerShell(wsl.exe --status; Write-Output \"---EXIT:$LASTEXITCODE---\")",
+      "PowerShell(wsl.exe --list --verbose; Write-Output \"---EXIT:$LASTEXITCODE---\")",
+      "PowerShell(wsl.exe --status; Write-Output \"---WSL_EXIT:$LASTEXITCODE---\"; docker version; Write-Output \"---DOCKER_EXIT:$LASTEXITCODE---\")",
+      "Bash(docker build *)",
+      "Bash(git check-ignore *)",
+      "Bash(awk '{print $NF}')",
+      "Bash(docker rm *)",
+      "Bash(docker run *)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} in %{time_total}s\\\\n\" http://localhost:5000/)",
+      "Bash(curl -s -o /dev/null -w \"health: HTTP %{http_code}\\\\n\" http://localhost:5000/health)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} in %{time_total}s\\\\n\" https://mydentalportal.onrender.com/health)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} in %{time_total}s\\\\n\" https://mydentalportal.onrender.com/)",
+      "Bash(curl -s https://mydentalportal.onrender.com/)",
+      "Bash(aws sts *)",
+      "PowerShell(python -m pip install --user --upgrade pipx 2>&1)",
+      "PowerShell(python -m pipx ensurepath 2>&1)",
+      "PowerShell(Write-Output \"=== py launcher list ===\"; py --list 2>&1; Write-Output \"=== py default ===\"; py -c \"import sys; print\\(sys.executable\\)\" 2>&1; Write-Output \"=== where python ===\"; \\(Get-Command python\\).Source; Write-Output \"=== VIRTUAL_ENV ===\"; $env:VIRTUAL_ENV)",
+      "PowerShell($env:VIRTUAL_ENV=$null; $env:PYTHONHOME=$null; py -3.12 -m pip install --user --upgrade pipx 2>&1 | Select-Object -Last 6)",
+      "PowerShell($env:VIRTUAL_ENV=$null; py -3.12 -m pipx ensurepath 2>&1 | Select-Object -Last 3; Write-Output \"=== installing awsebcli \\(this can take a minute\\) ===\"; py -3.12 -m pipx install awsebcli 2>&1 | Select-Object -Last 10)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
     ]
   }
 }

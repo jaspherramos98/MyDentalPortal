@@ -21,3 +21,7 @@ test.exe
 
 # Claude Code local memory (never commit)
 .claude/projects/
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml

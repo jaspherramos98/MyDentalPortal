@@ -1169,7 +1169,18 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             }
 
             const editingId = document.getElementById('appointmentForm').dataset.editingId;
-            
+
+            // Resolve patient_id from the entered name: link it only when the name
+            // matches a registered patient. Otherwise leave it null so ad-hoc /
+            // not-yet-registered walk-ins can still be booked by name without a
+            // stale id from a previous drag getting attached to the wrong person.
+            let resolvedPatientId = null;
+            document.querySelectorAll('.patient-card').forEach(card => {
+                if (card.dataset.patientName === patientName) {
+                    resolvedPatientId = card.dataset.patientId;
+                }
+            });
+
             const payload = {
                 patient_name: patientName,
                 date: appointmentDate,
@@ -1179,7 +1190,7 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                 duration: parseInt(document.getElementById('modalDuration').value),
                 priority: document.getElementById('modalPriority').value,
                 notes: document.getElementById('modalNotes').value || '',
-                patient_id: draggedPatient ? draggedPatient.id : null,
+                patient_id: resolvedPatientId,
             };
 
             try {

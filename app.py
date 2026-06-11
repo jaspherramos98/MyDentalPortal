@@ -4,7 +4,7 @@
 
 import os
 
-from flask import Flask, url_for, session
+from flask import Flask, url_for, session, request
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from werkzeug.security import generate_password_hash
 from datetime import datetime
@@ -124,8 +124,11 @@ def add_security_headers(response):
         "img-src 'self' data:; "
         "object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
     )
-    if 'user_id' in session:
-        # back-button-after-logout fix
+    # Authenticated pages must not be cached (back-button-after-logout fix).
+    # The patient-photo route is the one exception: it sets its own private,
+    # short-lived cache header so the detail page doesn't re-stream the full
+    # image on every view — don't clobber it here.
+    if 'user_id' in session and request.endpoint != 'uploads.patient_photo':
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'

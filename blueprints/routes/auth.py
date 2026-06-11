@@ -13,6 +13,11 @@ from extensions import mongo, limiter
 
 auth_bp = Blueprint('auth', __name__)
 
+# Pre-computed hash so failed logins stay roughly constant-time: we always run a
+# password check even when the email doesn't exist, so a missing account can't be
+# detected by a faster response (user-enumeration defense).
+_DUMMY_PASSWORD_HASH = generate_password_hash('unused-constant-time-placeholder')
+
 
 # ── helpers ──────────────────────────────────────────────────────────────
 def _valid_email(email):
@@ -38,7 +43,9 @@ def login():
 
         try:
             user = mongo.db.users.find_one({'email': email})
-            if user and check_password_hash(user['password'], password):
+            # Always hash-check (against a dummy hash if no such user) for constant time.
+            stored_hash = user['password'] if user else _DUMMY_PASSWORD_HASH
+            if check_password_hash(stored_hash, password) and user:
                 # Account approval gate. Users created before this feature have
                 # no 'status' field and are grandfathered in as approved.
                 status = user.get('status', 'approved')
