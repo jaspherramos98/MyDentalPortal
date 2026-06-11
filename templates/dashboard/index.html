@@ -33,29 +33,6 @@
 
     <!-- Clickable Statistics Cards -->
     <div class="row mb-4">
-        <!-- Clinics Card -->
-        <div class="col-md-3 mb-3">
-            <a href="{{ url_for('clinics.list_clinics') }}" class="text-decoration-none">
-                <div class="stat-card card h-100 bg-gradient-primary text-white shadow-sm hover-lift">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="card-title mb-1 opacity-75">Your Clinics</h6>
-                                <h2 class="mb-0 fw-bold">{{ stats.total_clinics or 0 }}</h2>
-                                <small class="opacity-75">Click to manage</small>
-                            </div>
-                            <div class="stat-icon">
-                                <i class="fas fa-clinic-medical fa-2x opacity-75"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-footer bg-rgba-white-10 border-0">
-                        <small><i class="fas fa-arrow-right me-1"></i> Manage Clinics</small>
-                    </div>
-                </div>
-            </a>
-        </div>
-        
         <!-- Patients Card -->
         <div class="col-md-3 mb-3">
             <a href="{{ url_for('patients.list_patients') }}" class="text-decoration-none">
@@ -120,6 +97,29 @@
                     </div>
                     <div class="card-footer bg-rgba-white-10 border-0">
                         <small><i class="fas fa-arrow-right me-1"></i> Weekly View</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Clinics Card -->
+        <div class="col-md-3 mb-3">
+            <a href="{{ url_for('clinics.list_clinics') }}" class="text-decoration-none">
+                <div class="stat-card card h-100 bg-gradient-primary text-white shadow-sm hover-lift">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-1 opacity-75">Your Clinics</h6>
+                                <h2 class="mb-0 fw-bold">{{ stats.total_clinics or 0 }}</h2>
+                                <small class="opacity-75">Click to manage</small>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-clinic-medical fa-2x opacity-75"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-rgba-white-10 border-0">
+                        <small><i class="fas fa-arrow-right me-1"></i> Manage Clinics</small>
                     </div>
                 </div>
             </a>

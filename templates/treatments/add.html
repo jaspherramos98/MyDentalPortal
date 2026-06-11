@@ -72,8 +72,12 @@
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label for="next_appointment" class="form-label">Next Appointment</label>
-                        <input type="date" class="form-control" id="next_appointment" name="next_appointment">
+                        <label class="form-label">Next Appointment</label>
+                        <button type="button" class="btn btn-outline-primary w-100" id="scheduleApptBtn"
+                                data-bs-toggle="modal" data-bs-target="#nextApptModal">
+                            <i class="fas fa-calendar-plus me-1"></i> Schedule Next Appointment
+                        </button>
+                        <small id="apptScheduledNote" class="text-success fw-semibold mt-1 d-none"></small>
                     </div>
                 </div>
 
@@ -118,6 +122,71 @@
     </div>
 </div>
 
+<!-- Next Appointment modal — creates a real appointment via /appointments/api,
+     with the patient pre-filled since we're already inside their record. -->
+<div class="modal fade" id="nextApptModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-calendar-plus me-2"></i>Schedule Next Appointment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="apptModalError" class="alert alert-danger d-none"></div>
+        <div class="row g-2">
+          <div class="col-12">
+            <label class="form-label">Patient</label>
+            <input type="text" class="form-control" value="{{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}" readonly>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Clinic</label>
+            <input type="text" class="form-control" value="{{ clinic.name }}" readonly>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Date *</label>
+            <input type="date" class="form-control" id="apptDate">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Time *</label>
+            <input type="time" class="form-control" id="apptTime">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Duration</label>
+            <select class="form-select" id="apptDuration">
+              <option value="30">30 minutes</option>
+              <option value="60">1 hour</option>
+              <option value="90">1.5 hours</option>
+              <option value="120">2 hours</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Type</label>
+            <select class="form-select" id="apptType">
+              <option value="follow-up" selected>Follow-up</option>
+              <option value="checkup">Regular Checkup</option>
+              <option value="cleaning">Teeth Cleaning</option>
+              <option value="filling">Dental Filling</option>
+              <option value="extraction">Tooth Extraction</option>
+              <option value="surgery">Surgery</option>
+              <option value="emergency">Emergency</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" id="apptNotes" rows="2" placeholder="e.g. Follow-up after this treatment"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="apptSaveBtn">
+          <i class="fas fa-calendar-check me-1"></i> Add to Calendar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 // Auto-calculate balance
 const charged = document.getElementById('amount_charged');
@@ -131,5 +200,60 @@ function updateBalance() {
 }
 charged.addEventListener('input', updateBalance);
 paid.addEventListener('input', updateBalance);
+
+// ── Next Appointment: create a real appointment via the shared API ──
+(function () {
+    const saveBtn = document.getElementById('apptSaveBtn');
+    if (!saveBtn) return;
+    const errBox = document.getElementById('apptModalError');
+
+    saveBtn.addEventListener('click', async function () {
+        errBox.classList.add('d-none');
+        const date = document.getElementById('apptDate').value;
+        const time = document.getElementById('apptTime').value;
+        if (!date || !time) {
+            errBox.textContent = 'Please choose a date and time.';
+            errBox.classList.remove('d-none');
+            return;
+        }
+        const payload = {
+            clinic_id: "{{ clinic._id }}",
+            patient_id: "{{ patient._id }}",
+            patient_name: "{{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}",
+            date: date,
+            time: time,
+            duration: parseInt(document.getElementById('apptDuration').value),
+            type: document.getElementById('apptType').value,
+            notes: document.getElementById('apptNotes').value || '',
+        };
+        saveBtn.disabled = true;
+        try {
+            // CSRF header is added automatically by the fetch wrapper in base.html.
+            const resp = await fetch("{{ url_for('appointments.create_appointment') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await resp.json();
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('nextApptModal')).hide();
+                const note = document.getElementById('apptScheduledNote');
+                note.textContent = '✓ Scheduled for ' + date + ' at ' + time;
+                note.classList.remove('d-none');
+                const btn = document.getElementById('scheduleApptBtn');
+                btn.classList.replace('btn-outline-primary', 'btn-outline-success');
+                btn.innerHTML = '<i class="fas fa-calendar-check me-1"></i> Reschedule';
+            } else {
+                errBox.textContent = data.error || 'Failed to schedule appointment.';
+                errBox.classList.remove('d-none');
+            }
+        } catch (e) {
+            errBox.textContent = 'Network error. Please try again.';
+            errBox.classList.remove('d-none');
+        } finally {
+            saveBtn.disabled = false;
+        }
+    });
+})();
 </script>
 {% endblock %}
