@@ -135,7 +135,11 @@ Created on first run if no users exist:
 ## Known Issues / TODO (as of v3)
 - Patient detail may fail on legacy data with flat (non-nested) structures — `_ensure_nested()` handles this
 - `appointments.html` has its own nav bar separate from `base.html` — should eventually be unified
-- Role-based access (dentist vs staff vs admin) is prepared in the user model but not enforced yet
+- Role-based access (dentist vs staff vs admin) is prepared in the user model but not enforced yet.
+  The full **multi-staff membership + roles** design (app_admin/dentist/staff, permission matrix,
+  access codes, admin-panel shape) is spec'd in TODO.md — build against that when implementing.
+- The "offline version" is decided as an **online-first PWA** (single source of truth) + an optional
+  read-only offline cache; two-way sync was rejected. See TODO.md.
 - Profile and Settings pages in the user dropdown are placeholder links (#)
 
 ## Deployment

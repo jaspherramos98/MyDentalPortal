@@ -2,125 +2,123 @@
 
 > Production medical software. Patient health data (PHI) is involved. Every change
 > must preserve confidentiality, integrity, and access control.
+>
+> **Working list — open items only.** Completed and now-live work has been removed;
+> see git history for the full record (security pen-test, hardening, AWS go-live, etc.).
 
-## Completed work batches
+## 🟢 Now — testing phase (quick wins + still-owed security/deploy)
 
-### Phase 1 — Quick fixes ✅
-- [x] Fix dashboard "This Week" appointment count (was never computed in `main.py`).
-      (Also excludes cancelled appointments from today/upcoming/this-week.)
-- [x] Add **Tooth Extraction** appointment type (modal, filter, legend, color) — applies to
-      drag-to-schedule too (shared modal); server-side enum allowlist added.
-- [x] Restore the X-ray section in the dental chart (restored to original sacred layout).
-- [x] Add a **Settings** page (account info, profile edit, change password).
+> Still in deployed **testing**: only the owner + tester(s) can access the app, so the
+> security/deploy items and quick wins are grouped here as the pre-broad-release tasks.
 
-### Phase 2 — Patient detail tabs (secure file handling) ✅
-- [x] **Prescription** tab — description text + optional image, stored in MongoDB GridFS.
-- [x] **Others / Files** tab — upload png/jpg/jpeg/webp/heic/pdf/docx/pages/numbers/key with
-      strict validation (extension allowlist + magic-byte sniff + Pillow decode + 16MB cap +
-      sanitized names). Served only via authenticated, ownership-checked, attachment-forced route.
-  - [x] Ability to name / rename an uploaded file.
-
-### Phase 3 — Hardening ✅ (see pen-test summary below)
-- [x] Security audit: auth on every route, clinic-ownership checks, upload validation,
-      XSS, session cookie flags, CSRF on state-changing requests.
-- [~] End-to-end test of all flows — code-level/structural verification done; **manual
-      browser + MongoDB smoke test still owed by the user**.
-
-### Deployment-readiness refactor ✅
-- [x] Consolidated duplicated `login_required` / `verify_patient_access` / `user_clinic_ids` /
-      `is_admin` / `admin_required` into `blueprints/utils/` (single source of truth).
-- [x] Removed dead `bcrypt` dependency and now-unused imports.
-
----
-
-## Security pen-test summary (code-level)
-
-Passed:
-- ✅ **Upload validation** rejects PHP webshells, JS, EXE, SVG, and extension-spoofed
-     files (extension allowlist + magic-byte sniff + Pillow decode). Genuine PNG/JPG/PDF pass.
-- ✅ **Auth** enforced on every protected route (shared `login_required`); admin routes gated.
-- ✅ **CSRF** blocks all token-less POSTs (login/register/settings/etc.).
-- ✅ **Access control** via `verify_patient_access` (clinic `owner_id` match) — single shared
-     helper, applied consistently to patient/treatment/prescription/file routes.
-- ✅ Security headers (nosniff, X-Frame-Options DENY, Referrer-Policy) on every response.
-
-Fixed during pen test:
-- ✅ **Stored XSS** in the appointments page: `patients_json|safe` (raw `json.dumps`) let a
-     patient name like `</script>…` break out of the `<script>` block. Now `patients|tojson`,
-     which escapes `<`/`>`/`&`/`'` for safe embedding. (Important once the customer-facing
-     booking lets outsiders supply names.)
-
-Hardening done:
-- [x] **Login rate-limiting** — Flask-Limiter on `/login` POST: 10/min, 50/hr
-      (verified trips to 429). NOTE: memory store = per-worker; use Redis storage_uri
-      in a multi-worker production deploy.
-- [x] **Content-Security-Policy** — pragmatic CSP set (allows cdnjs + inline for now).
-      Future: remove `'unsafe-inline'` by moving inline JS/handlers to static files.
-- [x] **Open-redirect hardening** — CSRF/413 handlers now only honour a same-origin
-      `request.referrer`, else fall back to dashboard/login.
-- [x] **Logout via POST** — `/logout` is POST + CSRF; navbar links are now forms.
-- [x] **Debug off in production** — `app.run` reads debug from env and is force-disabled
-      when `FLASK_ENV=production`; production still runs via gunicorn anyway.
-
-Still owed (need the live host / your action):
+- [ ] **Profile + Settings pages** — replace the placeholder `#` navbar dropdown links
+      with real pages.
+- [ ] **Enforce role-based access** (dentist / staff / admin) — `admin_required` exists in
+      `blueprints/utils/` but isn't applied broadly yet. *(Foundation for multi-staff below.)*
 - [ ] **Manual in-browser smoke test** with real credentials (login, CRUD, chart save,
-      prescription/file upload, appointment cancel). Automated read-only checks pass, but
-      authenticated page rendering couldn't be exercised here (no valid login creds).
-- [ ] Ensure MongoDB Atlas connection uses TLS and a least-privilege DB user.
-- [ ] Set strong `SECRET_KEY`, `FLASK_ENV=production`, and `ADMIN_EMAILS` on the host.
-- [ ] (Optional) Move rate-limiter storage to Redis for multi-worker correctness.
+      prescription/file upload, appointment cancel).
+- [ ] **MongoDB Atlas** — confirm the connection uses TLS and a least-privilege DB user.
+- [ ] Confirm strong `SECRET_KEY`, `FLASK_ENV=production`, and `ADMIN_EMAILS` are set on
+      every host (Render + AWS EB).
 
-## Pre-deployment to-do
-1. **Account verification / approval gate.** ✅ DONE
-   - New registrations are saved with `status: 'pending'` and cannot log in.
-   - Admins (email in `ADMIN_EMAILS`, default `admin@dental.com`, or `role: 'admin'`)
-     see an **Approvals** nav link → `/admin/registrations` to approve/reject.
-   - Users created before this feature (no `status`) are grandfathered as approved.
-   - To make another account an admin, set the `ADMIN_EMAILS` env var (comma-separated).
+## 🟡 Future Roadmap 1 (near-term)
 
-2. **Security hardening (from the Phase 3 audit).**
-   - [x] **CSRF protection** — Flask-WTF `CSRFProtect` enabled app-wide. Every POST form
-         carries a hidden `csrf_token`; fetch() calls send `X-CSRFToken` via a wrapper.
-         Invalid/missing token → JSON 400 (fetch) or flash+redirect (forms).
-   - [x] **SECRET_KEY** — ProductionConfig now refuses to boot if `SECRET_KEY` is unset
-         (falls back to the known dev key). Still must set a strong key on Render/AWS.
-   - [ ] **Debug off in production** — `python app.py` runs `debug=True`. Production must
-         run via gunicorn with `FLASK_ENV=production` (ProductionConfig already sets DEBUG=False).
-         Never expose the Werkzeug debugger publicly.
-   - [x] **Server-side appointment `type` allowlist** — create defaults invalid types to
-         `checkup`; update rejects invalid `type`/`status`/`priority` with 400.
-   - [x] **413 handler** — oversized uploads now flash a clear message and redirect back.
-   - [x] Security headers (nosniff / X-Frame-Options / Referrer-Policy) added globally.
-   - [x] Uploads validated by extension + magic bytes + Pillow decode; stored in GridFS;
-         served only via authenticated, ownership-checked, attachment-forced routes.
+**Recommended build order** (sequenced for smoother programming — identity/access first,
+external intake last):
+
+1. **Standalone app (online-first PWA) + token auth** — single source of truth in MongoDB;
+   one installable codebase for phone + PC. The **token-auth** piece (JWT/API token alongside
+   the current session-cookie auth) is the same identity layer multi-staff needs.
+   - [ ] (Phase 2, only if connectivity is flaky) **Read-only offline cache** via a PWA
+         service worker — last-loaded data stays *viewable* offline; editing needs a
+         connection. NOT two-way sync.
+2. **Multi-staff clinic membership + roles** — **build before booking.** Restructures access
+   (`owner_id` → membership), roles, permissions, and the audit log that everything leans on.
+   Full spec in the detail section below.
+3. **Customer-facing booking** — **build after multi-staff.** Adds external users booking into
+   clinics (dentist accept/decline + auto-routing to the correct clinic); depends on a settled
+   role/clinic/permission model + the audit log, so doing it second avoids reworking
+   who-can-accept / who-gets-notified. Full spec in the detail section below.
+
+- [ ] **Terminate AWS Elastic Beanstalk** — `eb terminate mydentalportal-env`.
+      Target window **~2026-07-15 to 2026-08-15** ("a month or 2"). *(Independent / time-based.)*
 
 ---
 
-## Post-deployment to-do (future features)
-1. **Customer-facing booking (Facebook Messenger / email integration)** — connected
-   directly to the Appointments tab.
-   - 1.1 Automated email / FB Messenger page for customers, wired to Appointments.
-   - 1.2 Customer opens a chat with the FB page → welcome message + a private link
-         only that customer can see/click.
-   - 1.3 Clicking the link → customer picks an available appointment date.
-   - 1.4 Customer enters basic personal details.
-   - 1.5 Dentist is notified (e.g. via Messenger) to **accept or decline**.
-   - 1.6 If declined → page messages the customer a phone number to call for more info.
-   - 1.7 If accepted → page sends a link where the customer enters medical history.
-         (Likely via a one-time code so the medical history saves against the right
-          patient + personal info.)
-   - 1.8 Accepted appointments are added automatically to the correct clinic's
-         Appointments tab.
+### Detail — Multi-staff: clinic membership + roles (spec'd 2026-06-11)
 
-2. **AWS deployment.**
-   - 2.1 Use as many beneficial AWS services as possible within the **free tier**
-         (target: Elastic Beanstalk or ECS Fargate, MongoDB Atlas, S3 for files,
-          CloudFront, SES for email).
+> Online-first means this is purely a **membership + roles** feature — NOT a sync/conflict
+> problem. Simultaneous edits to the same record fall back to last-write-wins, which is fine
+> for a small co-located clinic that coordinates verbally. Builds on the 🟢 "enforce
+> role-based access" item, and swaps cleanly because access checks are already centralized in
+> `blueprints/utils/` (`verify_patient_access`, `user_clinic_ids`, `is_admin`).
 
-3. **Multi-staff shared clinic (far future).**
-   - Today every account is data-isolated by `owner_id`: clinics belong to the
-     account that created them, and patients belong to clinics, so accounts can't
-     share data. For a clinic with multiple staff logins (dentist + assistants)
-     sharing the same patients, replace single-owner with **clinic membership**
-     (a clinic has many member users; access is by membership, not ownership).
-     Larger architectural change; revisit only when multiple staff logins are needed.
+**Three roles:** App Admin · Dentist (clinic owner) · Staff (assistant/receptionist).
+
+**Onboarding:**
+- [ ] App Admin approves a registering dentist *(gate already exists: `ADMIN_EMAILS` / Approvals)*.
+- [ ] Dentist generates a **staff access code** → staff registers/links with it → membership row
+      links staff to that dentist's clinic(s).
+
+**Data model:**
+- [ ] Add a `memberships` collection (user_id ↔ clinic_id ↔ role); change access from
+      "is `owner_id` me?" to membership-based. Staff linked to a dentist get all that dentist's
+      clinics (per-clinic scoping is a later extension).
+
+**Staff permissions:**
+- ✅ view/create/edit patients · full appointments · view+add+full-edit treatments ·
+  **edit the dental chart** (existing save flow only — never touch chart internals) ·
+  view/upload files & photos · edit clinical notes.
+- 🟠 **Pricing = propose, dentist confirms:** staff may enter/edit a treatment's price
+  (`amount`), but it stays **pending until a dentist confirms**. Needs a price-confirmation
+  state (`price_confirmed` + who/when) and a dentist review/confirm UI.
+- ❌ generate access codes / invite or manage staff (dentist-only) · create/edit/delete clinics
+  or settings · **delete** patients/records (dentist/admin only — keep this default) ·
+  confirm pricing (dentist-only) · app-admin functions.
+- **Payments/balance ledger** (when built): staff **record payments received, append-only**;
+  cannot edit/void existing entries (corrections/refunds = dentist only); everything stamped +
+  shown in the dentist's activity log.
+
+**App Admin powers (global superset of dentist abilities):**
+- [ ] Approve/reject dentists (existing) AND approve/oversee staff; generate codes for any dentist.
+- [ ] View every dentist + their linked staff; view/act on any clinic's data (global switch).
+- [ ] Account lifecycle (activate/deactivate/suspend); role management (promote to dentist,
+      grant/revoke admin, revoke/reassign staff); revoke/regenerate access codes; manage any clinic.
+- Reserved to admin only: granting admin rights, approving dentists, acting across other
+  dentists' data, deactivating dentist accounts.
+
+**Admin panel shape:**
+- [ ] List all registered dentists → click a dentist → dropdown of staff linked to that dentist.
+      Users view shows role (dentist vs staff) + linkage.
+
+**Audit trail / activity log (required):**
+- [ ] **DB-backed `audit_log` collection** (NOT Render stdout — those stay for debugging only;
+      ephemeral/monolithic/not user-scoped, don't try to organize them by dentist). Stamp records
+      with `created_by` / `updated_by`; write entries with `actor_user_id`, `actor_role`, owning
+      dentist/clinic, `action`, `entity_type`, `entity_id`, `timestamp`.
+- [ ] **Nested viewer scope (one log, three views):** staff see none · dentist sees their own
+      clinic(s)' activity (self + their staff) · **app admin sees all, grouped by dentist →
+      expand → that dentist's actions + their staff's** (admin panel + activity feed).
+- [ ] Build-time: **PHI hygiene** (log the action, not sensitive values) + **pagination /
+      retention** policy. Same mechanism powers pricing-confirmation review and payments oversight.
+
+---
+
+### Detail — Customer-facing booking (FB Messenger / email integration)
+
+> Wired to the Appointments tab. Build **after** multi-staff so it slots into a settled
+> role/clinic/permission model + audit log.
+
+- [ ] Automated email / FB Messenger page for customers.
+- [ ] Customer opens a chat → welcome message + a private link only that customer can see.
+- [ ] Clicking the link → customer picks an available appointment date.
+- [ ] Customer enters basic personal details.
+- [ ] Dentist is notified to **accept or decline**.
+- [ ] If declined → message the customer a phone number to call.
+- [ ] If accepted → send a link to enter medical history (one-time code so it saves
+      against the right patient + personal info).
+- [ ] Accepted appointments auto-added to the correct clinic's Appointments tab.
+
+## 🔵 Far future (only when worth paying for)
+- [ ] **Scaling that costs money** — Redis (accurate multi-worker rate limiting),
+      load balancer + HTTPS, bigger DB tier, multi-clinic at scale, CDN / object storage.
