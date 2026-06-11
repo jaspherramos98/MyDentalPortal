@@ -709,8 +709,15 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Patient Name</label>
-                                <input type="text" class="form-control" id="modalPatientName" readonly>
+                                <label class="form-label">Patient Name *</label>
+                                <input type="text" class="form-control" id="modalPatientName"
+                                       list="patientOptions" autocomplete="off"
+                                       placeholder="Type or pick a patient">
+                                <datalist id="patientOptions">
+                                    {% for p in patients %}
+                                    <option value="{{ p.name }}"></option>
+                                    {% endfor %}
+                                </datalist>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Date</label>
@@ -1045,10 +1052,22 @@ Description: Dental practice appointments calendar with drag-and-drop functional
         }
 
         function setupDragAndDrop() {
-            // Setup draggable patients
+            const today = new Date().toISOString().split('T')[0];
+            // Setup draggable patients (desktop) + tap-to-add (mobile/touch,
+            // where HTML5 drag-and-drop doesn't fire). A plain click doesn't
+            // fire after a real drag, so desktop dragging is unaffected.
             document.querySelectorAll('.patient-card').forEach(card => {
                 card.addEventListener('dragstart', handleDragStart);
                 card.addEventListener('dragend', handleDragEnd);
+                card.addEventListener('click', function() {
+                    const patient = {
+                        id: this.dataset.patientId,
+                        name: this.dataset.patientName,
+                        phone: this.dataset.patientPhone,
+                    };
+                    const sel = document.getElementById('appointmentForm').dataset.selectedDate;
+                    showAppointmentModal(patient, sel || today);
+                });
             });
         }
 
