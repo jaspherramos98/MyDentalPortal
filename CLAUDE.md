@@ -48,8 +48,9 @@ MyDentalPortal/
 │   │   ├── patients.py       # get, get_for_owner (access seam), ensure_nested
 │   │   ├── clinics.py        # owned_by, owned_ids, get_owned
 │   │   └── charts.py         # get_by_patient, insert, upsert (chart plumbing)
-│   ├── models/
-│   │   └── __init__.py       # (reserved for boundary schema validation)
+│   ├── models/              # Boundary schemas (pydantic) — validate at the write edge
+│   │   ├── __init__.py
+│   │   └── patient.py        # PatientDoc / validate_patient (lenient, extra="allow")
 │   └── utils/
 │       └── __init__.py       # login_required, admin_required, is_admin +
 │                             #   verify_patient_access/user_clinic_ids (delegate to repos)
@@ -110,6 +111,12 @@ especially for **patient access**: `verify_patient_access`/`user_clinic_ids` (in
 will change (owner_id → membership) — don't re-implement it inline in routes. Pass 1 migrated patients,
 clinics, charts + the access seam; remaining blueprints (appointments, treatments, uploads, admin,
 reports, auth, main) still query `mongo.db` directly and migrate in Pass 2.
+
+**Schema validation at the write edge (Phase 3):** new patient documents go through
+`patient_repo.create()` → `validate_patient()` (pydantic `PatientDoc`), which guarantees the nested
+section skeleton + a valid `clinic_id` and rejects malformed docs, while **preserving** all extra/PDA
+fields (`extra="allow"`). The edit route uses targeted dot-notation `$set` via `patient_repo.update_set()`
+(hardcoded keys can't structurally malform a doc). Reads still use `ensure_nested` for legacy tolerance.
 
 ### URL Naming Convention
 All url_for() calls use blueprint namespaces:

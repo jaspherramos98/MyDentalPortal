@@ -81,11 +81,20 @@
       untouched). `_ensure_nested` moved to `patients` repo. 33 tests pass + import smoke clean.
       **Pass 2 (mechanical, deferred):** migrate raw `mongo.db` queries in appointments, treatments,
       uploads, admin, reports, auth, main into repositories.
-- [ ] **Schema validation at the boundary.** Patient docs are schemaless nested dicts patched by
-      `_ensure_nested` (the legacy-flat-data bug is the symptom). Add validation (pydantic at the
-      edge, or Mongo `$jsonSchema` validators) so malformed/legacy docs become impossible rather
-      than defensively patched.
-- [ ] **Re-run the smoke test** after the refactor — confirm no behavioral regression.
+- [x] **Schema validation at the boundary — DONE (2026-06-15).** Added pydantic `PatientDoc` +
+      `validate_patient` (`blueprints/models/patient.py`); patient **create** goes through
+      `patient_repo.create()` → validation (guarantees nested skeleton + valid `clinic_id`, rejects
+      malformed docs, preserves all extra/PDA fields via `extra="allow"`). Edit uses targeted
+      dot-notation `$set` via `patient_repo.update_set()` (hardcoded keys can't malform structure).
+      `pydantic==2.9.2` added to requirements. 42 tests pass.
+  - ⚠️ **Found while doing this — patient field-name drift (latent bug, NOT yet fixed):** the create
+        form writes `medical_history.conditions` but `ensure_nested` creates `medical_conditions`;
+        create reads birthday from `f.get('birthdate')` while edit uses `f.get('birthday')`; create
+        writes `minor_info` while `ensure_nested` also lists `guardian_info`. Not renamed (would risk
+        the detail template). Decide a canonical field set and reconcile form/template/schema as a
+        focused follow-up before broad release.
+- [ ] **Re-run the smoke test** after the refactor — confirm no behavioral regression. *(Local/pre-deploy;
+      refactor+schema are behavior-preserving for valid input, covered by 42 tests. Not yet deployed.)*
 
 ### Phase 4 — Access enforcement (foundation for multi-staff; rests on Phase 3)
 > Enforce on the **refactored** service layer so checks live in centralized enforcement points

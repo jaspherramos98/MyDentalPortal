@@ -203,10 +203,10 @@ def create_patient():
                 return render_template('patients/create.html',
                                        clinics=user_clinics, form_data=f)
 
-            result = mongo.db.patients.insert_one(patient_data)
+            inserted_id = patient_repo.create(patient_data)
             flash('Patient created successfully!', 'success')
             return redirect(url_for('patients.patient_detail',
-                                    patient_id=str(result.inserted_id)))
+                                    patient_id=str(inserted_id)))
 
         except Exception as e:
             print(f"[ERROR] Create patient: {e}")
@@ -413,10 +413,7 @@ def edit_patient(patient_id):
                 'medical_history.conditions.other': (f.get('condition_other') or '').strip(),
                 'updated_at': datetime.utcnow(),
             }
-            mongo.db.patients.update_one(
-                {'_id': ObjectId(patient_id)},
-                {'$set': update_data},
-            )
+            patient_repo.update_set(patient_id, update_data)
             flash('Patient updated successfully!', 'success')
             return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 

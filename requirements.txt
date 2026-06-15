@@ -3,6 +3,7 @@
 
 Flask==2.3.3
 Flask-WTF==1.2.1
+pydantic==2.9.2
 Flask-Limiter==3.8.0
 Flask-PyMongo==2.3.0
 pymongo==4.5.0

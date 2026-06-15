@@ -5,6 +5,7 @@ from bson.objectid import ObjectId
 from bson.errors import InvalidId
 
 from extensions import mongo
+from blueprints.models import validate_patient
 
 
 # Every nested dict the detail/list templates may access — keep in sync with
@@ -58,3 +59,21 @@ def get_for_owner(patient_id, owner_id):
         'owner_id': owner_id,
     })
     return patient, clinic
+
+
+def create(data):
+    """Validate a patient document at the write boundary, then insert it.
+
+    Raises pydantic ValidationError if the document is malformed (e.g. missing
+    or invalid clinic_id). Returns the inserted _id.
+    """
+    doc = validate_patient(data)
+    return mongo.db.patients.insert_one(doc).inserted_id
+
+
+def update_set(patient_id, fields):
+    """Apply a targeted ``$set`` (dot-notation keys) to one patient."""
+    return mongo.db.patients.update_one(
+        {'_id': ObjectId(patient_id)},
+        {'$set': fields},
+    )
