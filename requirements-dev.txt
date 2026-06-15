@@ -1,0 +1,7 @@
+# Dev/test-only dependencies (NOT installed in production).
+#   pip install -r requirements-dev.txt
+-r requirements.txt
+pytest==8.3.3
+mongomock==4.1.2
+# mongomock 4.1.2 still imports pkg_resources, removed in setuptools 81+.
+setuptools<81

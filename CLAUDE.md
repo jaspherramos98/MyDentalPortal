@@ -193,3 +193,21 @@ cp .env.example .env
 python app.py
 # Open http://localhost:5000
 ```
+
+## Testing (added 2026-06-15, Phase 3)
+```bash
+pip install -r requirements-dev.txt   # pytest + mongomock (+ setuptools<81)
+pytest                                # runs tests/ ; ~1s, no DB/network needed
+```
+- **Hermetic by design:** tests do NOT import `app.py` (it runs `init_database()` real
+  DB writes at import). `tests/conftest.py` builds a minimal Flask app and points the shared
+  `mongo` singleton at an in-memory **mongomock** DB, then registers the *real* `charts_bp`
+  plus stub `auth`/`patients` blueprints (so `url_for` redirects resolve). No live cluster is
+  ever touched.
+- **Coverage so far (the highest-risk-to-regress paths):**
+  `tests/test_access_control.py` — `is_admin`, `verify_patient_access`, `user_clinic_ids`,
+  `login_required`, `admin_required`. `tests/test_charts.py` — the SACRED chart's default FDI
+  structure + the save route contract (auth, 404/403, persistence, read-only field stripping,
+  both URL aliases).
+- **Note:** `mongomock 4.1.2` imports `pkg_resources`, removed in setuptools 81+, so
+  `requirements-dev.txt` pins `setuptools<81`.

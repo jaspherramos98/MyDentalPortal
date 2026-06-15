@@ -63,11 +63,14 @@
 > Tests come **before** the refactor: the service-layer refactor is the dangerous part, and a
 > characterization test net lets you refactor safely instead of blind. Then harden the architecture
 > while it's cheap — both items are explicitly **prerequisites for multi-staff** (Roadmap #2).
-- [ ] **Automated test suite (highest-leverage gap for PHI software).** Only a *manual* smoke test
-      exists today. Stand up pytest, then add coverage in risk order: **(a) the SACRED chart
-      save/load flow** (highest-risk-to-regress, nothing guards it but care) and **(b) the
-      access-control utils** (`verify_patient_access`, `is_admin`, `admin_required`) as they behave
-      today. These become the net for the refactor below.
+- [x] **Automated test suite — net in place (2026-06-15).** pytest + mongomock stood up
+      (`requirements-dev.txt`, `pytest.ini`, `tests/conftest.py`); hermetic (no `app.py` import,
+      no live DB). 23 tests pass: **(a) SACRED chart** default FDI structure + save route contract
+      (auth, 404/403, persistence, read-only field stripping, both aliases) in `tests/test_charts.py`;
+      **(b) access-control utils** (`is_admin`, `verify_patient_access`, `user_clinic_ids`,
+      `login_required`, `admin_required`) in `tests/test_access_control.py`. This is the net for the
+      refactor below — *expand it as the service layer lands.* (Routes beyond charts are not yet
+      covered; add as needed.)
 - [ ] **Thin service/repository layer.** Routes currently query MongoDB directly (`models/` is
       basically just `_ensure_nested`). The multi-staff + audit-log + price-confirmation work will
       pile state-transition logic into route handlers unless reads/writes go through a thin layer
