@@ -34,16 +34,25 @@ MyDentalPortal/
 │   ├── routes/
 │   │   ├── __init__.py       # Blueprint registry
 │   │   ├── auth.py           # Login, register, logout
-│   │   ├── main.py           # Dashboard, index
+│   │   ├── main.py           # Dashboard, index, account settings
 │   │   ├── clinics.py        # Clinic CRUD + search + currency (PHP/USD)
 │   │   ├── patients.py       # Patient CRUD, PDA form fields, pagination
 │   │   ├── charts.py         # *** SACRED — dental chart, DO NOT modify chart logic ***
 │   │   ├── treatments.py     # Treatment records CRUD + JSON API
-│   │   └── appointments.py   # Appointments CRUD + calendar API
+│   │   ├── appointments.py   # Appointments CRUD + calendar API
+│   │   ├── uploads.py        # Patient photos/files + prescriptions (GridFS)
+│   │   ├── admin.py          # Registration approvals + user management
+│   │   └── reports.py        # Performance/reports
+│   ├── repositories/         # Thin data-access layer (Phase 3) — wraps mongo.db
+│   │   ├── __init__.py
+│   │   ├── patients.py       # get, get_for_owner (access seam), ensure_nested
+│   │   ├── clinics.py        # owned_by, owned_ids, get_owned
+│   │   └── charts.py         # get_by_patient, insert, upsert (chart plumbing)
 │   ├── models/
-│   │   └── __init__.py
+│   │   └── __init__.py       # (reserved for boundary schema validation)
 │   └── utils/
-│       └── __init__.py
+│       └── __init__.py       # login_required, admin_required, is_admin +
+│                             #   verify_patient_access/user_clinic_ids (delegate to repos)
 ├── static/
 │   ├── css/main.css
 │   └── js/
@@ -81,7 +90,8 @@ MyDentalPortal/
 - Only safe changes: import paths, url_for references, CSS styling, adding new assessment fields
 
 ### Patient Data Structure (matches PDA paper form)
-Patients are stored with nested dicts. Always use `_ensure_nested(patient)` before template rendering.
+Patients are stored with nested dicts. Always call `patient_repo.ensure_nested(patient)`
+(`from blueprints.repositories import patients as patient_repo`) before template rendering.
 Key nested paths: `personal_info`, `contact_info`, `dental_history`, `medical_history`,
 `medical_history.allergies`, `medical_history.women_health`, `medical_history.conditions`,
 `referral_info`, `minor_info`, `insurance_info`.
@@ -92,6 +102,14 @@ All blueprints import mongo from `extensions.py`:
 from extensions import mongo
 ```
 NEVER import from `app.py` or `app_factory.py` (deleted).
+
+### Data access — repository layer (Phase 3)
+Prefer the thin repositories in `blueprints/repositories/` over raw `mongo.db` queries in routes,
+especially for **patient access**: `verify_patient_access`/`user_clinic_ids` (in `utils/`) delegate to
+`patients.get_for_owner` / `clinics.owned_ids`. That owner-scoped check is the **single seam** multi-staff
+will change (owner_id → membership) — don't re-implement it inline in routes. Pass 1 migrated patients,
+clinics, charts + the access seam; remaining blueprints (appointments, treatments, uploads, admin,
+reports, auth, main) still query `mongo.db` directly and migrate in Pass 2.
 
 ### URL Naming Convention
 All url_for() calls use blueprint namespaces:

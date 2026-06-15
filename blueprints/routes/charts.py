@@ -11,8 +11,8 @@ from bson.objectid import ObjectId
 from datetime import datetime
 import traceback
 
-from extensions import mongo
-from blueprints.utils import login_required
+from blueprints.utils import login_required, verify_patient_access
+from blueprints.repositories import charts as charts_repo
 
 charts_bp = Blueprint('charts', __name__)
 
@@ -89,27 +89,18 @@ def create_default_dental_chart(patient_id):
 def view_chart(patient_id):
     """View dental chart for a patient."""
     try:
-        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
+        patient, clinic = verify_patient_access(patient_id)
         if not patient:
             flash('Patient not found', 'error')
             return redirect(url_for('patients.list_patients'))
-
-        clinic = mongo.db.clinics.find_one({
-            '_id': patient['clinic_id'],
-            'owner_id': session['user_id'],
-        })
         if not clinic:
             flash('Access denied', 'error')
             return redirect(url_for('patients.list_patients'))
 
         # Get or create dental chart
-        dental_chart = mongo.db.dental_charts.find_one(
-            {'patient_id': ObjectId(patient_id)}
-        )
+        dental_chart = charts_repo.get_by_patient(patient_id)
         if not dental_chart:
-            chart_data = create_default_dental_chart(patient_id)
-            result = mongo.db.dental_charts.insert_one(chart_data)
-            dental_chart = mongo.db.dental_charts.find_one({'_id': result.inserted_id})
+            dental_chart = charts_repo.insert(create_default_dental_chart(patient_id))
 
         # Prepare JSON-serialisable copy for template
         chart_data_json = {}
@@ -144,20 +135,12 @@ def view_chart(patient_id):
 def chart_pdf(patient_id):
     """Export the patient's dental chart as a PDF."""
     try:
-        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
-        if not patient:
+        patient, clinic = verify_patient_access(patient_id)
+        if not patient or not clinic:
             flash('Patient not found', 'error')
             return redirect(url_for('patients.list_patients'))
 
-        clinic = mongo.db.clinics.find_one({
-            '_id': patient['clinic_id'],
-            'owner_id': session['user_id'],
-        })
-        if not clinic:
-            flash('Patient not found', 'error')
-            return redirect(url_for('patients.list_patients'))
-
-        chart = mongo.db.dental_charts.find_one({'patient_id': ObjectId(patient_id)})
+        chart = charts_repo.get_by_patient(patient_id)
         if not chart:
             # No chart yet — export a blank one from the default structure.
             chart = create_default_dental_chart(patient_id)
@@ -185,14 +168,9 @@ def chart_pdf(patient_id):
 def update_chart(patient_id):
     """Update dental chart data (called by JS fetch)."""
     try:
-        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
+        patient, clinic = verify_patient_access(patient_id)
         if not patient:
             return jsonify({'success': False, 'error': 'Patient not found'}), 404
-
-        clinic = mongo.db.clinics.find_one({
-            '_id': patient['clinic_id'],
-            'owner_id': session['user_id'],
-        })
         if not clinic:
             return jsonify({'success': False, 'error': 'Access denied'}), 403
 
@@ -202,15 +180,7 @@ def update_chart(patient_id):
         for key in ('_id', 'patient_id', 'created_by', 'created_at'):
             data.pop(key, None)
 
-        mongo.db.dental_charts.update_one(
-            {'patient_id': ObjectId(patient_id)},
-            {'$set': {
-                **data,
-                'updated_at': datetime.utcnow(),
-                'updated_by': session['user_id'],
-            }},
-            upsert=True,
-        )
+        charts_repo.upsert(patient_id, data, session['user_id'])
         return jsonify({'success': True, 'message': 'Chart updated successfully'})
 
     except Exception as e:

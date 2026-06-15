@@ -71,11 +71,16 @@
       `login_required`, `admin_required`) in `tests/test_access_control.py`. This is the net for the
       refactor below — *expand it as the service layer lands.* (Routes beyond charts are not yet
       covered; add as needed.)
-- [ ] **Thin service/repository layer.** Routes currently query MongoDB directly (`models/` is
-      basically just `_ensure_nested`). The multi-staff + audit-log + price-confirmation work will
-      pile state-transition logic into route handlers unless reads/writes go through a thin layer
-      first. Refactor while it's cheap — guarded by the Phase 3 tests; expand tests to cover the new
-      layer as you go.
+- [~] **Thin service/repository layer — Pass 1 DONE (2026-06-15).** Added `blueprints/repositories/`
+      (`patients`, `clinics`, `charts`) of thin functions returning plain dicts. The access seam is
+      centralized: `verify_patient_access`/`user_clinic_ids` (utils) now delegate to
+      `patients.get_for_owner`/`clinics.owned_ids`, so every existing caller (treatments, uploads,
+      patients, reports, appointments) routes through one place — multi-staff changes ONLY
+      `get_for_owner` (owner_id → membership). `charts.py` inline owner-check removed (now via
+      `verify_patient_access`); chart DB ops moved to `charts_repo` (SACRED shape/save-load logic
+      untouched). `_ensure_nested` moved to `patients` repo. 33 tests pass + import smoke clean.
+      **Pass 2 (mechanical, deferred):** migrate raw `mongo.db` queries in appointments, treatments,
+      uploads, admin, reports, auth, main into repositories.
 - [ ] **Schema validation at the boundary.** Patient docs are schemaless nested dicts patched by
       `_ensure_nested` (the legacy-flat-data bug is the symptom). Add validation (pydantic at the
       edge, or Mongo `$jsonSchema` validators) so malformed/legacy docs become impossible rather

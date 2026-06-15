@@ -8,10 +8,9 @@
 from functools import wraps
 
 from flask import session, redirect, url_for, current_app, abort
-from bson.objectid import ObjectId
-from bson.errors import InvalidId
 
-from extensions import mongo
+from blueprints.repositories import patients as _patient_repo
+from blueprints.repositories import clinics as _clinic_repo
 
 
 def login_required(f):
@@ -26,29 +25,17 @@ def login_required(f):
 
 def user_clinic_ids():
     """ObjectIds of the active clinics owned by the current user."""
-    clinics = mongo.db.clinics.find(
-        {'owner_id': session['user_id'], 'is_active': True}, {'_id': 1},
-    )
-    return [c['_id'] for c in clinics]
+    return _clinic_repo.owned_ids(session['user_id'])
 
 
 def verify_patient_access(patient_id):
     """Return (patient, clinic) only if the current user owns the patient's clinic.
 
-    Returns (None, None) for a missing/invalid id or a patient in someone
-    else's clinic — the caller must treat that as access denied.
+    Returns (None, None) for a missing/invalid id; (patient, None) for a patient
+    in someone else's clinic — the caller must treat a None clinic as access
+    denied. Delegates to the patients repository (the multi-staff access seam).
     """
-    try:
-        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
-    except (InvalidId, TypeError):
-        return None, None
-    if not patient:
-        return None, None
-    clinic = mongo.db.clinics.find_one({
-        '_id': patient['clinic_id'],
-        'owner_id': session['user_id'],
-    })
-    return patient, clinic
+    return _patient_repo.get_for_owner(patient_id, session['user_id'])
 
 
 def is_admin():
