@@ -140,7 +140,9 @@ Created on first run if no users exist:
   access codes, admin-panel shape) is spec'd in TODO.md — build against that when implementing.
 - The "offline version" is decided as an **online-first PWA** (single source of truth) + an optional
   read-only offline cache; two-way sync was rejected. See TODO.md.
-- Profile and Settings pages in the user dropdown are placeholder links (#)
+- User dropdown has a single **Account** link → `main.settings` (`templates/settings.html`):
+  account info + profile (name/specialty) update + change password. (Formerly two placeholder
+  `#` links labeled Profile/Settings; collapsed to one Account link 2026-06-15.)
 
 ## Deployment
 ### Render (current)
@@ -152,12 +154,27 @@ Created on first run if no users exist:
 ### AWS (LIVE)
 - **Platform:** Elastic Beanstalk, Docker platform — config in `.elasticbeanstalk/config.yml`
 - **Application:** `mydentalportal`  |  **Environment:** `mydentalportal-env`  |  **Region:** `ap-southeast-1` (Singapore)
-- **Database:** MongoDB Atlas (`dental-portal-cluster`)
+- **Database:** MongoDB Atlas (`dental-portal-cluster`), DB **`dental_portal_showcase`** via the
+  scoped user **`dps_app`** (`readWrite` on that DB only — cannot touch prod).
 - **Deploy command:** `eb deploy mydentalportal-env` (run from project root; deploys the current git HEAD, so commit first)
 - **Container:** `Dockerfile` builds the image; gunicorn binds `0.0.0.0:8000` (EB reads the `EXPOSE 8000` line). Runs as unprivileged `appuser`.
-- **Env vars for the container:** `.env.docker` (git-ignored — holds SECRET_KEY + Atlas MONGO_URI; NEVER commit it). `.dockerignore` keeps `.env*` and secrets out of the image build context.
+- **Env vars for the container:** live env is set via EB environment properties (`eb setenv` / `eb printenv`
+  is authoritative). `.env.docker` (git-ignored) is a local mirror = the scoped `dps_app` showcase URI.
+  `.dockerignore` keeps `.env*` and secrets out of the image build context.
 - Requires the EB CLI (installed) and AWS credentials configured on the deploying machine.
 - Future (not yet done): ECS Fargate / App Runner migration, S3 + CloudFront for static/photos.
+
+### Database environments & credentials (hardened 2026-06-15)
+One Atlas cluster (`dental-portal-cluster`), exactly two databases — each accessed by its own
+least-privilege user (no shared admin on any deployed host):
+- **`dental_portal_prod`** — real PHI (Render). User **`dpp_app`** (`readWrite` on this DB only).
+  Render's `MONGO_URI` is set in the Render dashboard (env var, `sync:false`).
+- **`dental_portal_showcase`** — demo data (AWS EB). User **`dps_app`** (`readWrite` on this DB only).
+- The shared admin **`jaspherramos98ADMIN`** is for maintenance ONLY and lives in git-ignored
+  **`.env.atlas-admin`** (cluster scope). No deployed host uses it. Rotate it there.
+- **Maintenance scripts:** `scripts/db_inventory.py`, `db_copy.py`, `db_drop.py`, `db_test_user.py`
+  (read the URI from `.env.atlas-admin` by default; never hardcode creds). Atlas DB-user management
+  is control-plane only (UI/Admin API) — the driver cannot `createUser`.
 
 ## How to Run Locally
 ```bash

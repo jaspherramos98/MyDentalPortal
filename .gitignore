@@ -4,6 +4,7 @@ __pycache__/
 *.so
 .env
 .env.docker
+.env.atlas-admin
 .env.*.local
 venv/
 .venv/
