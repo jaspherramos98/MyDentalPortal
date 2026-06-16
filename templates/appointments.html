@@ -458,6 +458,43 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                 width: 50px;
                 height: 50px;
             }
+
+            /* Let the page scroll naturally instead of clipping at a fixed
+               100vh-80px height (the nav is taller on mobile, so that math cut
+               off the bottom of the calendar). */
+            .appointments-container { height: auto; overflow: visible; }
+            .calendar-container { height: auto; overflow-y: visible; }
+
+            /* Top nav: keep links on ONE horizontally-scrollable row instead of
+               wrapping into a vertical pile. */
+            .top-nav-bar .nav {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                min-width: 0;
+                -webkit-overflow-scrolling: touch;
+            }
+            .top-nav-bar .nav::-webkit-scrollbar { display: none; }
+            .top-nav-bar .nav-link { white-space: nowrap; padding: 6px 8px; }
+
+            /* Week view -> swipeable: each day gets a readable width and the
+               7-column grid scrolls/swipes horizontally (day headers stay above
+               their column since they share the same grid). */
+            .week-grid {
+                grid-template-columns: repeat(7, 82vw);
+                margin: 10px;
+                overflow-x: auto;
+                scroll-snap-type: x proximity;
+                -webkit-overflow-scrolling: touch;
+            }
+            .week-grid .week-day,
+            .week-grid .day-header { scroll-snap-align: start; }
+            .week-day { min-height: 300px; }
+
+            /* Month view -> keep all 7 columns (a month needs them) but shrink
+               cells so the whole grid fits the screen width. */
+            .calendar-grid { margin: 8px; }
+            .calendar-day { min-height: 60px; padding: 4px; font-size: 11px; }
+            .day-header { padding: 6px 2px; font-size: 11px; }
         }
     </style>
 </head>
