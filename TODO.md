@@ -94,8 +94,13 @@
         `PatientDoc` (guardian fields live under `minor_info`). The `birthday`/`birthdate` difference
         is **not** a data bug — create's form *field* is `birthdate` but maps to stored
         `personal_info.birthday`; edit + detail use `birthday` consistently. Regression test added.
-- [ ] **Re-run the smoke test** after the refactor — confirm no behavioral regression. *(Local/pre-deploy;
-      refactor+schema are behavior-preserving for valid input, covered by 42 tests. Not yet deployed.)*
+- [x] **Re-run the smoke test after the refactor — DONE 2026-06-16, PASS (local).** 52 unit tests pass +
+      an HTTP smoke (`scripts/smoke_test.py`, stdlib-only) hit the real WSGI stack: **11/11, zero 5xx** —
+      login, reads (dashboard, patients, patient detail, chart view, appointments, reports) and the
+      WRITE paths through the refactored layer (SACRED chart save → `charts_repo.upsert`; appointment
+      create → cancel → delete). No behavioral regression. Confirmed delete is a soft-delete
+      (`is_active:false`+`deleted_at`). Re-run with `BASE_URL=http://localhost:5000 python scripts/smoke_test.py`
+      against a local instance (refuses prod). ⏳ Not yet re-run against a deploy.
 
 ### Phase 4 — Access enforcement (foundation for multi-staff; rests on Phase 3)
 > Enforce on the **refactored** service layer so checks live in centralized enforcement points
