@@ -157,6 +157,13 @@ The off-canvas sidebar scrolls as ONE unit (filters→stats→patient list, fixe
 anchored to the full viewport (`top:0;bottom:0;overflow-y:auto`) and the previously-nested scrolls are
 flattened (`.sidebar .search-box{position:static}`, `.sidebar .patient-list{max-height:none;overflow:visible}`)
 — **don't reintroduce a sticky `.search-box` or a capped `.patient-list` inside the phone media query.**
+On mobile the **calendar header is stacked** (view-toggle row above the info badges, each wrapping with a
+steady gap) with tighter padding/smaller buttons; and the `#selectedDate` badge uses a **compact date
+format on phones** (`Jun 16, 2026` via a `matchMedia` check in `showAppointmentModal`) so picking a patient
+doesn't reflow the header and shove the calendar down. Desktop keeps the long `Tuesday, June 16, 2026` format.
+Mobile drag-drop is intentionally NOT supported (HTML5 DnD doesn't fire on touch); the mobile flow is
+**tap a patient card → appointment modal** (defaults to today; tapping a calendar day to pre-select a date
+on touch is a known gap, deferred).
 
 ### PWA (online-first, Phase 3.5 / roadmap #1 slice 1a)
 The app is installable. `app.py` serves `/manifest.webmanifest` and `/sw.js` (the latter from root with
