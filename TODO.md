@@ -195,9 +195,14 @@
 - [ ] **Make CI a required check** — GitHub branch protection on `main` so a red suite **blocks merges**
       (until then the workflow only *signals*, it can't stop a push). *(Repo Settings → Branches →
       protect `main` → require the CI check.)* Owner/manual, one-time.
-- [ ] **Repository Pass 2 (mechanical)** — migrate raw `mongo.db` queries in appointments, treatments,
-      uploads, admin, reports, auth, main into `blueprints/repositories/`. Carried from Phase 3; makes
-      the multi-staff access swap a true single-seam change. *(Expand tests as each route moves.)*
+- [~] **Repository Pass 2 (mechanical)** — migrate raw `mongo.db` queries into `blueprints/repositories/`.
+      Carried from Phase 3; makes the multi-staff access swap a true single-seam change. Done by PR/collection:
+      - [x] **appointments** (2026-06-16) — `repositories/appointments.py` (get/find_in_range/
+            find_active_on_day/insert/update_set/soft_delete) + `patients.active_in_clinics`; route now
+            uses appt/clinic/patient repos, zero `mongo.db` left in `appointments.py`. +5 repo tests
+            (57 total), live smoke 11/11.
+      - [ ] treatments · [ ] auth+admin (users) · [ ] uploads (files/GridFS) · [ ] main+reports (aggregations).
+      *(Expand tests as each route moves.)*
 - [ ] **Observability / error tracking** — capture unhandled 5xx off-box (Sentry free tier or at least
       structured logging shipped somewhere durable); Render stdout is ephemeral/not searchable. **Must-have:**
       error tracking. **Nice-to-have:** Prometheus + Grafana dashboards (latency/error-rate/throughput) —
