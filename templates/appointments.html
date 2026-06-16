@@ -379,32 +379,50 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             border-radius: 15px 15px 0 0;
         }
 
+        /* Legend now sits below the calendar grid as a horizontal, wrapping row. */
         .legend {
             background: white;
-            padding: 15px;
+            padding: 12px 15px;
             border-radius: 10px;
-            margin: 15px;
+            margin: 0 20px 20px 20px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 18px;
+        }
+
+        .legend h6 {
+            width: 100%;
+            margin: 0 0 4px;
         }
 
         .legend-item {
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            margin-bottom: 8px;
+            margin-bottom: 0;
         }
 
         .legend-color {
             width: 20px;
             height: 20px;
             border-radius: 4px;
-            margin-right: 10px;
+            margin-right: 8px;
+        }
+
+        /* Stats as a compact 2x2 grid instead of a tall vertical stack. */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 12px;
         }
 
         .stats-card {
             background: white;
             border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 15px;
+            padding: 12px;
+            margin-bottom: 0;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             text-align: center;
         }
@@ -435,6 +453,9 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                 width: 300px;
                 z-index: 1050;
                 transition: left 0.3s ease;
+                /* Reachable bottom so the draggable patient list can be scrolled
+                   into view past the browser/toolbar chrome. */
+                padding-bottom: 96px;
             }
 
             .sidebar.show {
@@ -445,10 +466,13 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                 margin-left: 0;
             }
 
+            /* Float the sidebar toggle at the BOTTOM-left so it no longer covers
+               the calendar header buttons (Previous / view toggles) up top. */
             .mobile-toggle {
                 position: fixed;
-                top: 100px;
-                left: 20px;
+                top: auto;
+                bottom: 24px;
+                left: 16px;
                 z-index: 1060;
                 background: var(--primary-color);
                 color: white;
@@ -456,6 +480,7 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                 border-radius: 50%;
                 width: 50px;
                 height: 50px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.25);
             }
 
             /* Let the page scroll naturally instead of clipping at a fixed
@@ -641,7 +666,7 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             </div>
 
             <!-- Today's Stats -->
-            <div class="px-3">
+            <div class="px-3 stats-grid">
                 <div class="stats-card">
                     <div class="stats-number" id="todayAppointments">0</div>
                     <div class="stats-label" id="todayLabel">Today's Appointments</div>
@@ -660,38 +685,7 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                 </div>
             </div>
 
-            <!-- Legend -->
-            <div class="legend">
-                <h6><i class="fas fa-info-circle"></i> Legend</h6>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: linear-gradient(135deg, #e3f2fd, #bbdefb);"></div>
-                    <span>Regular Checkup</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: linear-gradient(135deg, #ffebee, #ffcdd2);"></div>
-                    <span>Emergency</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: linear-gradient(135deg, #e8f5e8, #c8e6c9);"></div>
-                    <span>Follow-up</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: linear-gradient(135deg, #fff3e0, #ffe0b2);"></div>
-                    <span>Surgery</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: linear-gradient(135deg, #e0f2f1, #b2dfdb);"></div>
-                    <span>Cleaning</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: linear-gradient(135deg, #f3e5f5, #e1bee7);"></div>
-                    <span>Filling</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: linear-gradient(135deg, #efebe9, #d7ccc8);"></div>
-                    <span>Tooth Extraction</span>
-                </div>
-            </div>
+            <!-- (Legend moved below the calendar grid — see #appointments-legend) -->
 
             <!-- Patient List -->
             <div class="patient-list" id="patientList">
@@ -732,9 +726,6 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <button class="btn nav-btn me-2" onclick="goToToday()">
-                            <i class="fas fa-calendar-day"></i> Today
-                        </button>
                         <button class="btn nav-btn active" id="weekViewBtn" onclick="showWeekView()">
                             <i class="fas fa-calendar-week"></i> Week View
                         </button>
@@ -785,8 +776,41 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                     <div class="day-header">Thursday</div>
                     <div class="day-header">Friday</div>
                     <div class="day-header">Saturday</div>
-                    
+
                     <!-- Calendar days will be dynamically generated -->
+                </div>
+            </div>
+
+            <!-- Legend (moved here from the sidebar — sits below the grid, horizontal) -->
+            <div class="legend" id="appointments-legend">
+                <h6><i class="fas fa-info-circle"></i> Legend</h6>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #e3f2fd, #bbdefb);"></div>
+                    <span>Regular Checkup</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #ffebee, #ffcdd2);"></div>
+                    <span>Emergency</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #e8f5e8, #c8e6c9);"></div>
+                    <span>Follow-up</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #fff3e0, #ffe0b2);"></div>
+                    <span>Surgery</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #e0f2f1, #b2dfdb);"></div>
+                    <span>Cleaning</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #f3e5f5, #e1bee7);"></div>
+                    <span>Filling</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #efebe9, #d7ccc8);"></div>
+                    <span>Tooth Extraction</span>
                 </div>
             </div>
         </div>
