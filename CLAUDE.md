@@ -187,10 +187,19 @@ sizing decisions.
   `loadtest/targets-authed.txt` (git-ignored — holds a live cookie).
 - `loadtest/run-authed.sh` — runs `login.py` then attacks authed read paths (dashboard, patients,
   patient detail, appointments).
-- Vegeta binary is **not** installed by default — `scoop install vegeta` / `brew install vegeta` / release binary.
-- Verified end-to-end against local 2026-06-16 (login + all authed GETs 200). Note: the documented
-  default admin (`admin@dental.com` / `admin123`) must be `status:approved` + `is_active:true` to pass
-  the Phase 4 login gate.
+- Vegeta **v12.13.0 installed** at `~/.local/bin/vegeta.exe`. Use `BASE_URL=http://127.0.0.1:5000`
+  (NOT `localhost` — Vegeta's Go resolver can fail to resolve `localhost`). ⚠️ Local runs use the
+  **single-threaded Flask dev server** (gunicorn is Unix-only, no Windows), so numbers measure app+DB
+  *logic* latency, NOT production concurrency/worker tuning — that needs a non-prod Linux gunicorn box.
+- Local baselines 2026-06-16: public p95 3.5ms, authed read p95 10.6ms, both 100% 200s.
+
+### Smoke test (`scripts/smoke_test.py`, added 2026-06-16)
+Stdlib-only HTTP smoke over the real WSGI stack — the Phase 3 regression gate. Logs in, hits the main
+read pages + the write paths through the refactored layer (SACRED chart save; appointment
+create→cancel→delete). Refuses a prod-looking `BASE_URL`. Run against a local instance:
+`BASE_URL=http://127.0.0.1:5000 python scripts/smoke_test.py` (11/11, zero 5xx as of 2026-06-16).
+Note: the default admin (`admin@dental.com`/`admin123`) must be `status:approved`+`is_active:true` to
+pass the Phase 4 login gate.
 
 ## Environment Variables (.env)
 ```
