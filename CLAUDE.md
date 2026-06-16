@@ -148,8 +148,15 @@ Clinic and patient data are passed from Flask and rendered via Jinja `{% for %}`
 so the calendar's `100vh-80px` layout holds) — so it collapses to a hamburger on mobile like every other
 tab. Keep it in sync with `base.html` by hand. **Because it's standalone, PWA tags (manifest/theme/icon +
 SW registration) are also duplicated into its `<head>` — keep both in sync.**
-Mobile (in its `@media max-width:768px`): week view is a swipeable 7×82vw horizontal grid; month view
-keeps 7 columns but shrinks cells; containers go `height:auto` so nothing is clipped. Desktop unchanged.
+Mobile/landscape (phone layout triggers on `@media (max-width:768px), (max-height:500px)` — landscape
+phones are wide but short): week view is a swipeable 7×82vw horizontal grid; month view keeps 7 columns
+but shrinks cells; the filter sidebar is off-canvas (toggle bottom-left, forced visible over `d-md-none`);
+calendar forced full-width; stats are a 2×2 grid; the legend moved BELOW the grid (horizontal). Desktop
+unchanged except the owner-approved nav swap + stats-grid/legend placement.
+**⚠️ KNOWN OPEN BUG (next session):** the off-canvas sidebar does NOT scroll — the top `.search-box`
+filter section stays fixed, so the stats and the draggable patient list below it are unreachable on
+phone (drag-drop onto a date impossible). The whole sidebar (filters→stats→patient list) must scroll as
+one unit. See TODO Phase 5.
 
 ### PWA (online-first, Phase 3.5 / roadmap #1 slice 1a)
 The app is installable. `app.py` serves `/manifest.webmanifest` and `/sw.js` (the latter from root with

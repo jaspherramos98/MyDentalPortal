@@ -131,6 +131,24 @@
       placement apply to desktop too.)* Note: patient-detail `table-sm` tables are 2-col key/value and
       fit mobile — NOT wrapped (wide list tables were already `.table-responsive`). ⏳ Owner to re-verify
       on device.
+- [x] **Consistent navbar→title spacing — DONE 2026-06-15.** Added `padding-top:1.5rem` to
+      `.main-content` (base.html) so every base-extending page matches the settings page's gap below the
+      navbar (settings de-duped from `py-4` → `pb-4`). Desktop + mobile. (Appointments is standalone, not
+      affected.)
+- [x] **Appointments landscape-phone layout — DONE 2026-06-15.** Phone layout now triggers on short
+      height too (`@media (max-width:768px), (max-height:500px)`); calendar forced full-width when sidebar
+      off-canvas; toggle kept visible over `d-md-none`. (Landscape phones are wide >768px but short, so
+      width-only breakpoint had left them on the broken desktop layout.)
+- [ ] **OPEN BUG (next session) — appointments off-canvas sidebar isn't scrollable.** On mobile/landscape,
+      the **top filter section** (`.search-box`: clinic selector, patient search, type filter) stays
+      **fixed**, so you can't scroll down within the off-canvas sidebar to reach the **stats 2×2 grid**
+      and the **draggable patient list** (so drag-and-drop onto a date is impossible on phone).
+      *Investigate:* `.sidebar` (`height: calc(100vh-80px); overflow-y:auto`) + `.search-box` in
+      `templates/appointments.html` — likely a `position:sticky/fixed` on `.search-box` or an
+      overflow/height issue stopping the sidebar from scrolling as one unit. **Fix goal:** the entire
+      off-canvas sidebar (filters → stats → patient list) scrolls top-to-bottom on mobile + landscape.
+      (Earlier `.sidebar { padding-bottom:96px }` was added but the real blocker is the non-scrolling
+      top section.)
 
 ### Decision record — Hosting + HTTPS (settled 2026-06-13; no action until broad release)
 - **Long-term host = Render**, not AWS (EB was for portfolio and is being torn down — see 🟡).
