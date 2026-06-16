@@ -10,8 +10,8 @@ from bson.objectid import ObjectId
 from bson.errors import InvalidId
 from datetime import datetime
 
-from extensions import mongo
 from blueprints.utils import admin_required
+from blueprints.repositories import users as user_repo
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -19,9 +19,7 @@ admin_bp = Blueprint('admin', __name__)
 @admin_bp.route('/admin/registrations')
 @admin_required
 def registrations():
-    pending = list(
-        mongo.db.users.find({'status': 'pending'}).sort('created_at', -1)
-    )
+    pending = user_repo.list_by_status('pending')
     return render_template('admin/registrations.html', pending=pending)
 
 
@@ -32,10 +30,9 @@ def approve(user_id):
         oid = ObjectId(user_id)
     except (InvalidId, TypeError):
         abort(404)
-    mongo.db.users.update_one(
-        {'_id': oid, 'status': 'pending'},
-        {'$set': {'status': 'approved', 'updated_at': datetime.utcnow(),
-                  'approved_by': session['user_id']}},
+    user_repo.set_status_if_pending(
+        oid, 'approved',
+        {'updated_at': datetime.utcnow(), 'approved_by': session['user_id']},
     )
     flash('Account approved — the user can now log in.', 'success')
     return redirect(url_for('admin.registrations'))
@@ -48,10 +45,9 @@ def reject(user_id):
         oid = ObjectId(user_id)
     except (InvalidId, TypeError):
         abort(404)
-    mongo.db.users.update_one(
-        {'_id': oid, 'status': 'pending'},
-        {'$set': {'status': 'rejected', 'updated_at': datetime.utcnow(),
-                  'rejected_by': session['user_id']}},
+    user_repo.set_status_if_pending(
+        oid, 'rejected',
+        {'updated_at': datetime.utcnow(), 'rejected_by': session['user_id']},
     )
     flash('Registration rejected.', 'warning')
     return redirect(url_for('admin.registrations'))
@@ -62,9 +58,7 @@ def reject(user_id):
 @admin_required
 def users():
     """List all accounts (admin handles password resets manually — no email flow)."""
-    all_users = list(
-        mongo.db.users.find({}, {'password': 0}).sort('created_at', -1)
-    )
+    all_users = user_repo.list_all_no_password()
     return render_template('admin/users.html', users=all_users)
 
 
@@ -81,12 +75,11 @@ def reset_password(user_id):
         flash('New password must be at least 8 characters long.', 'error')
         return redirect(url_for('admin.users'))
 
-    result = mongo.db.users.update_one(
-        {'_id': oid},
-        {'$set': {'password': generate_password_hash(new_password),
-                  'updated_at': datetime.utcnow(),
-                  'password_reset_by': session['user_id']}},
-    )
+    result = user_repo.update_set(oid, {
+        'password': generate_password_hash(new_password),
+        'updated_at': datetime.utcnow(),
+        'password_reset_by': session['user_id'],
+    })
     if result.matched_count:
         flash('Password reset. Share the new password with the user securely.', 'success')
     else:
