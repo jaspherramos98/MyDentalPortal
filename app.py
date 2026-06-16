@@ -207,6 +207,18 @@ def health_check():
     except Exception as e:
         return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
+
+# ---------------------------------------------------------------------------
+# PWA (installable, online-first). The service worker caches only the static
+# app shell — never authenticated HTML or patient data (single source of truth).
+# ---------------------------------------------------------------------------
+@app.route('/manifest.webmanifest')
+def web_manifest():
+    from flask import send_from_directory, make_response
+    resp = make_response(send_from_directory(app.static_folder, 'manifest.webmanifest'))
+    resp.headers['Content-Type'] = 'application/manifest+json'
+    return resp
+
 # ---------------------------------------------------------------------------
 # Database initialisation
 # ---------------------------------------------------------------------------
