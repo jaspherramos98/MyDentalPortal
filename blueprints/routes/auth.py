@@ -9,7 +9,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import re
 
-from extensions import mongo, limiter
+from extensions import limiter
+from blueprints.repositories import users as user_repo
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -62,7 +63,7 @@ def login():
             return render_template('auth/login.html')
 
         try:
-            user = mongo.db.users.find_one({'email': email})
+            user = user_repo.get_by_email(email)
             # Always hash-check (against a dummy hash if no such user) for constant time.
             stored_hash = user['password'] if user else _DUMMY_PASSWORD_HASH
             if check_password_hash(stored_hash, password) and user:
@@ -123,7 +124,7 @@ def register():
             return render_template('auth/register.html')
 
         try:
-            if mongo.db.users.find_one({'email': email}):
+            if user_repo.get_by_email(email):
                 flash('Email already registered', 'error')
                 return render_template('auth/register.html')
 
@@ -139,7 +140,7 @@ def register():
                 'updated_at': datetime.utcnow(),
                 'is_active': True,
             }
-            mongo.db.users.insert_one(user_data)
+            user_repo.create(user_data)
 
             if request.is_json:
                 return jsonify({'success': True, 'pending': True})

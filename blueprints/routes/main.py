@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 from extensions import mongo
 from blueprints.utils import login_required
+from blueprints.repositories import users as user_repo
 
 main_bp = Blueprint('main', __name__)
 
@@ -133,10 +134,7 @@ def dashboard():
 @login_required
 def settings():
     """Account settings: view account info, update profile, change password."""
-    try:
-        user = mongo.db.users.find_one({'_id': ObjectId(session['user_id'])})
-    except Exception:
-        user = None
+    user = user_repo.get(session['user_id'])
     if not user:
         session.clear()
         return redirect(url_for('auth.login'))
@@ -150,14 +148,11 @@ def settings():
             if not name:
                 flash('Name cannot be empty', 'error')
             else:
-                mongo.db.users.update_one(
-                    {'_id': user['_id']},
-                    {'$set': {
-                        'name': name,
-                        'specialty': specialty,
-                        'updated_at': datetime.utcnow(),
-                    }},
-                )
+                user_repo.update_set(user['_id'], {
+                    'name': name,
+                    'specialty': specialty,
+                    'updated_at': datetime.utcnow(),
+                })
                 session['user_name'] = name
                 flash('Profile updated successfully', 'success')
             return redirect(url_for('main.settings'))
@@ -174,13 +169,10 @@ def settings():
             elif new != confirm:
                 flash('New passwords do not match', 'error')
             else:
-                mongo.db.users.update_one(
-                    {'_id': user['_id']},
-                    {'$set': {
-                        'password': generate_password_hash(new),
-                        'updated_at': datetime.utcnow(),
-                    }},
-                )
+                user_repo.update_set(user['_id'], {
+                    'password': generate_password_hash(new),
+                    'updated_at': datetime.utcnow(),
+                })
                 flash('Password changed successfully', 'success')
             return redirect(url_for('main.settings'))
 

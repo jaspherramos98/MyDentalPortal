@@ -113,8 +113,15 @@ Prefer the thin repositories in `blueprints/repositories/` over raw `mongo.db` q
 especially for **patient access**: `verify_patient_access`/`user_clinic_ids` (in `utils/`) delegate to
 `patients.get_for_owner` / `clinics.owned_ids`. That owner-scoped check is the **single seam** multi-staff
 will change (owner_id → membership) — don't re-implement it inline in routes. Pass 1 migrated patients,
-clinics, charts + the access seam; remaining blueprints (appointments, treatments, uploads, admin,
-reports, auth, main) still query `mongo.db` directly and migrate in Pass 2.
+clinics, charts + the access seam.
+
+**Pass 2 status (2026-06-16):**
+- ✅ **appointments** — `repositories/appointments.py`.
+- ✅ **treatments** — `repositories/treatments.py`.
+- ✅ **users** — `repositories/users.py` (the `users`-collection seam: `auth.py` login/register,
+  `admin.py` approvals + user mgmt, `main.py` settings). Multi-staff/role changes extend THIS module.
+- ⬜ **Still on raw `mongo.db`, pending Pass 2:** `uploads` (files/prescriptions/GridFS), `reports`,
+  and `main` **dashboard aggregations** (the users seam is migrated; the dashboard stats queries are not).
 
 **Schema validation at the write edge (Phase 3):** new patient documents go through
 `patient_repo.create()` → `validate_patient()` (pydantic `PatientDoc`), which guarantees the nested

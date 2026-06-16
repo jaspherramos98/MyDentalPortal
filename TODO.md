@@ -204,7 +204,12 @@
       - [x] **treatments** (2026-06-16) — `repositories/treatments.py` (get/list_for_patient/insert/
             update_set/delete); `treatments.py` (add/edit/mark-paid/delete/JSON-API) now uses it, zero
             `mongo.db` left. +3 repo tests (60 total), smoke 11/11 + treatments JSON API 200.
-      - [ ] auth+admin (users) · [ ] uploads (files/GridFS) · [ ] main+reports (aggregations).
+      - [x] **users** (2026-06-16) — `repositories/users.py` (get/get_by_email/create/update_set/
+            list_by_status/list_all_no_password/set_status_if_pending); migrated `auth.py` (login/register),
+            `admin.py` (registrations/approve/reject/users/reset-password), and `main.py` **settings**
+            (get user + profile/password update). `main.py` dashboard aggregations stay for the line below.
+            +4 repo tests (64 total), smoke 11/11 + /settings + /admin/registrations + /admin/users all 200.
+      - [ ] uploads (files/GridFS) · [ ] main dashboard + reports (aggregations).
       *(Expand tests as each route moves.)*
 - [ ] **Observability / error tracking** — capture unhandled 5xx off-box (Sentry free tier or at least
       structured logging shipped somewhere durable); Render stdout is ephemeral/not searchable. **Must-have:**

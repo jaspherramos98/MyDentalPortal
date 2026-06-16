@@ -10,6 +10,7 @@ from blueprints.repositories import clinics as clinic_repo
 from blueprints.repositories import charts as charts_repo
 from blueprints.repositories import appointments as appt_repo
 from blueprints.repositories import treatments as treatment_repo
+from blueprints.repositories import users as user_repo
 
 
 # ── patients repo ───────────────────────────────────────────────────────────
@@ -202,3 +203,52 @@ def test_treatment_update_set_and_delete(db):
 
     treatment_repo.delete(tid)
     assert treatment_repo.get(tid) is None  # hard delete
+
+
+# ── users repo ───────────────────────────────────────────────────────────────
+def test_users_create_get_and_by_email(db):
+    uid = user_repo.create({"email": "doc@x.com", "name": "Doc", "password": "h"})
+    assert isinstance(uid, str)
+    assert user_repo.get(uid)["email"] == "doc@x.com"
+    assert user_repo.get_by_email("doc@x.com")["_id"] == ObjectId(uid)
+    assert user_repo.get_by_email("nobody@x.com") is None
+    assert user_repo.get("not-an-id") is None
+    assert user_repo.get(str(ObjectId())) is None
+
+
+def test_users_update_set(db):
+    uid = user_repo.create({"email": "a@x.com", "name": "Old"})
+    res = user_repo.update_set(uid, {"name": "New", "specialty": "Ortho"})
+    assert res.matched_count == 1
+    got = user_repo.get(uid)
+    assert got["name"] == "New" and got["specialty"] == "Ortho"
+    # matched_count == 0 for a missing user (admin reset-password relies on this).
+    assert user_repo.update_set(str(ObjectId()), {"name": "x"}).matched_count == 0
+
+
+def test_users_list_by_status_and_list_all_no_password(db):
+    db.users.insert_many([
+        {"email": "p1@x.com", "status": "pending", "password": "h", "created_at": 1},
+        {"email": "p2@x.com", "status": "pending", "password": "h", "created_at": 2},
+        {"email": "a@x.com", "status": "approved", "password": "h", "created_at": 3},
+    ])
+    pend = user_repo.list_by_status("pending")
+    assert {u["email"] for u in pend} == {"p1@x.com", "p2@x.com"}
+    everyone = user_repo.list_all_no_password()
+    assert len(everyone) == 3
+    assert all("password" not in u for u in everyone)  # password projected out
+
+
+def test_users_set_status_if_pending_only_moves_pending(db):
+    pending_id = user_repo.create({"email": "p@x.com", "status": "pending"})
+    approved_id = user_repo.create({"email": "a@x.com", "status": "approved"})
+
+    r1 = user_repo.set_status_if_pending(pending_id, "approved", {"approved_by": "admin1"})
+    assert r1.modified_count == 1
+    got = user_repo.get(pending_id)
+    assert got["status"] == "approved" and got["approved_by"] == "admin1"
+
+    # An already-approved account is NOT touched (the status:'pending' guard).
+    r2 = user_repo.set_status_if_pending(approved_id, "rejected", {"rejected_by": "admin1"})
+    assert r2.modified_count == 0
+    assert user_repo.get(approved_id)["status"] == "approved"
