@@ -60,15 +60,14 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
-        /* Top Navigation Bar */
-        .top-nav-bar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1rem 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        /* Shared Bootstrap navbar, kept sticky so the calendar's 100vh-80px
+           layout still works (base.html's navbar isn't sticky, but this
+           full-height page needs it to be). */
+        .app-navbar {
             position: sticky;
             top: 0;
-            z-index: 1000;
+            z-index: 1030;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
         .nav-link {
@@ -465,16 +464,8 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             .appointments-container { height: auto; overflow: visible; }
             .calendar-container { height: auto; overflow-y: visible; }
 
-            /* Top nav: keep links on ONE horizontally-scrollable row instead of
-               wrapping into a vertical pile. */
-            .top-nav-bar .nav {
-                flex-wrap: nowrap;
-                overflow-x: auto;
-                min-width: 0;
-                -webkit-overflow-scrolling: touch;
-            }
-            .top-nav-bar .nav::-webkit-scrollbar { display: none; }
-            .top-nav-bar .nav-link { white-space: nowrap; padding: 6px 8px; }
+            /* (Top nav now uses the shared Bootstrap navbar, which collapses to
+               a hamburger on its own below the lg breakpoint.) */
 
             /* Week view -> swipeable: each day gets a readable width and the
                7-column grid scrolls/swipes horizontally (day headers stay above
@@ -500,81 +491,85 @@ Description: Dental practice appointments calendar with drag-and-drop functional
 </head>
 <body>
     <!-- Top Navigation Bar -->
-    <nav class="top-nav-bar">
+    <!-- Shared Bootstrap navbar (matches base.html for cross-page consistency;
+         collapses to a hamburger on mobile). Made sticky below so the calendar's
+         100vh-80px layout still works. -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary app-navbar">
         <div class="container-fluid">
-            <div class="d-flex align-items-center justify-content-between">
-                <div class="d-flex align-items-center">
-                    <a href="{{ url_for('main.dashboard') }}" class="text-white text-decoration-none me-4">
-                        <h4 class="mb-0">
-                            <i class="fas fa-tooth"></i> Dental Portal
-                        </h4>
-                    </a>
+            <a class="navbar-brand" href="{{ url_for('main.dashboard') }}">
+                <i class="fas fa-tooth"></i> Dental Portal
+            </a>
 
-                    <ul class="nav align-items-center">
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.dashboard') }}">
-                                <i class="fas fa-tachometer-alt"></i> Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link active" href="{{ url_for('appointments.appointments') }}">
-                                <i class="fas fa-calendar-alt"></i> Appointments
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('patients.list_patients') }}">
-                                <i class="fas fa-users"></i> Patients
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('clinics.list_clinics') }}">
-                                <i class="fas fa-building"></i> Clinics
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('reports.reports') }}">
-                                <i class="fas fa-chart-line"></i> Performance
-                            </a>
-                        </li>
-                        {% if is_admin %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('admin.registrations') }}">
-                                <i class="fas fa-user-shield"></i> Approvals
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('admin.users') }}">
-                                <i class="fas fa-users-cog"></i> Users
-                            </a>
-                        </li>
-                        {% endif %}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-plus"></i> Add New
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li>
-                                    <a class="dropdown-item" href="{{ url_for('patients.create_patient') }}">
-                                        <i class="fas fa-user-plus"></i> New Patient
-                                    </a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" href="{{ url_for('clinics.create_clinic') }}">
-                                        <i class="fas fa-clinic-medical"></i> New Clinic
-                                    </a>
-                                </li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li>
-                                    <a class="dropdown-item" href="{{ url_for('appointments.appointments') }}">
-                                        <i class="fas fa-calendar-plus"></i> New Appointment
-                                    </a>
-                                </li>
-                            </ul>
-                        </li>
-                    </ul>
-                </div>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
 
-                <ul class="nav">
+            <div class="collapse navbar-collapse" id="navbarNav">
+                {% if session.user_id %}
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.dashboard') }}">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" aria-current="page" href="{{ url_for('appointments.appointments') }}">
+                            <i class="fas fa-calendar"></i> Appointments
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('patients.list_patients') }}">
+                            <i class="fas fa-users"></i> Patients
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('clinics.list_clinics') }}">
+                            <i class="fas fa-clinic-medical"></i> Clinics
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('reports.reports') }}">
+                            <i class="fas fa-chart-line"></i> Performance
+                        </a>
+                    </li>
+                    {% if is_admin %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin.registrations') }}">
+                            <i class="fas fa-user-shield"></i> Approvals
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin.users') }}">
+                            <i class="fas fa-users-cog"></i> Users
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-plus"></i> Add New
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('patients.create_patient') }}">
+                                    <i class="fas fa-user-plus"></i> New Patient
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('clinics.create_clinic') }}">
+                                    <i class="fas fa-clinic-medical"></i> New Clinic
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('appointments.appointments') }}">
+                                    <i class="fas fa-calendar-plus"></i> New Appointment
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <ul class="navbar-nav">
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-user"></i> {{ session.user_name or 'User' }}
@@ -582,12 +577,7 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li>
                                 <a class="dropdown-item" href="{{ url_for('main.settings') }}">
-                                    <i class="fas fa-user-cog"></i> Profile
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('main.settings') }}">
-                                    <i class="fas fa-cog"></i> Settings
+                                    <i class="fas fa-user-cog"></i> Account
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
@@ -602,6 +592,7 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                         </ul>
                     </li>
                 </ul>
+                {% endif %}
             </div>
         </div>
     </nav>
