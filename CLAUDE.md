@@ -56,8 +56,12 @@ MyDentalPortal/
 │                             #   verify_patient_access/user_clinic_ids (delegate to repos)
 ├── static/
 │   ├── css/main.css
-│   └── js/
-│       └── main.js
+│   ├── js/
+│   │   └── main.js
+│   ├── manifest.webmanifest  # PWA manifest (served at /manifest.webmanifest)
+│   ├── sw.js                 # PWA service worker (served at /sw.js, root scope)
+│   ├── offline.html          # PWA offline fallback (static, no PHI)
+│   └── icons/                # PWA icons (192/512/maskable) — placeholder tooth
 └── templates/
     ├── base.html               # Main layout with navbar
     ├── auth/login.html
@@ -140,6 +144,16 @@ Options: PHP (₱) and USD ($).
 `appointments.html` is a **standalone page** — it does NOT extend `base.html`.
 It has its own nav bar, CSS, and inline JavaScript. The calendar uses the `/appointments/api` endpoints.
 Clinic and patient data are passed from Flask and rendered via Jinja `{% for %}` loops.
+**Because it's standalone, PWA tags (manifest/theme/icon + SW registration) are duplicated into its
+`<head>` separately from `base.html` — keep both in sync.**
+
+### PWA (online-first, Phase 3.5 / roadmap #1 slice 1a)
+The app is installable. `app.py` serves `/manifest.webmanifest` and `/sw.js` (the latter from root with
+`Service-Worker-Allowed: /` so its scope is the whole app). **`static/sw.js` caches ONLY the static app
+shell** (`/static/*`, cache-first) — navigations are **network-only** with a static `offline.html`
+fallback, and **data/authenticated HTML is NEVER cached** (online-first = single source of truth, no PHI
+on device). Service workers need HTTPS (met on Render) or localhost. Icons are placeholders from
+`scripts/gen_pwa_icons.py`. Deferred: offline DATA caching, token auth, push.
 
 ## Environment Variables (.env)
 ```

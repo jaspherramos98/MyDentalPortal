@@ -141,26 +141,15 @@ hardening and Phase 4 access enforcement above are the prerequisites for #2):
    the current session-cookie auth) is the same identity layer multi-staff needs.
    **Sequence decided (2026-06-15): PWA installability FIRST (slice 1a); token auth deferred to
    build alongside multi-staff (#2).**
-   - [ ] **Slice 1a — installable, online-first PWA (app shell only). READY TO IMPLEMENT — plan:**
-         PHI-safe principle: the service worker caches ONLY the static app shell (CSS/JS/icons),
-         NEVER authenticated HTML or patient data (pages always come from the network = single source
-         of truth; offline shows a static fallback only).
-         - [ ] `static/manifest.webmanifest` (name, `display:standalone`, theme/bg colors, icons).
-         - [ ] App icons `static/icons/icon-192.png`, `icon-512.png`, `maskable-512.png` — generate
-               brand-colored placeholders with Pillow (already a dep); flag as replaceable. Also fixes
-               the current `/favicon.ico 404`.
-         - [ ] `static/sw.js` — install: pre-cache static shell + offline page. fetch: same-origin
-               `/static/*` = cache-first; navigations (HTML) = network-only with offline-page fallback;
-               data/authenticated HTML = NEVER cached.
-         - [ ] `static/offline.html` (static, no PHI).
-         - [ ] Root-scope Flask routes in `app.py`: `GET /sw.js` (send with header
-               `Service-Worker-Allowed: /` so it controls the whole app) and `GET /manifest.webmanifest`.
-         - [ ] Wire-up in BOTH `templates/base.html` AND `templates/appointments.html` (standalone page):
-               `<link rel="manifest">`, `theme-color` meta, `apple-touch-icon`, SW-registration script.
-         - [ ] Verify: route mimetypes/headers correct; browser shows "Install app" + Lighthouse PWA
-               pass. No behavior change → existing 52 tests stay green.
-         - Suggested 2 commits (cutoff-safe): (1) manifest+icons+offline+routes; (2) sw.js+template wiring.
-         - Out of scope for 1a: offline DATA caching, token auth, push notifications.
+   - [x] **Slice 1a — installable, online-first PWA (app shell only). DONE 2026-06-15.**
+         Shipped: `static/manifest.webmanifest` (+ `/manifest.webmanifest` route), brand-blue tooth
+         icons via `scripts/gen_pwa_icons.py` (192/512/maskable — placeholders, replace with a designed
+         icon; also fixed the `/favicon.ico 404`), `static/sw.js` (online-first: navigations network-only
+         w/ `offline.html` fallback, `/static/*` cache-first, data/PHI NEVER cached) served at `/sw.js`
+         with `Service-Worker-Allowed: /`, and wiring in `base.html` + `appointments.html`. 52 tests
+         still pass. ⏳ **Browser verification still owed:** "Install app" prompt + Lighthouse PWA pass
+         on the Render (HTTPS) deploy.
+         - Out of scope (deferred): offline DATA caching, token auth, push notifications.
    - [ ] (Phase 2, only if connectivity is flaky) **Read-only offline cache** via a PWA
          service worker — last-loaded data stays *viewable* offline; editing needs a
          connection. NOT two-way sync.
