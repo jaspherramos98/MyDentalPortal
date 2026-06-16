@@ -4,7 +4,7 @@
 # Usage: [BASE_URL=...] [EMAIL=...] [PASSWORD=...] [RATE=30] [DURATION=30s] bash loadtest/run-authed.sh
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://localhost:5000}"
+BASE_URL="${BASE_URL:-http://127.0.0.1:5000}"
 RATE="${RATE:-30}"
 DURATION="${DURATION:-30s}"
 

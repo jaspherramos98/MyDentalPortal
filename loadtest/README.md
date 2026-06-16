@@ -10,14 +10,27 @@ Starter vs free-tier cold start — see TODO Phase 6).
 patient data).** It will stress real PHI and pollute metrics/logs.
 
 Target one of:
-- **Local** — `python app.py` → `http://localhost:5000` (recommended; default).
+- **Local** — `python app.py` → `http://127.0.0.1:5000` (recommended; default).
 - **AWS showcase** env (`dental_portal_showcase`, demo data only).
 
 The runners refuse to start if `BASE_URL` looks like the prod host.
 
+> **Use `127.0.0.1`, not `localhost`.** Vegeta's Go HTTP client resolves hostnames
+> via the system DNS; in some environments `localhost` fails to resolve (e.g.
+> `lookup localhost on 8.8.8.8:53: no such host`). The literal IP skips DNS. All
+> defaults here use `127.0.0.1`.
+
+> **⚠️ Local runs use the Flask dev server (single-threaded), NOT gunicorn.**
+> gunicorn is Unix-only (needs `fork`) and won't run on Windows, so local numbers
+> measure **app + DB logic latency under serialized load** — useful to spot slow
+> endpoints, but they do NOT characterize production concurrency. True
+> worker-count / cold-start tuning must run against a **Linux gunicorn** target
+> (a non-prod staging/showcase box) — never prod.
+
 ## Install Vegeta
-- Windows (scoop): `scoop install vegeta` — or download the release binary from
-  https://github.com/tsenart/vegeta/releases and put `vegeta.exe` on PATH.
+- Windows: `scoop install vegeta`, or download the release `.zip` from
+  https://github.com/tsenart/vegeta/releases and extract `vegeta.exe` onto PATH.
+  (This repo's binary was installed to `~/.local/bin/vegeta.exe`, v12.13.0.)
 - macOS: `brew install vegeta`
 - Go: `go install github.com/tsenart/vegeta/v12@latest`
 
@@ -26,7 +39,7 @@ Verify: `vegeta --version`
 ## What's here
 | File | Purpose |
 |------|---------|
-| `targets-public.txt` | Unauthenticated GET targets (health, login page, manifest, static shell). Absolute URLs use `http://localhost:5000` — edit if testing another host. |
+| `targets-public.txt` | Unauthenticated GET targets (health, login page, manifest, static shell). Absolute URLs use `http://127.0.0.1:5000` — edit if testing another host. |
 | `run-public.sh` | Runs the public baseline (no login needed). |
 | `login.py` | Logs in (handles CSRF + session cookie), writes `targets-authed.txt` with the `Cookie` header baked in. Read-only GET routes only. |
 | `run-authed.sh` | Calls `login.py`, then runs Vegeta against the authed targets. |
@@ -36,10 +49,10 @@ Verify: `vegeta --version`
 
 ### 1. Public baseline (no auth)
 ```bash
-# defaults to http://localhost:5000, 50 req/s for 30s
+# defaults to http://127.0.0.1:5000, 50 req/s for 30s
 bash loadtest/run-public.sh
 # or override:
-RATE=100 DURATION=20s BASE_URL=http://localhost:5000 bash loadtest/run-public.sh
+RATE=100 DURATION=20s BASE_URL=http://127.0.0.1:5000 bash loadtest/run-public.sh
 ```
 
 ### 2. Authenticated read paths

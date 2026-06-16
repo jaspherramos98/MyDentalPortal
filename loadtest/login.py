@@ -20,7 +20,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-BASE_URL = os.environ.get("BASE_URL", "http://localhost:5000").rstrip("/")
+BASE_URL = os.environ.get("BASE_URL", "http://127.0.0.1:5000").rstrip("/")
 EMAIL = os.environ.get("EMAIL", "admin@dental.com")
 PASSWORD = os.environ.get("PASSWORD", "admin123")
 

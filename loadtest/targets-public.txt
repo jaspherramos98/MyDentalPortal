@@ -1,6 +1,6 @@
-GET http://localhost:5000/health
-GET http://localhost:5000/login
-GET http://localhost:5000/manifest.webmanifest
-GET http://localhost:5000/sw.js
-GET http://localhost:5000/static/css/main.css
-GET http://localhost:5000/static/js/main.js
+GET http://127.0.0.1:5000/health
+GET http://127.0.0.1:5000/login
+GET http://127.0.0.1:5000/manifest.webmanifest
+GET http://127.0.0.1:5000/sw.js
+GET http://127.0.0.1:5000/static/css/main.css
+GET http://127.0.0.1:5000/static/js/main.js

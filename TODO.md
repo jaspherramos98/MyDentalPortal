@@ -164,16 +164,23 @@
 > (`python app.py`) or the AWS **showcase** env only. Login is rate-limited (10/min) and all
 > POSTs are CSRF-protected, so load-test **read-only GETs**; the authed runner logs in once
 > (handling CSRF) and reuses the session cookie.
-- [ ] **Prereq: install the Vegeta binary** (`scoop install vegeta` / `brew install vegeta` /
-      release binary). Harness in `loadtest/` is built + verified end-to-end (2026-06-16); only the
-      binary is missing before any attack can run.
-- [ ] **Baseline — public endpoints (no auth).** `loadtest/run-public.sh` hits `/health`,
-      `/login` (GET), `/manifest.webmanifest`, static shell. Establishes raw throughput/latency
-      and confirms gunicorn worker count is sane.
-- [ ] **Authed read paths.** `loadtest/run-authed.sh` (logs in via `loadtest/login.py`, reuses
-      the cookie) against dashboard, patients list, a patient detail, appointments. Read-only.
-- [ ] **Use results to size the deploy:** confirm `--workers/--threads` in the gunicorn cmd and
-      validate the "Render Starter / no-spin-down" call below with real cold-start + p95 numbers.
+- [x] **Vegeta binary installed — DONE 2026-06-16.** v12.13.0 at `~/.local/bin/vegeta.exe`
+      (downloaded release zip, no elevation). NOTE: use `127.0.0.1` not `localhost` in `BASE_URL` —
+      Vegeta's Go resolver can fail to resolve `localhost` (`lookup localhost on 8.8.8.8:53`); harness
+      defaults switched to `127.0.0.1`.
+- [x] **Baseline — public endpoints — DONE 2026-06-16 (local).** `run-public.sh` @ 50 req/s × 20s:
+      **100% 200s**, p50 2.2ms / p95 3.5ms / p99 4.3ms / max 42ms.
+- [x] **Authed read paths — DONE 2026-06-16 (local).** `run-authed.sh` @ 30 req/s × 20s across
+      dashboard, patients, patient detail, appointments: **100% 200s**, p50 7.2ms / p95 10.6ms /
+      p99 13.6ms / max 41ms. DB-backed pages ~3× static but still single-digit ms; no slow endpoints.
+- [ ] **Use results to size the deploy — BLOCKED on a Linux gunicorn target.** ⚠️ Local runs use the
+      **Flask dev server (single-threaded)**; gunicorn is Unix-only and won't run on Windows, so the
+      numbers above measure app+DB *logic* latency under serialized load, NOT production concurrency or
+      `--workers/--threads`. To validate worker count + the Render cold-start / Starter call with real
+      numbers, run Vegeta against a **non-prod Linux gunicorn** box (never prod). No clean target right
+      now (AWS showcase is HTTP-only + being torn down) — revisit when a staging env exists, or accept
+      the Render Starter upgrade as a product decision regardless (it's already non-negotiable for
+      clinic use per the Decision record below).
 
 ### Decision record — Hosting + HTTPS (settled 2026-06-13; no action until broad release)
 - **Long-term host = Render**, not AWS (EB was for portfolio and is being torn down — see 🟡).
