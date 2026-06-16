@@ -1,0 +1,41 @@
+name: CI
+
+# Test gate: run the pytest suite on every push to main and every PR targeting
+# main. Tests are hermetic (mongomock, no live DB/network — see tests/conftest.py),
+# so no services are needed. Render auto-deploys on push; this gives a green/red
+# signal so a regression is visible (make this a required check in branch
+# protection to actually block merges).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel an in-progress run if a newer commit is pushed to the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        # requirements-dev.txt pulls in requirements.txt (-r) + pytest/mongomock
+        # and pins setuptools<81 (mongomock 4.1.2 still imports pkg_resources).
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest

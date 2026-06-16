@@ -182,6 +182,31 @@
       the Render Starter upgrade as a product decision regardless (it's already non-negotiable for
       clinic use per the Decision record below).
 
+### Phase 7 — Operational maturity (production-readiness gates BEFORE broad release / Tier 3)
+> The security/access/test/schema **foundations are in place** (Phases 0–4). These are the operational
+> gaps between "works for us" and "production-grade ops." Do **CI first** so the big Tier-3 features
+> (multi-staff, booking) are built under a green test gate instead of blind.
+- [x] **CI pipeline — pytest on push + PR (DONE 2026-06-16).** `.github/workflows/ci.yml`: ubuntu +
+      Python 3.11, installs `requirements-dev.txt`, runs `pytest` (hermetic — mongomock, no DB/network).
+      Cancels superseded runs per ref.
+- [ ] **Make CI a required check** — GitHub branch protection on `main` so a red suite **blocks merges**
+      (until then the workflow only *signals*, it can't stop a push). *(Repo Settings → Branches →
+      protect `main` → require the CI check.)* Owner/manual, one-time.
+- [ ] **Repository Pass 2 (mechanical)** — migrate raw `mongo.db` queries in appointments, treatments,
+      uploads, admin, reports, auth, main into `blueprints/repositories/`. Carried from Phase 3; makes
+      the multi-staff access swap a true single-seam change. *(Expand tests as each route moves.)*
+- [ ] **Observability / error tracking** — capture unhandled 5xx off-box (Sentry free tier or at least
+      structured logging shipped somewhere durable); Render stdout is ephemeral/not searchable. **Must-have:**
+      error tracking. **Nice-to-have:** Prometheus + Grafana dashboards (latency/error-rate/throughput) —
+      strong portfolio signal, pairs with the Vegeta harness.
+- [ ] **DB backup + restore DRILL** — confirm a recoverable backup of `dental_portal_prod` exists (Atlas
+      backups + `scripts/backup_data.py`) **and actually test a restore**. Untested backups don't count.
+      *(PHI — non-negotiable before broad release.)*
+- [ ] **Real load test vs a Linux gunicorn target** — see Phase 6 (blocked on a non-prod Linux box);
+      needed to size `--workers/--threads` and validate the cold-start / Render-Starter call with real numbers.
+- [ ] **PWA browser verification** — "Install app" prompt + Lighthouse PWA pass on the Render (HTTPS)
+      deploy. Carried from Roadmap #1 slice 1a.
+
 ### Decision record — Hosting + HTTPS (settled 2026-06-13; no action until broad release)
 - **Long-term host = Render**, not AWS (EB was for portfolio and is being torn down — see 🟡).
   **Render serves HTTPS for free** (auto-provisioned/renewed certs on `*.onrender.com` and custom
