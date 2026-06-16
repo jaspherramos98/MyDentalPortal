@@ -202,6 +202,9 @@
 
         .main-content {
             flex: 1;
+            /* Breathing room below the navbar on every page (matches the
+               settings page's look). Applies to desktop + mobile. */
+            padding-top: 1.5rem;
         }
 
         .flash-messages {
@@ -303,15 +306,24 @@
                 padding-right: 12px;
             }
 
-            /* Patient-detail action buttons: let the btn-group wrap to multiple
-               rows on mobile instead of overflowing off-screen. */
+            /* Patient-detail actions: a tidy 2-column grid of compact buttons on
+               mobile instead of a row of full-size buttons that wrap raggedly. */
             .patient-actions.btn-group {
-                flex-wrap: wrap;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
                 gap: 6px;
+                width: 100%;
+            }
+            .patient-actions.btn-group > form {
+                display: block;
             }
             .patient-actions.btn-group > .btn,
             .patient-actions.btn-group > form > .btn {
+                width: 100%;
                 border-radius: 6px !important;
+                font-size: 0.85rem;
+                padding: 0.4rem 0.5rem;
+                white-space: nowrap;
             }
 
             /* Dental chart header: wrap the Export PDF / Back buttons below the
