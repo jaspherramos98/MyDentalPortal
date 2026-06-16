@@ -9,6 +9,7 @@ from blueprints.repositories import patients as patient_repo
 from blueprints.repositories import clinics as clinic_repo
 from blueprints.repositories import charts as charts_repo
 from blueprints.repositories import appointments as appt_repo
+from blueprints.repositories import treatments as treatment_repo
 
 
 # ── patients repo ───────────────────────────────────────────────────────────
@@ -173,3 +174,31 @@ def test_appt_update_set_and_soft_delete(db):
     appt_repo.soft_delete(appt_id)
     gone = appt_repo.get(appt_id)
     assert gone["is_active"] is False and "deleted_at" in gone
+
+
+# ── treatments repo ──────────────────────────────────────────────────────────
+def test_treatment_insert_get_and_invalid_id(db):
+    pid = ObjectId()
+    tid = treatment_repo.insert({"patient_id": pid, "procedure": "filling", "date": "2026-07-01"})
+    assert isinstance(tid, str)
+    assert treatment_repo.get(tid)["procedure"] == "filling"
+    assert treatment_repo.get("not-an-id") is None
+    assert treatment_repo.get(str(ObjectId())) is None
+
+
+def test_treatment_list_for_patient_scopes_and_sorts(db):
+    p1, p2 = ObjectId(), ObjectId()
+    treatment_repo.insert({"patient_id": p1, "date": "2026-07-01", "tag": "old"})
+    treatment_repo.insert({"patient_id": p1, "date": "2026-07-05", "tag": "new"})
+    treatment_repo.insert({"patient_id": p2, "date": "2026-07-09", "tag": "other"})
+    rows = treatment_repo.list_for_patient(str(p1))
+    assert [r["tag"] for r in rows] == ["new", "old"]  # this patient only, newest first
+
+
+def test_treatment_update_set_and_delete(db):
+    tid = treatment_repo.insert({"patient_id": ObjectId(), "balance": 500.0})
+    treatment_repo.update_set(tid, {"amount_paid": 500.0, "balance": 0.0})
+    assert treatment_repo.get(tid)["balance"] == 0.0
+
+    treatment_repo.delete(tid)
+    assert treatment_repo.get(tid) is None  # hard delete

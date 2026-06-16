@@ -201,7 +201,10 @@
             find_active_on_day/insert/update_set/soft_delete) + `patients.active_in_clinics`; route now
             uses appt/clinic/patient repos, zero `mongo.db` left in `appointments.py`. +5 repo tests
             (57 total), live smoke 11/11.
-      - [ ] treatments · [ ] auth+admin (users) · [ ] uploads (files/GridFS) · [ ] main+reports (aggregations).
+      - [x] **treatments** (2026-06-16) — `repositories/treatments.py` (get/list_for_patient/insert/
+            update_set/delete); `treatments.py` (add/edit/mark-paid/delete/JSON-API) now uses it, zero
+            `mongo.db` left. +3 repo tests (60 total), smoke 11/11 + treatments JSON API 200.
+      - [ ] auth+admin (users) · [ ] uploads (files/GridFS) · [ ] main+reports (aggregations).
       *(Expand tests as each route moves.)*
 - [ ] **Observability / error tracking** — capture unhandled 5xx off-box (Sentry free tier or at least
       structured logging shipped somewhere durable); Render stdout is ephemeral/not searchable. **Must-have:**
