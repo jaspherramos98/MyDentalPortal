@@ -87,12 +87,13 @@
       malformed docs, preserves all extra/PDA fields via `extra="allow"`). Edit uses targeted
       dot-notation `$set` via `patient_repo.update_set()` (hardcoded keys can't malform structure).
       `pydantic==2.9.2` added to requirements. 42 tests pass.
-  - ⚠️ **Found while doing this — patient field-name drift (latent bug, NOT yet fixed):** the create
-        form writes `medical_history.conditions` but `ensure_nested` creates `medical_conditions`;
-        create reads birthday from `f.get('birthdate')` while edit uses `f.get('birthday')`; create
-        writes `minor_info` while `ensure_nested` also lists `guardian_info`. Not renamed (would risk
-        the detail template). Decide a canonical field set and reconcile form/template/schema as a
-        focused follow-up before broad release.
+  - ✅ **Patient field-name drift — RECONCILED (2026-06-15).** Audited create/edit forms, detail.html,
+        `ensure_nested`, and `PatientDoc` against each other. Fixes: `ensure_nested` now backfills
+        `medical_history.conditions` (was the dead `medical_conditions` — real latent crash on legacy
+        data missing that sub-dict); removed dead `guardian_info` section from `ensure_nested` +
+        `PatientDoc` (guardian fields live under `minor_info`). The `birthday`/`birthdate` difference
+        is **not** a data bug — create's form *field* is `birthdate` but maps to stored
+        `personal_info.birthday`; edit + detail use `birthday` consistently. Regression test added.
 - [ ] **Re-run the smoke test** after the refactor — confirm no behavioral regression. *(Local/pre-deploy;
       refactor+schema are behavior-preserving for valid input, covered by 42 tests. Not yet deployed.)*
 

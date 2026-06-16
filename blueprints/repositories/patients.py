@@ -9,14 +9,17 @@ from blueprints.models import validate_patient
 
 
 # Every nested dict the detail/list templates may access — keep in sync with
-# templates so a patient missing any section never 500s.
+# templates so a patient missing any section never 500s. (Guardian fields live
+# under `minor_info`; there is no separate `guardian_info` section.)
 _NESTED_TOP_LEVEL = (
     'personal_info', 'contact_info', 'emergency_contact', 'dental_history',
-    'medical_history', 'referral_info', 'guardian_info', 'minor_info',
-    'insurance_info',
+    'medical_history', 'referral_info', 'minor_info', 'insurance_info',
 )
+# `conditions` is the key the create/edit forms write and detail.html reads
+# (was mistakenly 'medical_conditions' here, which nothing else used — so a
+# patient missing the conditions sub-dict could break the detail page).
 _MEDICAL_HISTORY_SUBS = (
-    'allergies', 'women_health', 'medical_conditions',
+    'allergies', 'women_health', 'conditions',
     'general_health', 'physician_info', 'vital_signs',
 )
 

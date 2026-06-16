@@ -49,6 +49,11 @@ def test_ensure_nested_fills_and_preserves():
     # Existing nested data preserved, missing sub-dicts created.
     assert out["medical_history"]["allergies"] == {"penicillin": True}
     assert out["medical_history"]["women_health"] == {}
+    # Regression: detail.html reads medical_history.conditions — ensure_nested
+    # must backfill THAT key (not the dead 'medical_conditions') so a patient
+    # missing it doesn't break the detail page.
+    assert out["medical_history"]["conditions"] == {}
+    assert "medical_conditions" not in out["medical_history"]
 
 
 def test_ensure_nested_replaces_non_dict():

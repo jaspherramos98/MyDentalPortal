@@ -29,7 +29,7 @@ def test_coerces_clinic_id_string_to_objectid():
 def test_fills_missing_sections_and_defaults():
     out = validate_patient({"clinic_id": ObjectId()})
     for section in ("personal_info", "contact_info", "medical_history",
-                    "guardian_info", "minor_info", "insurance_info"):
+                    "minor_info", "insurance_info"):
         assert out[section] == {}
     assert out["is_active"] is True
 

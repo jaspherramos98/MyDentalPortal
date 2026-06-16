@@ -26,8 +26,7 @@ class PatientDoc(BaseModel):
     dental_history: dict = Field(default_factory=dict)
     medical_history: dict = Field(default_factory=dict)
     referral_info: dict = Field(default_factory=dict)
-    guardian_info: dict = Field(default_factory=dict)
-    minor_info: dict = Field(default_factory=dict)
+    minor_info: dict = Field(default_factory=dict)  # includes guardian_name/occupation
     insurance_info: dict = Field(default_factory=dict)
 
     @field_validator("clinic_id", mode="before")
