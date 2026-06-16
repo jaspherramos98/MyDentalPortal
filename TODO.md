@@ -111,6 +111,19 @@
       10 new tests (`tests/test_roles.py`), 52 total pass. Staff role not yet functionally used —
       that's roadmap #2 (multi-staff).
 
+### Phase 5 — Mobile responsiveness (one codebase, responsive; desktop must not regress)
+> Real-device testing surfaced mobile issues. Rule: fix via mobile-only `@media`/Bootstrap so desktop
+> is unaffected; if a fix can't avoid touching desktop, confirm with owner first.
+- [x] **Dental chart Save button blocked by the unsaved-changes banner — FIXED 2026-06-15.** base.html
+      lifts `.save-btn` above the banner via `--unsaved-banner-h`. Improves desktop too; SACRED chart untouched.
+- [x] **Appointments page mobile — FIXED 2026-06-15.** Swipeable week grid, fit-to-screen month grid,
+      natural scrolling; **and** swapped the custom gradient nav for the shared Bootstrap navbar
+      (hamburger on mobile, blue bar on desktop — owner-approved desktop change).
+- [ ] **Whole-app mobile audit (#3) — IN PROGRESS.** Approach: deploy → owner tests each tab on a phone →
+      fix targeted. **Known likely issue to fix:** `patients/detail.html` has ~8 of 10 tables NOT wrapped
+      in `.table-responsive` (overflow on phones); `settings.html` has 1 unwrapped (narrow, low risk).
+      Wrapping wide tables is a safe, desktop-neutral win — do once confirmed which tabs break.
+
 ### Decision record — Hosting + HTTPS (settled 2026-06-13; no action until broad release)
 - **Long-term host = Render**, not AWS (EB was for portfolio and is being torn down — see 🟡).
   **Render serves HTTPS for free** (auto-provisioned/renewed certs on `*.onrender.com` and custom

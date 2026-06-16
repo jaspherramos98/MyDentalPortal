@@ -142,10 +142,14 @@ Options: PHP (₱) and USD ($).
 
 ### Appointments Page
 `appointments.html` is a **standalone page** — it does NOT extend `base.html`.
-It has its own nav bar, CSS, and inline JavaScript. The calendar uses the `/appointments/api` endpoints.
+It has its own CSS and inline JavaScript; the calendar uses the `/appointments/api` endpoints.
 Clinic and patient data are passed from Flask and rendered via Jinja `{% for %}` loops.
-**Because it's standalone, PWA tags (manifest/theme/icon + SW registration) are duplicated into its
-`<head>` separately from `base.html` — keep both in sync.**
+**Its top nav is now a COPY of base.html's Bootstrap navbar** (class `app-navbar`, kept `position:sticky`
+so the calendar's `100vh-80px` layout holds) — so it collapses to a hamburger on mobile like every other
+tab. Keep it in sync with `base.html` by hand. **Because it's standalone, PWA tags (manifest/theme/icon +
+SW registration) are also duplicated into its `<head>` — keep both in sync.**
+Mobile (in its `@media max-width:768px`): week view is a swipeable 7×82vw horizontal grid; month view
+keeps 7 columns but shrinks cells; containers go `height:auto` so nothing is clipped. Desktop unchanged.
 
 ### PWA (online-first, Phase 3.5 / roadmap #1 slice 1a)
 The app is installable. `app.py` serves `/manifest.webmanifest` and `/sw.js` (the latter from root with
