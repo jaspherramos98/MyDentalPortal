@@ -9,8 +9,8 @@ from bson.objectid import ObjectId
 from datetime import datetime
 import traceback
 
-from extensions import mongo
 from blueprints.utils import login_required, verify_patient_access as _verify_patient_access
+from blueprints.repositories import treatments as treatment_repo
 
 treatments_bp = Blueprint('treatments', __name__)
 
@@ -53,7 +53,7 @@ def add_treatment(patient_id):
                 'updated_at': datetime.utcnow(),
             }
 
-            mongo.db.treatment_records.insert_one(treatment)
+            treatment_repo.insert(treatment)
             flash('Treatment record added successfully!', 'success')
             return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
@@ -74,7 +74,7 @@ def add_treatment(patient_id):
 @login_required
 def edit_treatment(treatment_id):
     try:
-        treatment = mongo.db.treatment_records.find_one({'_id': ObjectId(treatment_id)})
+        treatment = treatment_repo.get(treatment_id)
         if not treatment:
             flash('Treatment not found', 'error')
             return redirect(url_for('patients.list_patients'))
@@ -106,10 +106,7 @@ def edit_treatment(treatment_id):
                 'next_appointment': f.get('next_appointment', ''),
                 'updated_at': datetime.utcnow(),
             }
-            mongo.db.treatment_records.update_one(
-                {'_id': ObjectId(treatment_id)},
-                {'$set': update},
-            )
+            treatment_repo.update_set(treatment_id, update)
             flash('Treatment updated successfully!', 'success')
             return redirect(url_for('patients.patient_detail',
                                     patient_id=str(treatment['patient_id'])))
@@ -131,19 +128,16 @@ def edit_treatment(treatment_id):
 def mark_paid(treatment_id):
     """Clear a treatment's outstanding balance by setting amount_paid = charged."""
     try:
-        treatment = mongo.db.treatment_records.find_one({'_id': ObjectId(treatment_id)})
+        treatment = treatment_repo.get(treatment_id)
         if treatment:
             patient, clinic = _verify_patient_access(str(treatment['patient_id']))
             if clinic:
                 charged = float(treatment.get('amount_charged') or 0)
-                mongo.db.treatment_records.update_one(
-                    {'_id': treatment['_id']},
-                    {'$set': {
-                        'amount_paid': charged,
-                        'balance': 0.0,
-                        'updated_at': datetime.utcnow(),
-                    }},
-                )
+                treatment_repo.update_set(treatment_id, {
+                    'amount_paid': charged,
+                    'balance': 0.0,
+                    'updated_at': datetime.utcnow(),
+                })
                 flash('Treatment marked as fully paid.', 'success')
                 return redirect(url_for('patients.patient_detail',
                                         patient_id=str(treatment['patient_id'])))
@@ -160,11 +154,11 @@ def mark_paid(treatment_id):
 @login_required
 def delete_treatment(treatment_id):
     try:
-        treatment = mongo.db.treatment_records.find_one({'_id': ObjectId(treatment_id)})
+        treatment = treatment_repo.get(treatment_id)
         if treatment:
             patient, clinic = _verify_patient_access(str(treatment['patient_id']))
             if clinic:
-                mongo.db.treatment_records.delete_one({'_id': ObjectId(treatment_id)})
+                treatment_repo.delete(treatment_id)
                 flash('Treatment record deleted', 'success')
                 return redirect(url_for('patients.patient_detail',
                                         patient_id=str(treatment['patient_id'])))
@@ -184,10 +178,7 @@ def get_treatments_api(patient_id):
     if not clinic:
         return jsonify({'error': 'Access denied'}), 403
 
-    treatments = list(
-        mongo.db.treatment_records.find({'patient_id': ObjectId(patient_id)})
-        .sort('date', -1)
-    )
+    treatments = treatment_repo.list_for_patient(patient_id)
     for t in treatments:
         t['_id'] = str(t['_id'])
         t['patient_id'] = str(t['patient_id'])
