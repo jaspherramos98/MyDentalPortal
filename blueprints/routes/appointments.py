@@ -8,8 +8,10 @@ from flask import (
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta
 
-from extensions import mongo
 from blueprints.utils import login_required, user_clinic_ids as _user_clinic_ids
+from blueprints.repositories import appointments as appt_repo
+from blueprints.repositories import clinics as clinic_repo
+from blueprints.repositories import patients as patient_repo
 
 appointments_bp = Blueprint('appointments', __name__)
 
@@ -50,16 +52,7 @@ def _has_time_conflict(clinic_id, date, time_str, duration, exclude_id=None):
         return False
     end = start + int(duration or 30)
 
-    query = {
-        'clinic_id': clinic_id if isinstance(clinic_id, ObjectId) else ObjectId(clinic_id),
-        'date': date,
-        'is_active': True,
-        'status': {'$ne': 'cancelled'},
-    }
-    if exclude_id:
-        query['_id'] = {'$ne': ObjectId(exclude_id)}
-
-    for other in mongo.db.appointments.find(query):
+    for other in appt_repo.find_active_on_day(clinic_id, date, exclude_id):
         o_start = _to_minutes(other.get('time'))
         if o_start is None:
             continue
@@ -75,19 +68,16 @@ def _has_time_conflict(clinic_id, date, time_str, duration, exclude_id=None):
 @login_required
 def appointments():
     try:
-        user_clinics = list(
-            mongo.db.clinics.find({'owner_id': session['user_id'], 'is_active': True})
-            .sort('name', 1)
+        user_clinics = sorted(
+            clinic_repo.owned_by(session['user_id']),
+            key=lambda c: c.get('name', ''),
         )
         if not user_clinics:
             flash('Create a clinic first before managing appointments.', 'warning')
             return redirect(url_for('clinics.create_clinic'))
 
         clinic_ids = [c['_id'] for c in user_clinics]
-        patients = list(
-            mongo.db.patients.find({'clinic_id': {'$in': clinic_ids}, 'is_active': True})
-            .sort('personal_info.first_name', 1)
-        )
+        patients = patient_repo.active_in_clinics(clinic_ids)
 
         formatted = []
         for p in patients:
@@ -124,21 +114,13 @@ def get_appointments():
         start = request.args.get('start_date')
         end = request.args.get('end_date')
 
-        query = {'is_active': True}
-        if clinic_filter:
-            query['clinic_id'] = ObjectId(clinic_filter)
-        else:
-            query['clinic_id'] = {'$in': clinic_ids}
-
-        if start and end:
-            query['date'] = {'$gte': start, '$lte': end}
-        else:
+        if not (start and end):
             today = datetime.now()
             ws = today - timedelta(days=today.weekday())
             we = ws + timedelta(days=6)
-            query['date'] = {'$gte': ws.strftime('%Y-%m-%d'), '$lte': we.strftime('%Y-%m-%d')}
+            start, end = ws.strftime('%Y-%m-%d'), we.strftime('%Y-%m-%d')
 
-        appts = list(mongo.db.appointments.find(query).sort([('date', 1), ('time', 1)]))
+        appts = appt_repo.find_in_range(clinic_ids, clinic_filter, start, end)
         out = []
         for a in appts:
             out.append({
@@ -175,10 +157,7 @@ def create_appointment():
         if str(data['date']) < _today_str():
             return jsonify({'success': False, 'error': 'The appointment date cannot be in the past.'}), 400
 
-        clinic = mongo.db.clinics.find_one({
-            '_id': ObjectId(data['clinic_id']),
-            'owner_id': session['user_id'],
-        })
+        clinic = clinic_repo.get_owned(ObjectId(data['clinic_id']), session['user_id'])
         if not clinic:
             return jsonify({'success': False, 'error': 'Invalid clinic'}), 403
 
@@ -218,10 +197,10 @@ def create_appointment():
             except Exception:
                 pass
 
-        result = mongo.db.appointments.insert_one(appt)
+        appt_id = appt_repo.insert(appt)
         return jsonify({
             'success': True,
-            'appointment_id': str(result.inserted_id),
+            'appointment_id': appt_id,
             'message': f'Appointment scheduled at {clinic["name"]}',
         })
     except Exception as e:
@@ -235,13 +214,11 @@ def create_appointment():
 def update_appointment(appt_id):
     try:
         data = request.get_json()
-        appt = mongo.db.appointments.find_one({'_id': ObjectId(appt_id)})
+        appt = appt_repo.get(appt_id)
         if not appt:
             return jsonify({'success': False, 'error': 'Not found'}), 404
 
-        clinic = mongo.db.clinics.find_one({
-            '_id': appt['clinic_id'], 'owner_id': session['user_id'],
-        })
+        clinic = clinic_repo.get_owned(appt['clinic_id'], session['user_id'])
         if not clinic:
             return jsonify({'success': False, 'error': 'Access denied'}), 403
 
@@ -277,7 +254,7 @@ def update_appointment(appt_id):
                     val = val.strip()
                 update[field] = val
 
-        mongo.db.appointments.update_one({'_id': ObjectId(appt_id)}, {'$set': update})
+        appt_repo.update_set(appt_id, update)
         return jsonify({'success': True, 'message': 'Updated'})
     except Exception as e:
         print(f"Update appointment error: {e}")
@@ -289,20 +266,15 @@ def update_appointment(appt_id):
 @login_required
 def delete_appointment(appt_id):
     try:
-        appt = mongo.db.appointments.find_one({'_id': ObjectId(appt_id)})
+        appt = appt_repo.get(appt_id)
         if not appt:
             return jsonify({'success': False, 'error': 'Not found'}), 404
 
-        clinic = mongo.db.clinics.find_one({
-            '_id': appt['clinic_id'], 'owner_id': session['user_id'],
-        })
+        clinic = clinic_repo.get_owned(appt['clinic_id'], session['user_id'])
         if not clinic:
             return jsonify({'success': False, 'error': 'Access denied'}), 403
 
-        mongo.db.appointments.update_one(
-            {'_id': ObjectId(appt_id)},
-            {'$set': {'is_active': False, 'deleted_at': datetime.utcnow()}},
-        )
+        appt_repo.soft_delete(appt_id)
         return jsonify({'success': True, 'message': 'Deleted'})
     except Exception as e:
         print(f"Delete appointment error: {e}")

@@ -44,6 +44,15 @@ def get(patient_id):
         return None
 
 
+def active_in_clinics(clinic_ids, sort_field='personal_info.first_name'):
+    """Active patients across the given clinics, sorted by `sort_field`."""
+    return list(
+        mongo.db.patients
+        .find({'clinic_id': {'$in': clinic_ids}, 'is_active': True})
+        .sort(sort_field, 1)
+    )
+
+
 def get_for_owner(patient_id, owner_id):
     """Return (patient, clinic) scoped to an owner — the access-control seam.
 
