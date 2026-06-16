@@ -294,6 +294,44 @@
                 left: 10px;
                 max-width: none;
             }
+
+            /* Give page content breathing room on phones. Several pages drop
+               content straight into the content block with no container, so
+               without this they run edge-to-edge. Desktop is unaffected. */
+            .main-content {
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+
+            /* Patient-detail action buttons: let the btn-group wrap to multiple
+               rows on mobile instead of overflowing off-screen. */
+            .patient-actions.btn-group {
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+            .patient-actions.btn-group > .btn,
+            .patient-actions.btn-group > form > .btn {
+                border-radius: 6px !important;
+            }
+
+            /* Dental chart header: wrap the Export PDF / Back buttons below the
+               title and keep them right-aligned on mobile. */
+            .chart-header > .d-flex { flex-wrap: wrap; gap: 8px; }
+            .chart-header > .d-flex > div:last-child { margin-left: auto; }
+        }
+
+        /* Dental chart: make the blue "Dental Chart" bar fill the card edges so
+           there are no white gaps in the card corners around it. (Scoped, and
+           there is only one .section-title, so this is contained.) */
+        .teeth-section .section-title {
+            margin: -15px -15px 10px -15px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        /* Keep the patient avatar a circle — without flex-shrink:0 it gets
+           squished horizontally in a narrow flex row and turns into an oval. */
+        .patient-avatar {
+            flex-shrink: 0;
         }
 
         /* Keep a fixed bottom-right action button (e.g. the dental chart's

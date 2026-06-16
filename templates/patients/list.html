@@ -145,28 +145,4 @@
     </a>
 </div>
 {% endif %}
-
-<!-- Quick Actions -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-bolt"></i> Quick Actions</h5>
-            </div>
-            <div class="card-body">
-                <div class="d-flex gap-2 flex-wrap">
-                    <a href="{{ url_for('patients.create_patient') }}" class="btn btn-outline-primary">
-                        <i class="fas fa-plus"></i> Add Patient
-                    </a>
-                    <a href="{{ url_for('clinics.list_clinics') }}" class="btn btn-outline-info">
-                        <i class="fas fa-building"></i> View Clinics
-                    </a>
-                    <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-success">
-                        <i class="fas fa-tachometer-alt"></i> Dashboard
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
