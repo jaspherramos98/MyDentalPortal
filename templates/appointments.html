@@ -547,6 +547,31 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             .calendar-grid { margin: 8px; }
             .calendar-day { min-height: 60px; padding: 4px; font-size: 11px; }
             .day-header { padding: 6px 2px; font-size: 11px; }
+
+            /* Calendar header: tighter padding + smaller controls so it stops
+               cramming, and a STACKED layout (view toggle above info badges) so
+               the rows wrap with steady spacing — and so the selected-date badge
+               changing width reflows in place instead of shoving the calendar. */
+            .calendar-header { padding: 12px; }
+            .calendar-nav { margin-bottom: 10px; gap: 6px; }
+            .calendar-nav h3 { font-size: 1rem; line-height: 1.2; text-align: center; }
+            .nav-btn { padding: 6px 12px; font-size: 0.85rem; }
+            /* Stack the view-toggle row above the badges; each row left-aligns and
+               wraps with a consistent gap (overrides Bootstrap's space-between). */
+            .calendar-header > .d-flex {
+                flex-direction: column;
+                align-items: stretch !important;
+                gap: 8px;
+            }
+            .calendar-header > .d-flex > div,
+            .calendar-header > .d-flex .d-flex,
+            .calendar-header > .d-flex .d-flex > div {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                justify-content: flex-start !important;
+            }
+            .calendar-header .badge { white-space: nowrap; }
         }
     </style>
 </head>
@@ -1301,13 +1326,17 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             document.getElementById('modalPriority').value = 'normal';
             document.getElementById('modalNotes').value = '';
             
-            // Update selected date display
-            const selectedDateFormatted = new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
+            // Update selected date display. On phones use a compact format so the
+            // badge width stays close to "Select a date" — the long weekday/month
+            // string was far wider and reflowed the whole header (shoving the
+            // calendar + legend down when you picked a patient). Desktop unchanged.
+            const isPhone = window.matchMedia('(max-width: 768px), (max-height: 500px)').matches;
+            const selectedDateFormatted = new Date(date + 'T00:00:00').toLocaleDateString(
+                'en-US',
+                isPhone
+                    ? { year: 'numeric', month: 'short', day: 'numeric' }
+                    : { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
+            );
             document.getElementById('selectedDate').textContent = selectedDateFormatted;
             
             // Store dragged patient info
