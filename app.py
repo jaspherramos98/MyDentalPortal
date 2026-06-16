@@ -219,6 +219,17 @@ def web_manifest():
     resp.headers['Content-Type'] = 'application/manifest+json'
     return resp
 
+
+@app.route('/sw.js')
+def service_worker():
+    # Served from root so its scope covers the whole app (a SW under /static/
+    # could only control /static/). Service-Worker-Allowed makes that explicit.
+    from flask import send_from_directory, make_response
+    resp = make_response(send_from_directory(app.static_folder, 'sw.js'))
+    resp.headers['Content-Type'] = 'application/javascript'
+    resp.headers['Service-Worker-Allowed'] = '/'
+    return resp
+
 # ---------------------------------------------------------------------------
 # Database initialisation
 # ---------------------------------------------------------------------------
