@@ -456,6 +456,16 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                 width: 300px;
                 z-index: 1050;
                 transition: left 0.3s ease;
+                /* Anchor the drawer to the full viewport (top..bottom) so it has a
+                   concrete scroll height regardless of navbar height — overrides the
+                   desktop `height: calc(100vh-80px)`. The whole drawer is ONE scroll
+                   container (filters -> stats -> patient list); the nested scrolls
+                   below are flattened so it all scrolls top-to-bottom as one unit. */
+                top: 0;
+                bottom: 0;
+                height: auto;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
                 /* Reachable bottom so the draggable patient list can be scrolled
                    into view past the browser/toolbar chrome. */
                 padding-bottom: 96px;
@@ -463,6 +473,19 @@ Description: Dental practice appointments calendar with drag-and-drop functional
 
             .sidebar.show {
                 left: 0;
+            }
+
+            /* Flatten the nested scrolls so the drawer scrolls as a single unit:
+               the filter section must NOT stick (it pinned at top, hiding stats +
+               list below it), and the patient list must NOT be its own capped
+               scroll box (calc(100vh-400px) went negative on landscape phones,
+               collapsing the list to ~0 height). */
+            .sidebar .search-box {
+                position: static;
+            }
+            .sidebar .patient-list {
+                max-height: none;
+                overflow: visible;
             }
 
             .calendar-container {

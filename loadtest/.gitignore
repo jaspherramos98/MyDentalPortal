@@ -1,0 +1,6 @@
+# Generated authed targets contain a live session cookie — never commit.
+targets-authed.txt
+# Vegeta result artifacts.
+*.bin
+*.json
+*.hdr

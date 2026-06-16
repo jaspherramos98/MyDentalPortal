@@ -1,0 +1,6 @@
+GET http://localhost:5000/health
+GET http://localhost:5000/login
+GET http://localhost:5000/manifest.webmanifest
+GET http://localhost:5000/sw.js
+GET http://localhost:5000/static/css/main.css
+GET http://localhost:5000/static/js/main.js

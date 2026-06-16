@@ -153,10 +153,10 @@ phones are wide but short): week view is a swipeable 7×82vw horizontal grid; mo
 but shrinks cells; the filter sidebar is off-canvas (toggle bottom-left, forced visible over `d-md-none`);
 calendar forced full-width; stats are a 2×2 grid; the legend moved BELOW the grid (horizontal). Desktop
 unchanged except the owner-approved nav swap + stats-grid/legend placement.
-**⚠️ KNOWN OPEN BUG (next session):** the off-canvas sidebar does NOT scroll — the top `.search-box`
-filter section stays fixed, so the stats and the draggable patient list below it are unreachable on
-phone (drag-drop onto a date impossible). The whole sidebar (filters→stats→patient list) must scroll as
-one unit. See TODO Phase 5.
+The off-canvas sidebar scrolls as ONE unit (filters→stats→patient list, fixed 2026-06-16): on mobile it's
+anchored to the full viewport (`top:0;bottom:0;overflow-y:auto`) and the previously-nested scrolls are
+flattened (`.sidebar .search-box{position:static}`, `.sidebar .patient-list{max-height:none;overflow:visible}`)
+— **don't reintroduce a sticky `.search-box` or a capped `.patient-list` inside the phone media query.**
 
 ### PWA (online-first, Phase 3.5 / roadmap #1 slice 1a)
 The app is installable. `app.py` serves `/manifest.webmanifest` and `/sw.js` (the latter from root with
@@ -165,6 +165,25 @@ shell** (`/static/*`, cache-first) — navigations are **network-only** with a s
 fallback, and **data/authenticated HTML is NEVER cached** (online-first = single source of truth, no PHI
 on device). Service workers need HTTPS (met on Render) or localhost. Icons are placeholders from
 `scripts/gen_pwa_icons.py`. Deferred: offline DATA caching, token auth, push.
+
+## Load / performance testing (Vegeta, added 2026-06-16)
+Harness lives in `loadtest/` (TODO Phase 6). Uses [Vegeta](https://github.com/tsenart/vegeta)
+for constant-rate HTTP load + latency histograms — feeds the gunicorn-worker / Render-Starter
+sizing decisions.
+- **⚠️ PHI SAFETY:** never load-test Render prod (`dental_portal_prod` = real PHI). Runners + the
+  login helper refuse a prod-looking `BASE_URL` (`onrender.com`). Target **local** (`python app.py`)
+  or the AWS **showcase** env only. Login is rate-limited (10/min) and POSTs are CSRF-protected, so
+  the harness load-tests **read-only GETs**.
+- `loadtest/run-public.sh` — unauthenticated baseline (`/health`, `/login` GET, manifest, static shell).
+- `loadtest/login.py` — stdlib-only (no pip deps); logs in (handles CSRF + Flask `session` cookie),
+  **verifies** it authenticated (re-requests `/dashboard`), discovers a real patient id, writes
+  `loadtest/targets-authed.txt` (git-ignored — holds a live cookie).
+- `loadtest/run-authed.sh` — runs `login.py` then attacks authed read paths (dashboard, patients,
+  patient detail, appointments).
+- Vegeta binary is **not** installed by default — `scoop install vegeta` / `brew install vegeta` / release binary.
+- Verified end-to-end against local 2026-06-16 (login + all authed GETs 200). Note: the documented
+  default admin (`admin@dental.com` / `admin123`) must be `status:approved` + `is_active:true` to pass
+  the Phase 4 login gate.
 
 ## Environment Variables (.env)
 ```

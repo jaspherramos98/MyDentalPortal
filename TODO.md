@@ -139,16 +139,36 @@
       height too (`@media (max-width:768px), (max-height:500px)`); calendar forced full-width when sidebar
       off-canvas; toggle kept visible over `d-md-none`. (Landscape phones are wide >768px but short, so
       width-only breakpoint had left them on the broken desktop layout.)
-- [ ] **OPEN BUG (next session) — appointments off-canvas sidebar isn't scrollable.** On mobile/landscape,
-      the **top filter section** (`.search-box`: clinic selector, patient search, type filter) stays
-      **fixed**, so you can't scroll down within the off-canvas sidebar to reach the **stats 2×2 grid**
-      and the **draggable patient list** (so drag-and-drop onto a date is impossible on phone).
-      *Investigate:* `.sidebar` (`height: calc(100vh-80px); overflow-y:auto`) + `.search-box` in
-      `templates/appointments.html` — likely a `position:sticky/fixed` on `.search-box` or an
-      overflow/height issue stopping the sidebar from scrolling as one unit. **Fix goal:** the entire
-      off-canvas sidebar (filters → stats → patient list) scrolls top-to-bottom on mobile + landscape.
-      (Earlier `.sidebar { padding-bottom:96px }` was added but the real blocker is the non-scrolling
-      top section.)
+- [x] **Appointments off-canvas sidebar now scrollable — FIXED 2026-06-16.** The drawer scrolls as
+      ONE unit (filters → stats → patient list) on mobile + landscape. Root causes were two nested
+      scrolls fighting the drawer's own scroll: `.search-box` was `position:sticky;top:0` (pinned the
+      filter section, hiding everything below it) and `.patient-list` had its own
+      `max-height:calc(100vh-400px);overflow-y:auto` (a nested scroll box that went *negative* on
+      landscape, collapsing the list to ~0). Fix (all inside the existing phone media query, desktop
+      untouched): anchored the fixed `.sidebar` to the full viewport (`top:0;bottom:0;height:auto;
+      overflow-y:auto;-webkit-overflow-scrolling:touch`) and flattened the nested scrolls
+      (`.sidebar .search-box{position:static}`, `.sidebar .patient-list{max-height:none;overflow:visible}`).
+      Page renders 200. ⏳ Owner to re-verify drag-drop onto a date on a real phone (portrait + landscape).
+
+### Phase 6 — Load / performance testing (Vegeta) — feeds the Render Starter decision
+> We have functional (smoke) + unit (52 tests) coverage but **no load/perf testing**. Vegeta
+> (constant-rate HTTP load + latency histograms) fills that gap and produces the hard numbers
+> behind the broad-release gate below (cold start, gunicorn worker tuning). Harness lives in
+> `loadtest/` (added 2026-06-16).
+> **⚠️ PHI SAFETY RULE: never run load against Render `dental_portal_prod`.** Target **local**
+> (`python app.py`) or the AWS **showcase** env only. Login is rate-limited (10/min) and all
+> POSTs are CSRF-protected, so load-test **read-only GETs**; the authed runner logs in once
+> (handling CSRF) and reuses the session cookie.
+- [ ] **Prereq: install the Vegeta binary** (`scoop install vegeta` / `brew install vegeta` /
+      release binary). Harness in `loadtest/` is built + verified end-to-end (2026-06-16); only the
+      binary is missing before any attack can run.
+- [ ] **Baseline — public endpoints (no auth).** `loadtest/run-public.sh` hits `/health`,
+      `/login` (GET), `/manifest.webmanifest`, static shell. Establishes raw throughput/latency
+      and confirms gunicorn worker count is sane.
+- [ ] **Authed read paths.** `loadtest/run-authed.sh` (logs in via `loadtest/login.py`, reuses
+      the cookie) against dashboard, patients list, a patient detail, appointments. Read-only.
+- [ ] **Use results to size the deploy:** confirm `--workers/--threads` in the gunicorn cmd and
+      validate the "Render Starter / no-spin-down" call below with real cold-start + p95 numbers.
 
 ### Decision record — Hosting + HTTPS (settled 2026-06-13; no action until broad release)
 - **Long-term host = Render**, not AWS (EB was for portfolio and is being torn down — see 🟡).
