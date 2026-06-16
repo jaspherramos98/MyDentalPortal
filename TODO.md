@@ -119,10 +119,18 @@
 - [x] **Appointments page mobile — FIXED 2026-06-15.** Swipeable week grid, fit-to-screen month grid,
       natural scrolling; **and** swapped the custom gradient nav for the shared Bootstrap navbar
       (hamburger on mobile, blue bar on desktop — owner-approved desktop change).
-- [ ] **Whole-app mobile audit (#3) — IN PROGRESS.** Approach: deploy → owner tests each tab on a phone →
-      fix targeted. **Known likely issue to fix:** `patients/detail.html` has ~8 of 10 tables NOT wrapped
-      in `.table-responsive` (overflow on phones); `settings.html` has 1 unwrapped (narrow, low risk).
-      Wrapping wide tables is a safe, desktop-neutral win — do once confirmed which tabs break.
+- [x] **Whole-app mobile pass — DONE 2026-06-15 (owner real-device testing).** 15 issues fixed across
+      batches (all desktop-safe via `@media`/scoped selectors unless noted):
+      edge-to-edge padding (central `.main-content` mobile padding); dashboard header buttons wrap +
+      right-justify; patient-detail action btn-group wraps; patients-list avatar stays circular +
+      removed redundant Quick Actions; dental chart header buttons wrap right + section-title bar made
+      flush (no white corners) — both via base.html, SACRED file untouched; **appointments**: removed
+      dead "Today" button, stats → 2×2 grid, legend moved below the grid (horizontal), sidebar toggle
+      → bottom-left (no longer covers header), off-canvas sidebar bottom padding for drag-drop reach.
+      *(Owner-approved desktop changes: appointments nav → shared Bootstrap navbar; stats grid + legend
+      placement apply to desktop too.)* Note: patient-detail `table-sm` tables are 2-col key/value and
+      fit mobile — NOT wrapped (wide list tables were already `.table-responsive`). ⏳ Owner to re-verify
+      on device.
 
 ### Decision record — Hosting + HTTPS (settled 2026-06-13; no action until broad release)
 - **Long-term host = Render**, not AWS (EB was for portfolio and is being torn down — see 🟡).
