@@ -186,9 +186,12 @@
 > The security/access/test/schema **foundations are in place** (Phases 0–4). These are the operational
 > gaps between "works for us" and "production-grade ops." Do **CI first** so the big Tier-3 features
 > (multi-staff, booking) are built under a green test gate instead of blind.
-- [x] **CI pipeline — pytest on push + PR (DONE 2026-06-16).** `.github/workflows/ci.yml`: ubuntu +
-      Python 3.11, installs `requirements-dev.txt`, runs `pytest` (hermetic — mongomock, no DB/network).
-      Cancels superseded runs per ref.
+- [x] **CI pipeline — pytest on push + PR (DONE 2026-06-16, verified GREEN).** `.github/workflows/ci.yml`:
+      ubuntu + Python 3.11, installs `requirements-dev.txt`, runs `pytest` (hermetic — mongomock, no
+      DB/network). Cancels superseded runs per ref. First run failed (bare `pytest` doesn't put the
+      project root on `sys.path` → `ModuleNotFoundError: extensions`; local passed only via
+      `python -m pytest`); fixed with `pythonpath = .` in `pytest.ini` (reproduced + verified in a
+      `python:3.11` Docker container, then green on GitHub).
 - [ ] **Make CI a required check** — GitHub branch protection on `main` so a red suite **blocks merges**
       (until then the workflow only *signals*, it can't stop a push). *(Repo Settings → Branches →
       protect `main` → require the CI check.)* Owner/manual, one-time.
