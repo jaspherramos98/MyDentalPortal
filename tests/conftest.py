@@ -66,7 +66,7 @@ def _make_app():
     app.register_blueprint(patients)
 
     # Test-only routes to exercise the access-control decorators directly.
-    from blueprints.utils import login_required, admin_required
+    from blueprints.utils import login_required, admin_required, role_required, ROLE_DENTIST
 
     @app.route("/_login_guarded")
     @login_required
@@ -76,6 +76,11 @@ def _make_app():
     @app.route("/_admin_guarded")
     @admin_required
     def _admin_guarded():
+        return "ok", 200
+
+    @app.route("/_dentist_guarded")
+    @role_required(ROLE_DENTIST)
+    def _dentist_guarded():
         return "ok", 200
 
     return app

@@ -13,6 +13,13 @@ from blueprints.repositories import patients as _patient_repo
 from blueprints.repositories import clinics as _clinic_repo
 
 
+# Role vocabulary. App Admin is a global superset; Dentist owns clinics; Staff
+# (assistant/receptionist) is the constrained role multi-staff will introduce.
+ROLE_ADMIN = 'admin'
+ROLE_DENTIST = 'dentist'
+ROLE_STAFF = 'staff'
+
+
 def login_required(f):
     """Redirect to login if there is no authenticated session."""
     @wraps(f)
@@ -57,3 +64,27 @@ def admin_required(f):
             abort(403)
         return f(*args, **kwargs)
     return decorated
+
+
+def current_role():
+    """The logged-in user's role (defaults to dentist for legacy sessions)."""
+    return session.get('user_role', ROLE_DENTIST)
+
+
+def role_required(*roles):
+    """Require an authenticated user whose role is in `roles`; 403 otherwise.
+
+    Admins implicitly satisfy any role requirement (they are a global superset).
+    This is the multi-staff foundation: future staff-restricted routes declare
+    e.g. @role_required(ROLE_DENTIST) and staff get a 403.
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if 'user_id' not in session:
+                return redirect(url_for('auth.login'))
+            if is_admin() or current_role() in roles:
+                return f(*args, **kwargs)
+            abort(403)
+        return decorated
+    return decorator

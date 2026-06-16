@@ -24,6 +24,26 @@ def _valid_email(email):
     return bool(re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email))
 
 
+def account_block_reason(user):
+    """Return (flash_category, message) if `user` may NOT log in, else None.
+
+    Lifecycle gate, enforced after the password check. Legacy accounts created
+    before these fields existed have no `status`/`is_active` and are grandfathered
+    in as active+approved. Anything not explicitly approved is denied by default.
+    """
+    if user.get('is_active') is False:
+        return ('error', 'Your account has been deactivated. Please contact the clinic.')
+    status = user.get('status', 'approved')
+    if status == 'pending':
+        return ('warning', 'Your account is awaiting administrator approval.')
+    if status == 'rejected':
+        return ('error', 'Your registration was not approved. Please contact the clinic.')
+    if status != 'approved':
+        # Any other lifecycle state (e.g. suspended) is blocked by default.
+        return ('error', 'Your account is not active. Please contact the clinic.')
+    return None
+
+
 # ── routes ───────────────────────────────────────────────────────────────
 @auth_bp.route('/login', methods=['GET', 'POST'])
 @limiter.limit(
@@ -46,14 +66,10 @@ def login():
             # Always hash-check (against a dummy hash if no such user) for constant time.
             stored_hash = user['password'] if user else _DUMMY_PASSWORD_HASH
             if check_password_hash(stored_hash, password) and user:
-                # Account approval gate. Users created before this feature have
-                # no 'status' field and are grandfathered in as approved.
-                status = user.get('status', 'approved')
-                if status == 'pending':
-                    flash('Your account is awaiting administrator approval.', 'warning')
-                    return render_template('auth/login.html')
-                if status == 'rejected':
-                    flash('Your registration was not approved. Please contact the clinic.', 'error')
+                # Account lifecycle gate (approval + active/deactivated).
+                block = account_block_reason(user)
+                if block:
+                    flash(block[1], block[0])
                     return render_template('auth/login.html')
 
                 session['user_id'] = str(user['_id'])

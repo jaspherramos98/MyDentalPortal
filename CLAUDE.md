@@ -160,9 +160,13 @@ Created on first run if no users exist:
 ## Known Issues / TODO (as of v3)
 - Patient detail may fail on legacy data with flat (non-nested) structures — `_ensure_nested()` handles this
 - `appointments.html` has its own nav bar separate from `base.html` — should eventually be unified
-- Role-based access (dentist vs staff vs admin) is prepared in the user model but not enforced yet.
-  The full **multi-staff membership + roles** design (app_admin/dentist/staff, permission matrix,
-  access codes, admin-panel shape) is spec'd in TODO.md — build against that when implementing.
+- Role-based access **foundation enforced (Phase 4, 2026-06-15):** `login_required`/`admin_required`
+  cover all routes (admin blueprint fully admin-gated); login enforces an account lifecycle gate
+  (`account_block_reason` — approved-only + `is_active`, legacy users grandfathered); and
+  `role_required(*roles)` + `ROLE_ADMIN/DENTIST/STAFF` constants exist in `blueprints/utils/` as the
+  multi-staff seam (admins implicitly satisfy any role). The **staff** role isn't functionally used
+  yet — the full **multi-staff membership + roles** design (permission matrix, access codes,
+  admin-panel shape) is spec'd in TODO.md; build against that when implementing.
 - The "offline version" is decided as an **online-first PWA** (single source of truth) + an optional
   read-only offline cache; two-way sync was rejected. See TODO.md.
 - User dropdown has a single **Account** link → `main.settings` (`templates/settings.html`):

@@ -100,8 +100,15 @@
 > Enforce on the **refactored** service layer so checks live in centralized enforcement points
 > (one place, not decorators scattered per route) — exactly what multi-staff swaps into. Tests
 > from Phase 3 catch regressions from the behavior change.
-- [ ] **Enforce role-based access** (dentist / staff / admin) — `admin_required` exists in
-      `blueprints/utils/` but isn't applied broadly yet.
+- [x] **Enforce role-based access — DONE (2026-06-15).** Audited the full route surface: every route
+      is `login_required` (only `register`/`logout`/`index` are intentionally public) and the admin
+      blueprint is fully `admin_required` — coverage was already complete. Closed the real gaps:
+      (1) login now enforces an account **lifecycle gate** (`account_block_reason` in `auth.py`:
+      approved-only allow-list + `is_active`, legacy users grandfathered) — a deactivated/non-approved
+      account can no longer log in; (2) added `role_required(*roles)` + `ROLE_ADMIN/DENTIST/STAFF`
+      constants in `blueprints/utils/` as the multi-staff seam (admins implicitly satisfy any role).
+      10 new tests (`tests/test_roles.py`), 52 total pass. Staff role not yet functionally used —
+      that's roadmap #2 (multi-staff).
 
 ### Decision record — Hosting + HTTPS (settled 2026-06-13; no action until broad release)
 - **Long-term host = Render**, not AWS (EB was for portfolio and is being torn down — see 🟡).
