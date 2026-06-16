@@ -295,6 +295,15 @@
                 max-width: none;
             }
         }
+
+        /* Keep a fixed bottom-right action button (e.g. the dental chart's
+           Save button) above the unsaved-changes banner so the banner never
+           blocks the click. --unsaved-banner-h is 0 unless the banner is shown
+           (set in JS below), so normal layout is unchanged. */
+        .save-btn {
+            bottom: calc(20px + var(--unsaved-banner-h, 0px)) !important;
+            transition: bottom 0.2s ease;
+        }
     </style>
 
     <script>
@@ -365,10 +374,15 @@
                     document.body.appendChild(banner);
                 }
                 banner.style.display = 'block';
+                // Publish the banner's height so fixed bottom buttons (.save-btn)
+                // can sit above it. Measured after display so wrapped text counts.
+                document.documentElement.style.setProperty(
+                    '--unsaved-banner-h', banner.offsetHeight + 'px');
             }
             function hideBanner() {
                 const banner = document.getElementById('unsavedBanner');
                 if (banner) banner.style.display = 'none';
+                document.documentElement.style.setProperty('--unsaved-banner-h', '0px');
             }
 
             // Shared API so JS-driven pages (e.g. the dental chart, which has no
