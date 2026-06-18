@@ -23,6 +23,11 @@ test.exe
 # Claude Code local memory (never commit)
 .claude/projects/
 
+# Internal working docs — kept LOCAL only (contain infra topology / ops detail,
+# not for a public repo). Present on the dev machine; never tracked.
+CLAUDE.md
+TODO.md
+
 # Data backups (contain PHI — never commit)
 backups/
 *.backup.zip
