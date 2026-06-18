@@ -3,7 +3,7 @@
 [![CI](https://github.com/jaspherramos98/MyDentalPortal/actions/workflows/ci.yml/badge.svg)](https://github.com/jaspherramos98/MyDentalPortal/actions/workflows/ci.yml)
 
 A web-based **dental clinic management system** built for a real clinic
-(JRAMOS DENTAL HUB — Obando, Bulacan, Philippines). It runs a single clinic today but is
+It runs a single clinic today but is
 architected for multi-clinic, multi-staff (role-based) growth.
 
 > ⚕️ **This is production medical software handling patient health data (PHI).** Confidentiality,
