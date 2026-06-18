@@ -89,3 +89,40 @@ def update_set(patient_id, fields):
         {'_id': ObjectId(patient_id)},
         {'$set': fields},
     )
+
+
+def unset(patient_id, keys):
+    """Remove fields (list of dot-notation keys) from one patient (e.g. photo)."""
+    return mongo.db.patients.update_one(
+        {'_id': ObjectId(patient_id)},
+        {'$unset': {k: '' for k in keys}},
+    )
+
+
+def recent_in_clinics(clinic_ids, limit=10):
+    """Active patients across the given clinics, newest first (dashboard)."""
+    return list(
+        mongo.db.patients
+        .find({'clinic_id': {'$in': clinic_ids}, 'is_active': True})
+        .sort('created_at', -1)
+        .limit(limit)
+    )
+
+
+def count_active_in_clinics(clinic_ids, created_since=None):
+    """Count active patients in the given clinics, optionally created on/after
+    `created_since` (a datetime). Used by the dashboard stats."""
+    query = {'clinic_id': {'$in': clinic_ids}, 'is_active': True}
+    if created_since is not None:
+        query['created_at'] = {'$gte': created_since}
+    return mongo.db.patients.count_documents(query)
+
+
+def find_active_in_clinics(clinic_ids, created_since=None, fields=None):
+    """Active patients in the given clinics, optionally created on/after
+    `created_since` (a datetime). `fields` is an optional projection. Used by
+    reports (patient-growth time series)."""
+    query = {'clinic_id': {'$in': clinic_ids}, 'is_active': True}
+    if created_since is not None:
+        query['created_at'] = {'$gte': created_since}
+    return list(mongo.db.patients.find(query, fields))

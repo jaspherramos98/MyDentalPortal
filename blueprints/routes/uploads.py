@@ -16,14 +16,13 @@ from flask import (
     Blueprint, request, session, redirect, url_for, flash, send_file, abort,
 )
 from bson.objectid import ObjectId
-from bson.errors import InvalidId
 from datetime import datetime
-from gridfs import GridFS
 from werkzeug.utils import secure_filename
 from PIL import Image
 
-from extensions import mongo
 from blueprints.utils import login_required, verify_patient_access as _verify_patient_access
+from blueprints.repositories import uploads as uploads_repo
+from blueprints.repositories import patients as patient_repo
 
 uploads_bp = Blueprint('uploads', __name__)
 
@@ -50,10 +49,6 @@ CONTENT_TYPES = {
     'numbers': 'application/x-iwork-numbers-sffnumbers',
     'key': 'application/x-iwork-keynote-sffkey',
 }
-
-
-def _fs():
-    return GridFS(mongo.db)
 
 
 # ── upload validation ────────────────────────────────────────────────────────
@@ -102,10 +97,8 @@ def _validate(data, ext, allowed):
 def _store(data, original_name, ext):
     """Persist bytes to GridFS, return the GridFS id."""
     safe = secure_filename(original_name) or f'upload.{ext}'
-    return _fs().put(
-        data,
-        filename=safe,
-        contentType=CONTENT_TYPES.get(ext, 'application/octet-stream'),
+    return uploads_repo.put_blob(
+        data, safe, CONTENT_TYPES.get(ext, 'application/octet-stream'),
     )
 
 
@@ -134,21 +127,13 @@ def set_photo(patient_id):
         return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
     # Replace any existing photo (delete the old GridFS blob first).
-    old_id = patient.get('photo_file_id')
-    if old_id:
-        try:
-            _fs().delete(old_id)
-        except Exception:
-            pass
+    uploads_repo.delete_blob(patient.get('photo_file_id'))
 
-    mongo.db.patients.update_one(
-        {'_id': ObjectId(patient_id)},
-        {'$set': {
-            'photo_file_id': _store(data, upload.filename, ext),
-            'photo_ext': ext,
-            'photo_content_type': CONTENT_TYPES.get(ext, 'application/octet-stream'),
-        }},
-    )
+    patient_repo.update_set(patient_id, {
+        'photo_file_id': _store(data, upload.filename, ext),
+        'photo_ext': ext,
+        'photo_content_type': CONTENT_TYPES.get(ext, 'application/octet-stream'),
+    })
     flash('Patient photo updated.', 'success')
     return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
@@ -159,15 +144,11 @@ def patient_photo(patient_id):
     _, clinic = _verify_patient_access(patient_id)
     if not clinic:
         abort(403)
-    try:
-        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
-    except (InvalidId, TypeError):
-        abort(404)
+    patient = patient_repo.get(patient_id)
     if not patient or not patient.get('photo_file_id'):
         abort(404)
-    try:
-        gf = _fs().get(patient['photo_file_id'])
-    except Exception:
+    gf = uploads_repo.get_blob(patient['photo_file_id'])
+    if gf is None:
         abort(404)
     # Stream the GridFS object directly instead of buffering the whole file into
     # memory (io.BytesIO(gf.read())). A 2.4 MB iPad photo loaded fully into RAM
@@ -193,15 +174,8 @@ def delete_photo(patient_id):
     if not clinic:
         flash('Access denied or patient not found', 'error')
         return redirect(url_for('patients.list_patients'))
-    if patient.get('photo_file_id'):
-        try:
-            _fs().delete(patient['photo_file_id'])
-        except Exception:
-            pass
-    mongo.db.patients.update_one(
-        {'_id': ObjectId(patient_id)},
-        {'$unset': {'photo_file_id': '', 'photo_ext': '', 'photo_content_type': ''}},
-    )
+    uploads_repo.delete_blob(patient.get('photo_file_id'))
+    patient_repo.unset(patient_id, ['photo_file_id', 'photo_ext', 'photo_content_type'])
     flash('Patient photo removed.', 'success')
     return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
@@ -242,7 +216,7 @@ def add_prescription(patient_id):
         doc['image_file_id'] = _store(data, upload.filename, ext)
         doc['image_name'] = secure_filename(upload.filename)
 
-    mongo.db.prescriptions.insert_one(doc)
+    uploads_repo.insert_prescription(doc)
     flash('Prescription saved.', 'success')
     return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
@@ -250,18 +224,14 @@ def add_prescription(patient_id):
 @uploads_bp.route('/prescriptions/<prescription_id>/image')
 @login_required
 def prescription_image(prescription_id):
-    try:
-        pres = mongo.db.prescriptions.find_one({'_id': ObjectId(prescription_id)})
-    except (InvalidId, TypeError):
-        abort(404)
+    pres = uploads_repo.get_prescription(prescription_id)
     if not pres or not pres.get('image_file_id'):
         abort(404)
     _, clinic = _verify_patient_access(str(pres['patient_id']))
     if not clinic:
         abort(403)
-    try:
-        gf = _fs().get(pres['image_file_id'])
-    except Exception:
+    gf = uploads_repo.get_blob(pres['image_file_id'])
+    if gf is None:
         abort(404)
     # Image preview is inline, but locked to a known image content-type with
     # nosniff so the browser can't be tricked into executing it.
@@ -278,19 +248,12 @@ def prescription_image(prescription_id):
 @uploads_bp.route('/prescriptions/<prescription_id>/delete', methods=['POST'])
 @login_required
 def delete_prescription(prescription_id):
-    try:
-        pres = mongo.db.prescriptions.find_one({'_id': ObjectId(prescription_id)})
-    except (InvalidId, TypeError):
-        pres = None
+    pres = uploads_repo.get_prescription(prescription_id)
     if pres:
         _, clinic = _verify_patient_access(str(pres['patient_id']))
         if clinic:
-            if pres.get('image_file_id'):
-                try:
-                    _fs().delete(pres['image_file_id'])
-                except Exception:
-                    pass
-            mongo.db.prescriptions.delete_one({'_id': pres['_id']})
+            uploads_repo.delete_blob(pres.get('image_file_id'))
+            uploads_repo.delete_prescription(pres['_id'])
             flash('Prescription deleted.', 'success')
             return redirect(url_for('patients.patient_detail',
                                     patient_id=str(pres['patient_id'])))
@@ -321,7 +284,7 @@ def add_file(patient_id):
 
     display_name = (request.form.get('display_name') or '').strip() or upload.filename
 
-    mongo.db.patient_files.insert_one({
+    uploads_repo.insert_file({
         'patient_id': ObjectId(patient_id),
         'clinic_id': clinic['_id'],
         'file_id': _store(data, upload.filename, ext),
@@ -339,18 +302,14 @@ def add_file(patient_id):
 @uploads_bp.route('/files/<file_doc_id>/download')
 @login_required
 def download_file(file_doc_id):
-    try:
-        meta = mongo.db.patient_files.find_one({'_id': ObjectId(file_doc_id)})
-    except (InvalidId, TypeError):
-        abort(404)
+    meta = uploads_repo.get_file(file_doc_id)
     if not meta:
         abort(404)
     _, clinic = _verify_patient_access(str(meta['patient_id']))
     if not clinic:
         abort(403)
-    try:
-        gf = _fs().get(meta['file_id'])
-    except Exception:
+    gf = uploads_repo.get_blob(meta['file_id'])
+    if gf is None:
         abort(404)
 
     # Force a download (never inline) so nothing the user uploaded can run in
@@ -371,19 +330,13 @@ def download_file(file_doc_id):
 @uploads_bp.route('/files/<file_doc_id>/rename', methods=['POST'])
 @login_required
 def rename_file(file_doc_id):
-    try:
-        meta = mongo.db.patient_files.find_one({'_id': ObjectId(file_doc_id)})
-    except (InvalidId, TypeError):
-        meta = None
+    meta = uploads_repo.get_file(file_doc_id)
     if meta:
         _, clinic = _verify_patient_access(str(meta['patient_id']))
         if clinic:
             new_name = (request.form.get('display_name') or '').strip()
             if new_name:
-                mongo.db.patient_files.update_one(
-                    {'_id': meta['_id']},
-                    {'$set': {'display_name': new_name[:200]}},
-                )
+                uploads_repo.update_file_set(meta['_id'], {'display_name': new_name[:200]})
                 flash('File renamed.', 'success')
             else:
                 flash('New name cannot be empty.', 'error')
@@ -396,18 +349,12 @@ def rename_file(file_doc_id):
 @uploads_bp.route('/files/<file_doc_id>/delete', methods=['POST'])
 @login_required
 def delete_file(file_doc_id):
-    try:
-        meta = mongo.db.patient_files.find_one({'_id': ObjectId(file_doc_id)})
-    except (InvalidId, TypeError):
-        meta = None
+    meta = uploads_repo.get_file(file_doc_id)
     if meta:
         _, clinic = _verify_patient_access(str(meta['patient_id']))
         if clinic:
-            try:
-                _fs().delete(meta['file_id'])
-            except Exception:
-                pass
-            mongo.db.patient_files.delete_one({'_id': meta['_id']})
+            uploads_repo.delete_blob(meta['file_id'])
+            uploads_repo.delete_file(meta['_id'])
             flash('File deleted.', 'success')
             return redirect(url_for('patients.patient_detail',
                                     patient_id=str(meta['patient_id'])))

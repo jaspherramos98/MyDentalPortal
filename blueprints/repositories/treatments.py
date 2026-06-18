@@ -26,6 +26,16 @@ def list_for_patient(patient_id):
     )
 
 
+def find_for_clinics(clinic_ids, start_date=None, fields=None):
+    """Treatments across the given clinics, optionally on/after `start_date`
+    (a 'YYYY-MM-DD' string — `date` is stored as that format, so the comparison
+    is lexicographic). `fields` is an optional projection. Used by reports."""
+    query = {'clinic_id': {'$in': clinic_ids}}
+    if start_date:
+        query['date'] = {'$gte': start_date}
+    return list(mongo.db.treatment_records.find(query, fields))
+
+
 def insert(doc):
     """Insert a treatment document; return the new _id (str)."""
     return str(mongo.db.treatment_records.insert_one(doc).inserted_id)

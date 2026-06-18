@@ -3,6 +3,8 @@
 These hit mongomock directly — no Flask context needed, since repository
 functions take explicit args (no hidden session reads).
 """
+from datetime import datetime
+
 from bson.objectid import ObjectId
 
 from blueprints.repositories import patients as patient_repo
@@ -11,6 +13,7 @@ from blueprints.repositories import charts as charts_repo
 from blueprints.repositories import appointments as appt_repo
 from blueprints.repositories import treatments as treatment_repo
 from blueprints.repositories import users as user_repo
+from blueprints.repositories import uploads as uploads_repo
 
 
 # ── patients repo ───────────────────────────────────────────────────────────
@@ -252,3 +255,136 @@ def test_users_set_status_if_pending_only_moves_pending(db):
     r2 = user_repo.set_status_if_pending(approved_id, "rejected", {"rejected_by": "admin1"})
     assert r2.modified_count == 0
     assert user_repo.get(approved_id)["status"] == "approved"
+
+
+# ── patients: dashboard / reports aggregation helpers ─────────────────────────
+def test_patients_unset_removes_keys(db):
+    pid = ObjectId()
+    db.patients.insert_one({"_id": pid, "photo_file_id": "x", "photo_ext": "png",
+                            "name": "keep"})
+    patient_repo.unset(str(pid), ["photo_file_id", "photo_ext"])
+    got = db.patients.find_one({"_id": pid})
+    assert "photo_file_id" not in got and "photo_ext" not in got
+    assert got["name"] == "keep"  # untouched field stays
+
+
+def test_patients_recent_in_clinics_orders_and_limits(db):
+    c1 = ObjectId()
+    for i in range(3):
+        db.patients.insert_one({"_id": ObjectId(), "clinic_id": c1, "is_active": True,
+                                "created_at": datetime(2026, 1, i + 1), "tag": i})
+    db.patients.insert_one({"_id": ObjectId(), "clinic_id": c1, "is_active": False,
+                            "created_at": datetime(2026, 1, 9), "tag": "inactive"})
+    rows = patient_repo.recent_in_clinics([c1], limit=2)
+    assert [r["tag"] for r in rows] == [2, 1]  # newest first, capped at 2, active only
+
+
+def test_patients_count_active_in_clinics_with_since(db):
+    c1 = ObjectId()
+    db.patients.insert_many([
+        {"_id": ObjectId(), "clinic_id": c1, "is_active": True, "created_at": datetime(2026, 1, 1)},
+        {"_id": ObjectId(), "clinic_id": c1, "is_active": True, "created_at": datetime(2026, 6, 1)},
+        {"_id": ObjectId(), "clinic_id": c1, "is_active": False, "created_at": datetime(2026, 6, 1)},
+    ])
+    assert patient_repo.count_active_in_clinics([c1]) == 2
+    assert patient_repo.count_active_in_clinics([c1], created_since=datetime(2026, 3, 1)) == 1
+
+
+def test_patients_find_active_in_clinics_projects(db):
+    c1 = ObjectId()
+    db.patients.insert_one({"_id": ObjectId(), "clinic_id": c1, "is_active": True,
+                            "created_at": datetime(2026, 6, 1), "secret": "hide"})
+    rows = patient_repo.find_active_in_clinics([c1], fields={"created_at": 1})
+    assert len(rows) == 1 and "secret" not in rows[0]
+
+
+# ── appointments: dashboard helpers ──────────────────────────────────────────
+def test_appt_find_active_on_date_sorts_excludes_cancelled(db):
+    c1 = ObjectId()
+    appt_repo.insert(_appt(c1, date="2026-07-01", time="12:00", tag="late"))
+    appt_repo.insert(_appt(c1, date="2026-07-01", time="08:00", tag="early"))
+    appt_repo.insert(_appt(c1, date="2026-07-01", time="10:00", status="cancelled", tag="x"))
+    appt_repo.insert(_appt(c1, date="2026-07-02", time="08:00", tag="otherday"))
+    rows = appt_repo.find_active_on_date([c1], "2026-07-01")
+    assert [r["tag"] for r in rows] == ["early", "late"]
+
+
+def test_appt_find_upcoming_range_and_limit(db):
+    c1 = ObjectId()
+    appt_repo.insert(_appt(c1, date="2026-07-01", time="09:00", tag="a"))
+    appt_repo.insert(_appt(c1, date="2026-07-03", time="09:00", tag="b"))
+    appt_repo.insert(_appt(c1, date="2026-07-10", time="09:00", tag="out"))  # out of range
+    rows = appt_repo.find_upcoming([c1], "2026-07-01", "2026-07-07", limit=10)
+    assert [r["tag"] for r in rows] == ["a", "b"]
+    assert len(appt_repo.find_upcoming([c1], "2026-07-01", "2026-07-07", limit=1)) == 1
+
+
+def test_appt_count_active_in_range_excludes_cancelled(db):
+    c1 = ObjectId()
+    appt_repo.insert(_appt(c1, date="2026-07-01"))
+    appt_repo.insert(_appt(c1, date="2026-07-05"))
+    appt_repo.insert(_appt(c1, date="2026-07-05", status="cancelled"))
+    appt_repo.insert(_appt(c1, date="2026-07-20"))  # out of range
+    assert appt_repo.count_active_in_range([c1], "2026-07-01", "2026-07-07") == 2
+
+
+# ── treatments: reports helper ───────────────────────────────────────────────
+def test_treatment_find_for_clinics_scopes_and_dates(db):
+    c1, c2 = ObjectId(), ObjectId()
+    treatment_repo.insert({"clinic_id": c1, "date": "2026-01-01", "secret": "h", "tag": "old"})
+    treatment_repo.insert({"clinic_id": c1, "date": "2026-06-01", "tag": "new"})
+    treatment_repo.insert({"clinic_id": c2, "date": "2026-06-01", "tag": "other"})  # excluded
+    all_c1 = treatment_repo.find_for_clinics([c1])
+    assert {r["tag"] for r in all_c1} == {"old", "new"}
+    since = treatment_repo.find_for_clinics([c1], start_date="2026-03-01")
+    assert {r["tag"] for r in since} == {"new"}
+    projected = treatment_repo.find_for_clinics([c1], fields={"tag": 1})
+    assert all("secret" not in r for r in projected)
+
+
+# ── clinics: dashboard / reports helper ──────────────────────────────────────
+def test_clinics_owned_active_by_name(db):
+    owner = str(ObjectId())
+    db.clinics.insert_many([
+        {"_id": ObjectId(), "owner_id": owner, "is_active": True, "name": "Zeta"},
+        {"_id": ObjectId(), "owner_id": owner, "is_active": True, "name": "Alpha"},
+        {"_id": ObjectId(), "owner_id": owner, "is_active": False, "name": "Beta"},  # inactive
+        {"_id": ObjectId(), "owner_id": str(ObjectId()), "is_active": True, "name": "Other"},
+    ])
+    rows = clinic_repo.owned_active_by_name(owner)
+    assert [c["name"] for c in rows] == ["Alpha", "Zeta"]
+
+
+# ── uploads: prescriptions + patient_files + GridFS ──────────────────────────
+def test_uploads_prescription_crud(db):
+    pid = ObjectId()
+    pres_id = uploads_repo.insert_prescription({"patient_id": pid, "description": "amoxicillin"})
+    assert isinstance(pres_id, str)
+    assert uploads_repo.get_prescription(pres_id)["description"] == "amoxicillin"
+    assert uploads_repo.get_prescription("not-an-id") is None
+    assert uploads_repo.get_prescription(str(ObjectId())) is None
+    uploads_repo.delete_prescription(pres_id)
+    assert uploads_repo.get_prescription(pres_id) is None
+
+
+def test_uploads_file_crud_and_rename(db):
+    pid = ObjectId()
+    file_id = uploads_repo.insert_file({"patient_id": pid, "display_name": "x-ray", "ext": "png"})
+    assert uploads_repo.get_file(file_id)["display_name"] == "x-ray"
+    uploads_repo.update_file_set(file_id, {"display_name": "panoramic"})
+    assert uploads_repo.get_file(file_id)["display_name"] == "panoramic"
+    assert uploads_repo.get_file("not-an-id") is None
+    uploads_repo.delete_file(file_id)
+    assert uploads_repo.get_file(file_id) is None
+
+
+def test_uploads_gridfs_roundtrip(db):
+    import mongomock.gridfs
+    mongomock.gridfs.enable_gridfs_integration()
+    blob_id = uploads_repo.put_blob(b"hello-bytes", "note.txt", "text/plain")
+    gf = uploads_repo.get_blob(blob_id)
+    assert gf is not None and gf.read() == b"hello-bytes"
+    uploads_repo.delete_blob(blob_id)
+    assert uploads_repo.get_blob(blob_id) is None
+    # Best-effort delete tolerates a missing/None id without raising.
+    uploads_repo.delete_blob(None)

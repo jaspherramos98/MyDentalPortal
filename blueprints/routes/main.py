@@ -6,12 +6,13 @@ from flask import (
     redirect, url_for, request, flash,
 )
 from werkzeug.security import generate_password_hash, check_password_hash
-from bson.objectid import ObjectId
 from datetime import datetime, timedelta
 
-from extensions import mongo
 from blueprints.utils import login_required
 from blueprints.repositories import users as user_repo
+from blueprints.repositories import clinics as clinic_repo
+from blueprints.repositories import patients as patient_repo
+from blueprints.repositories import appointments as appt_repo
 
 main_bp = Blueprint('main', __name__)
 
@@ -29,10 +30,7 @@ def dashboard():
     try:
         user_id = session['user_id']
 
-        user_clinics = list(
-            mongo.db.clinics.find({'owner_id': user_id, 'is_active': True})
-            .sort('name', 1)
-        )
+        user_clinics = clinic_repo.owned_active_by_name(user_id)
         clinic_ids = [c['_id'] for c in user_clinics]
 
         recent_patients = []
@@ -48,44 +46,24 @@ def dashboard():
         }
 
         if clinic_ids:
-            from blueprints.repositories import patients as patient_repo
-            recent_patients = list(
-                mongo.db.patients.find({'clinic_id': {'$in': clinic_ids}, 'is_active': True})
-                .sort('created_at', -1).limit(10)
-            )
+            recent_patients = patient_repo.recent_in_clinics(clinic_ids, limit=10)
             for rp in recent_patients:
                 patient_repo.ensure_nested(rp)
-            stats['total_patients'] = mongo.db.patients.count_documents(
-                {'clinic_id': {'$in': clinic_ids}, 'is_active': True}
-            )
+            stats['total_patients'] = patient_repo.count_active_in_clinics(clinic_ids)
 
             today_str = datetime.now().strftime('%Y-%m-%d')
-            today_appointments = list(
-                mongo.db.appointments.find({
-                    'clinic_id': {'$in': clinic_ids},
-                    'date': today_str,
-                    'is_active': True,
-                    'status': {'$ne': 'cancelled'},
-                }).sort('time', 1)
-            )
+            today_appointments = appt_repo.find_active_on_date(clinic_ids, today_str)
 
             end_date = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d')
-            upcoming_appointments = list(
-                mongo.db.appointments.find({
-                    'clinic_id': {'$in': clinic_ids},
-                    'date': {'$gte': today_str, '$lte': end_date},
-                    'is_active': True,
-                    'status': {'$ne': 'cancelled'},
-                }).sort([('date', 1), ('time', 1)]).limit(10)
+            upcoming_appointments = appt_repo.find_upcoming(
+                clinic_ids, today_str, end_date, limit=10,
             )
 
             now = datetime.utcnow()
             month_start = datetime(now.year, now.month, 1)
-            stats['patients_this_month'] = mongo.db.patients.count_documents({
-                'clinic_id': {'$in': clinic_ids},
-                'is_active': True,
-                'created_at': {'$gte': month_start},
-            })
+            stats['patients_this_month'] = patient_repo.count_active_in_clinics(
+                clinic_ids, created_since=month_start,
+            )
             # "This Week" = the calendar week (Sunday–Saturday) containing today,
             # to match the Appointments week view. Dates are stored as
             # 'YYYY-MM-DD' strings, so lexicographic range comparison is valid.
@@ -93,15 +71,11 @@ def dashboard():
             days_since_sunday = (today_dt.weekday() + 1) % 7  # Mon=0..Sun=6 -> Sun=0
             week_start = today_dt - timedelta(days=days_since_sunday)
             week_end = week_start + timedelta(days=6)
-            stats['appointments_this_week'] = mongo.db.appointments.count_documents({
-                'clinic_id': {'$in': clinic_ids},
-                'date': {
-                    '$gte': week_start.strftime('%Y-%m-%d'),
-                    '$lte': week_end.strftime('%Y-%m-%d'),
-                },
-                'is_active': True,
-                'status': {'$ne': 'cancelled'},
-            })
+            stats['appointments_this_week'] = appt_repo.count_active_in_range(
+                clinic_ids,
+                week_start.strftime('%Y-%m-%d'),
+                week_end.strftime('%Y-%m-%d'),
+            )
             stats['today_appointments'] = len(today_appointments)
             stats['upcoming_appointments'] = len(upcoming_appointments)
 
