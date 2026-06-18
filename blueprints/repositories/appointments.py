@@ -50,6 +50,44 @@ def find_active_on_day(clinic_id, date, exclude_id=None):
     return list(mongo.db.appointments.find(query))
 
 
+def find_active_on_date(clinic_ids, date):
+    """Active, non-cancelled appointments across `clinic_ids` on one day,
+    sorted by time (dashboard "today")."""
+    return list(
+        mongo.db.appointments.find({
+            'clinic_id': {'$in': clinic_ids},
+            'date': date,
+            'is_active': True,
+            'status': {'$ne': 'cancelled'},
+        }).sort('time', 1)
+    )
+
+
+def find_upcoming(clinic_ids, start, end, limit=10):
+    """Active, non-cancelled appointments across `clinic_ids` in the date range
+    ['YYYY-MM-DD' start, end], sorted by (date, time), capped at `limit`
+    (dashboard "upcoming")."""
+    return list(
+        mongo.db.appointments.find({
+            'clinic_id': {'$in': clinic_ids},
+            'date': {'$gte': start, '$lte': end},
+            'is_active': True,
+            'status': {'$ne': 'cancelled'},
+        }).sort([('date', 1), ('time', 1)]).limit(limit)
+    )
+
+
+def count_active_in_range(clinic_ids, start, end):
+    """Count active, non-cancelled appointments across `clinic_ids` in the date
+    range ['YYYY-MM-DD' start, end] (dashboard "this week")."""
+    return mongo.db.appointments.count_documents({
+        'clinic_id': {'$in': clinic_ids},
+        'date': {'$gte': start, '$lte': end},
+        'is_active': True,
+        'status': {'$ne': 'cancelled'},
+    })
+
+
 def insert(doc):
     """Insert an appointment document; return the new _id (str)."""
     return str(mongo.db.appointments.insert_one(doc).inserted_id)

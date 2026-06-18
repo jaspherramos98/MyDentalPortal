@@ -9,6 +9,9 @@ architected for future multi-clinic and multi-user (role-based) expansion.
 
 **This is production medical software. Patient health data is involved. Treat every change with care.**
 
+## ⭐ Keep this file in sync with TODO.md
+> **Whenever you update `TODO.md`, update `CLAUDE.md` in the SAME task.** Don't let them drift.
+
 ## Tech Stack
 - **Backend:** Python 3.11, Flask 2.3.3, Flask-PyMongo
 - **Database:** MongoDB (local via Compass for dev, MongoDB Atlas for production)
@@ -45,9 +48,13 @@ MyDentalPortal/
 │   │   └── reports.py        # Performance/reports
 │   ├── repositories/         # Thin data-access layer (Phase 3) — wraps mongo.db
 │   │   ├── __init__.py
-│   │   ├── patients.py       # get, get_for_owner (access seam), ensure_nested
-│   │   ├── clinics.py        # owned_by, owned_ids, get_owned
-│   │   └── charts.py         # get_by_patient, insert, upsert (chart plumbing)
+│   │   ├── patients.py       # get, get_for_owner (access seam), ensure_nested + dashboard/reports aggs
+│   │   ├── clinics.py        # owned_by, owned_ids, get_owned, owned_active_by_name
+│   │   ├── charts.py         # get_by_patient, insert, upsert (chart plumbing)
+│   │   ├── appointments.py   # get/find_in_range/find_active_on_day + dashboard aggs
+│   │   ├── treatments.py     # get/list_for_patient/CRUD + find_for_clinics (reports)
+│   │   ├── users.py          # users-collection seam (auth/admin/settings) — multi-staff extends this
+│   │   └── uploads.py        # GridFS blobs + prescriptions + patient_files
 │   ├── models/              # Boundary schemas (pydantic) — validate at the write edge
 │   │   ├── __init__.py
 │   │   └── patient.py        # PatientDoc / validate_patient (lenient, extra="allow")
@@ -115,13 +122,18 @@ especially for **patient access**: `verify_patient_access`/`user_clinic_ids` (in
 will change (owner_id → membership) — don't re-implement it inline in routes. Pass 1 migrated patients,
 clinics, charts + the access seam.
 
-**Pass 2 status (2026-06-16):**
-- ✅ **appointments** — `repositories/appointments.py`.
-- ✅ **treatments** — `repositories/treatments.py`.
+**Pass 2 status — COMPLETE (2026-06-17):** every route is off raw `mongo.db`; all queries go through
+`blueprints/repositories/`.
+- ✅ **appointments** — `repositories/appointments.py` (+ dashboard helpers: `find_active_on_date`,
+  `find_upcoming`, `count_active_in_range`).
+- ✅ **treatments** — `repositories/treatments.py` (+ `find_for_clinics` for reports).
 - ✅ **users** — `repositories/users.py` (the `users`-collection seam: `auth.py` login/register,
   `admin.py` approvals + user mgmt, `main.py` settings). Multi-staff/role changes extend THIS module.
-- ⬜ **Still on raw `mongo.db`, pending Pass 2:** `uploads` (files/prescriptions/GridFS), `reports`,
-  and `main` **dashboard aggregations** (the users seam is migrated; the dashboard stats queries are not).
+- ✅ **uploads** — `repositories/uploads.py` (GridFS blob put/get/delete + the `prescriptions` and
+  `patient_files` collections). Validation + access control stay in `uploads.py`; only storage moved.
+- ✅ **main dashboard + reports** — aggregation helpers added to clinics/patients/appointments/
+  treatments repos (`owned_active_by_name`, `recent_in_clinics`, `count_active_in_clinics`,
+  `find_active_in_clinics`, `find_for_clinics`); `main.py` dashboard and `reports.py` use them.
 
 **Schema validation at the write edge (Phase 3):** new patient documents go through
 `patient_repo.create()` → `validate_patient()` (pydantic `PatientDoc`), which guarantees the nested

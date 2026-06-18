@@ -15,8 +15,10 @@ from bson.errors import InvalidId
 from datetime import datetime
 from collections import defaultdict
 
-from extensions import mongo
 from blueprints.utils import login_required, user_clinic_ids
+from blueprints.repositories import clinics as clinic_repo
+from blueprints.repositories import treatments as treatment_repo
+from blueprints.repositories import patients as patient_repo
 
 reports_bp = Blueprint('reports', __name__)
 
@@ -58,10 +60,7 @@ def _fmt(symbol, amount):
 @login_required
 def reports():
     all_clinic_ids = user_clinic_ids()
-    clinics = list(
-        mongo.db.clinics.find({'owner_id': session['user_id'], 'is_active': True})
-        .sort('name', 1)
-    )
+    clinics = clinic_repo.owned_active_by_name(session['user_id'])
 
     # ── clinic filter ──
     sel = request.args.get('clinic') or ''
@@ -107,13 +106,10 @@ def reports():
         )
 
     # ── treatments ──
-    tq = {'clinic_id': {'$in': scope_ids}}
-    if start_str:
-        tq['date'] = {'$gte': start_str}
-    treatments = list(mongo.db.treatment_records.find(tq, {
+    treatments = treatment_repo.find_for_clinics(scope_ids, start_date=start_str, fields={
         'date': 1, 'amount_charged': 1, 'amount_paid': 1, 'balance': 1,
         'procedure': 1, 'status': 1,
-    }))
+    })
 
     # Period-scoped figures (revenue/billed in the selected window + time series).
     total_billed = total_paid = 0.0
@@ -146,10 +142,9 @@ def reports():
     # always reduce it regardless of the selected period. So these are summed
     # across every treatment in scope, ignoring the date filter.
     all_collected = all_outstanding = 0.0
-    for t in mongo.db.treatment_records.find(
-        {'clinic_id': {'$in': scope_ids}},
-        {'amount_charged': 1, 'amount_paid': 1, 'balance': 1},
-    ):
+    for t in treatment_repo.find_for_clinics(scope_ids, fields={
+        'amount_charged': 1, 'amount_paid': 1, 'balance': 1,
+    }):
         charged = float(t.get('amount_charged') or 0)
         paid = float(t.get('amount_paid') or 0)
         bal = t.get('balance')
@@ -159,12 +154,11 @@ def reports():
             all_outstanding += bal
 
     # ── new patients (created_at is a real datetime) ──
-    pq = {'clinic_id': {'$in': scope_ids}, 'is_active': True}
-    if start_dt:
-        pq['created_at'] = {'$gte': start_dt}
     monthly_new = defaultdict(int)
     new_patients = 0
-    for p in mongo.db.patients.find(pq, {'created_at': 1}):
+    for p in patient_repo.find_active_in_clinics(
+        scope_ids, created_since=start_dt, fields={'created_at': 1},
+    ):
         new_patients += 1
         ca = p.get('created_at')
         if isinstance(ca, datetime):
