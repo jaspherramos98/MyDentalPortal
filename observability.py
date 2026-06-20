@@ -18,7 +18,17 @@ import os
 
 
 # Keys whose values could carry PHI or auth material — scrubbed from every event.
-_SENSITIVE_HEADERS = {'cookie', 'authorization', 'x-csrftoken'}
+# Header handling is allowlist, not blocklist: only these survive, everything
+# else is dropped. This is deliberate — a blocklist misses things. It removes
+# cookies + auth AND every client-IP header variant (X-Forwarded-For,
+# Cf-Connecting-Ip, True-Client-IP, X-Real-IP, Forwarded, …) which are personal
+# data under RA 10173. Kept headers are debugging-useful and carry no PII.
+_SAFE_HEADERS = {
+    'accept', 'accept-encoding', 'accept-language', 'content-type', 'user-agent',
+}
+
+# Request-environment keys that can hold the client IP — scrubbed too.
+_SENSITIVE_ENV = {'REMOTE_ADDR'}
 
 
 def _scrub_phi(event, hint):
@@ -30,11 +40,17 @@ def _scrub_phi(event, hint):
         request.pop('data', None)
         request.pop('query_string', None)
         request.pop('cookies', None)
+        # Allowlist headers — drop cookies, auth, and any client-IP header.
         headers = request.get('headers')
         if isinstance(headers, dict):
             for key in list(headers):
-                if key.lower() in _SENSITIVE_HEADERS:
+                if key.lower() not in _SAFE_HEADERS:
                     headers.pop(key, None)
+        # Drop client IP from the WSGI environ if present.
+        env = request.get('env')
+        if isinstance(env, dict):
+            for key in _SENSITIVE_ENV:
+                env.pop(key, None)
     # Never attach a user identity (we don't set one, but be defensive).
     event.pop('user', None)
     return event
