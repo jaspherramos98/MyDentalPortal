@@ -12,8 +12,9 @@
     <!-- PWA: installable, online-first -->
     <link rel="manifest" href="/manifest.webmanifest">
     <meta name="theme-color" content="#0d6efd">
-    <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='icons/favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='icons/favicon-16x16.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
 
     <!-- Attach the CSRF token to every same-origin fetch() that changes state.
          Runs in <head> so it's in place before any later script fires a request. -->
