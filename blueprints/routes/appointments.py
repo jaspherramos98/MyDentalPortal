@@ -18,7 +18,7 @@ appointments_bp = Blueprint('appointments', __name__)
 # Server-side allowlists — never trust client-supplied enums.
 ALLOWED_TYPES = {
     'checkup', 'cleaning', 'filling', 'extraction',
-    'emergency', 'follow-up', 'surgery',
+    'emergency', 'follow-up', 'surgery', 'orthodontic', 'others',
 }
 ALLOWED_STATUSES = {'scheduled', 'cancelled', 'completed', 'no-show'}
 ALLOWED_PRIORITIES = {'normal', 'high', 'urgent'}

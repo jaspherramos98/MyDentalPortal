@@ -312,6 +312,16 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             border: 1px solid #795548;
         }
 
+        .appointment-card.orthodontic {
+            background: linear-gradient(135deg, #e8eaf6, #c5cae9);
+            border: 1px solid #3f51b5;
+        }
+
+        .appointment-card.others {
+            background: linear-gradient(135deg, #eceff1, #cfd8dc);
+            border: 1px solid #607d8b;
+        }
+
         .appointment-time {
             font-weight: bold;
             margin-bottom: 2px;
@@ -337,6 +347,8 @@ Description: Dental practice appointments calendar with drag-and-drop functional
         .appointment-type.cleaning { background: #009688; }
         .appointment-type.filling { background: #9c27b0; }
         .appointment-type.extraction { background: #795548; }
+        .appointment-type.orthodontic { background: #3f51b5; }
+        .appointment-type.others { background: #607d8b; }
 
         .appointment-card.cancelled {
             opacity: 0.55;
@@ -722,6 +734,8 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                         <option value="emergency">Emergency</option>
                         <option value="follow-up">Follow-up</option>
                         <option value="surgery">Surgery</option>
+                        <option value="orthodontic">Orthodontic Treatment</option>
+                        <option value="others">Others</option>
                     </select>
                 </div>
             </div>
@@ -873,6 +887,14 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                     <div class="legend-color" style="background: linear-gradient(135deg, #efebe9, #d7ccc8);"></div>
                     <span>Tooth Extraction</span>
                 </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #e8eaf6, #c5cae9);"></div>
+                    <span>Orthodontic Treatment</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #eceff1, #cfd8dc);"></div>
+                    <span>Others</span>
+                </div>
             </div>
         </div>
     </div>
@@ -939,6 +961,8 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                                     <option value="emergency">Emergency</option>
                                     <option value="follow-up">Follow-up</option>
                                     <option value="surgery">Surgery</option>
+                                    <option value="orthodontic">Orthodontic Treatment</option>
+                                    <option value="others">Others</option>
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
