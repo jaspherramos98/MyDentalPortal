@@ -18,7 +18,7 @@ load_dotenv()
 
 # Error tracking. Must run before the Flask app is created so Sentry can hook
 # into it. No-op unless SENTRY_DSN is set (prod-only); PHI-safe (see observability.py).
-_sentry_enabled = init_sentry()
+init_sentry()
 
 # ---------------------------------------------------------------------------
 # Create app
@@ -211,22 +211,6 @@ def health_check():
         return jsonify({"status": "healthy", "database": "connected"}), 200
     except Exception as e:
         return jsonify({"status": "unhealthy", "error": str(e)}), 500
-
-
-# ---------------------------------------------------------------------------
-# TEMPORARY — Sentry verification. Registered ONLY when Sentry is enabled
-# (SENTRY_DSN set), so it doesn't exist on local/dev/showcase. Visiting it while
-# logged in raises an intentional, PHI-free error so you can confirm (a) the
-# event reaches Sentry and (b) the captured event contains no request body /
-# query string / cookies. *** REMOVE this route once verification is done. ***
-# ---------------------------------------------------------------------------
-if _sentry_enabled:
-    from blueprints.utils import login_required as _login_required
-
-    @app.route('/sentry-debug')
-    @_login_required
-    def sentry_debug():
-        raise RuntimeError('Sentry verification test error (intentional, no PHI).')
 
 
 # ---------------------------------------------------------------------------
