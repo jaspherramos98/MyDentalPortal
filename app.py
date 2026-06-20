@@ -12,8 +12,13 @@ from dotenv import load_dotenv
 
 from extensions import mongo, limiter
 from config import get_config
+from observability import init_sentry
 
 load_dotenv()
+
+# Error tracking. Must run before the Flask app is created so Sentry can hook
+# into it. No-op unless SENTRY_DSN is set (prod-only); PHI-safe (see observability.py).
+_sentry_enabled = init_sentry()
 
 # ---------------------------------------------------------------------------
 # Create app
