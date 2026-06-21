@@ -80,48 +80,57 @@
                             <i class="fas fa-clinic-medical"></i> Clinics
                         </a>
                     </li>
-                    {% if session.user_role != 'staff' %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('staff.list_staff') }}">
-                            <i class="fas fa-user-nurse"></i> Staff
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.activity') }}">
-                            <i class="fas fa-clock-rotate-left"></i> Activity
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('deletions.queue') }}">
-                            <i class="fas fa-trash-can-arrow-up"></i> Requests
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('treatments.pending_prices') }}">
-                            <i class="fas fa-money-check-dollar"></i> Prices
-                        </a>
-                    </li>
-                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('reports.reports') }}">
                             <i class="fas fa-chart-line"></i> Performance
                         </a>
                     </li>
-                    {% if is_admin %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('admin.registrations') }}">
-                            <i class="fas fa-user-shield"></i> Approvals
+                    {% if session.user_role != 'staff' %}
+                    <!-- Management & oversight tools, grouped to keep the bar uncluttered -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-toolbox"></i> Manage
                         </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('admin.panel') }}">
-                            <i class="fas fa-users-gear"></i> Admin Panel
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('admin.users') }}">
-                            <i class="fas fa-users-cog"></i> Users
-                        </a>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('staff.list_staff') }}">
+                                    <i class="fas fa-user-nurse"></i> Staff
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('treatments.pending_prices') }}">
+                                    <i class="fas fa-money-check-dollar"></i> Pending Prices
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('deletions.queue') }}">
+                                    <i class="fas fa-trash-can-arrow-up"></i> Deletion Requests
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('main.activity') }}">
+                                    <i class="fas fa-clock-rotate-left"></i> Activity Log
+                                </a>
+                            </li>
+                            {% if is_admin %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('admin.registrations') }}">
+                                    <i class="fas fa-user-shield"></i> Approvals
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('admin.panel') }}">
+                                    <i class="fas fa-users-gear"></i> Admin Panel
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('admin.users') }}">
+                                    <i class="fas fa-users-cog"></i> Users
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
                     </li>
                     {% endif %}
                     <li class="nav-item dropdown">
