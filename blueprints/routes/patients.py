@@ -12,6 +12,7 @@ import traceback
 from extensions import mongo
 from blueprints.utils import (
     login_required, user_clinic_ids as _get_user_clinic_ids, verify_patient_access,
+    role_required, ROLE_DENTIST,
 )
 from blueprints.repositories import patients as patient_repo
 from werkzeug.utils import secure_filename
@@ -428,7 +429,7 @@ def edit_patient(patient_id):
 
 # ── DELETE (soft) ────────────────────────────────────────────────────────
 @patients_bp.route('/patients/<patient_id>/delete', methods=['POST'])
-@login_required
+@role_required(ROLE_DENTIST)  # deleting a patient record is dentist/admin only
 def delete_patient(patient_id):
     try:
         patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})

@@ -155,3 +155,25 @@ def test_admin_required_redirects_anonymous(client):
     resp = client.get("/_admin_guarded")
     assert resp.status_code == 302
     assert "/login" in resp.headers["Location"]
+
+
+# ── role_required (the staff-restricted-action gate, PR B) ───────────────────
+def test_role_required_forbids_staff(client, login):
+    login(role="staff", email="staff@dental.com")
+    assert client.get("/_dentist_guarded").status_code == 403
+
+
+def test_role_required_allows_dentist(client, login):
+    login(role="dentist", email="dentist@dental.com")
+    assert client.get("/_dentist_guarded").status_code == 200
+
+
+def test_role_required_admin_satisfies_any_role(client, login):
+    login(role="admin")  # admin is a global superset
+    assert client.get("/_dentist_guarded").status_code == 200
+
+
+def test_role_required_redirects_anonymous(client):
+    resp = client.get("/_dentist_guarded")
+    assert resp.status_code == 302
+    assert "/login" in resp.headers["Location"]
