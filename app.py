@@ -29,6 +29,20 @@ config_class = get_config()
 app.config.from_object(config_class)
 config_class.init_app(app)
 
+# Trust the reverse proxy/proxies in front of us so request.remote_addr is the
+# REAL client IP (from X-Forwarded-For), not the proxy's. Without this, the
+# per-IP rate limiter buckets ALL clients together. Gated on TRUSTED_PROXY_COUNT
+# so local/dev (0) is unchanged. ⚠️ Set it to the EXACT number of trusted proxies
+# in the chain — too high lets clients spoof their IP. On Render set 1; behind
+# Cloudflare->Render set 2.
+_trusted_proxies = int(os.environ.get('TRUSTED_PROXY_COUNT', '0') or 0)
+if _trusted_proxies > 0:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app, x_for=_trusted_proxies, x_proto=_trusted_proxies,
+        x_host=_trusted_proxies,
+    )
+
 mongo.init_app(app)
 
 # CSRF protection for all state-changing requests (POST/PUT/PATCH/DELETE).

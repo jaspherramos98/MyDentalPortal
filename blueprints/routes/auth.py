@@ -117,6 +117,11 @@ def login():
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
+@limiter.limit(
+    '5 per hour',
+    methods=['POST'],
+    error_message='Too many registration attempts. Please wait and try again.',
+)
 def register():
     if request.method == 'POST':
         data = request.get_json() if request.is_json else request.form
@@ -179,6 +184,11 @@ def register():
 
 
 @auth_bp.route('/join', methods=['GET', 'POST'])
+@limiter.limit(
+    '10 per hour',
+    methods=['POST'],
+    error_message='Too many attempts. Please wait and try again.',
+)
 def join():
     """Staff self-registration via a dentist's single-use access code.
 
