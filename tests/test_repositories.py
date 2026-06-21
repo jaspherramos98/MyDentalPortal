@@ -314,6 +314,20 @@ def test_treatment_update_set_and_delete(db):
     assert treatment_repo.get(tid) is None  # hard delete
 
 
+def test_treatment_find_pending_prices(db):
+    c1 = ObjectId()
+    db.treatment_records.insert_many([
+        {"clinic_id": c1, "date": "2026-01-01", "price_confirmed": False},
+        {"clinic_id": c1, "date": "2026-01-02", "price_confirmed": True},
+        {"clinic_id": c1, "date": "2026-01-03"},                       # legacy = confirmed
+        {"clinic_id": ObjectId(), "date": "2026-01-04", "price_confirmed": False},  # other clinic
+    ])
+    # Scoped to c1: only its one pending (legacy + confirmed excluded).
+    assert len(treatment_repo.find_pending_prices([c1])) == 1
+    # All clinics (admin): both pending across clinics.
+    assert len(treatment_repo.find_pending_prices(None)) == 2
+
+
 # ── users repo ───────────────────────────────────────────────────────────────
 def test_users_create_get_and_by_email(db):
     uid = user_repo.create({"email": "doc@x.com", "name": "Doc", "password": "h"})

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Pending Prices{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-3"><i class="fas fa-money-check-dollar"></i> Pending Prices</h2>
+    <p class="text-muted small">
+        Treatment prices entered by staff await your confirmation. Confirming locks
+        the price in; you can also edit the treatment to change it.
+    </p>
+
+    <div class="card">
+        <div class="card-body p-0">
+            {% if treatments %}
+            <table class="table mb-0 align-middle">
+                <thead>
+                    <tr><th>Date</th><th>Patient</th><th>Procedure</th><th>Amount</th><th class="text-end">Action</th></tr>
+                </thead>
+                <tbody>
+                    {% for t in treatments %}
+                    <tr>
+                        <td class="text-nowrap small">{{ t.date }}</td>
+                        <td>
+                            <a href="{{ url_for('patients.patient_detail', patient_id=t.patient_id) }}">
+                                {{ t.patient_name }}
+                            </a>
+                        </td>
+                        <td>{{ t.procedure or '—' }}</td>
+                        <td class="text-nowrap">{{ t.currency or 'PHP' }} {{ '%.2f'|format(t.amount_charged or 0) }}</td>
+                        <td class="text-end">
+                            <div class="d-inline-flex gap-2">
+                                <form method="POST" action="{{ url_for('treatments.confirm_price', treatment_id=t._id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="from" value="queue">
+                                    <button type="submit" class="btn btn-sm btn-success">Confirm</button>
+                                </form>
+                                <a class="btn btn-sm btn-outline-secondary"
+                                   href="{{ url_for('treatments.edit_treatment', treatment_id=t._id) }}">Edit</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="p-3 text-muted">No prices pending confirmation.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

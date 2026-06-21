@@ -96,6 +96,11 @@
                             <i class="fas fa-trash-can-arrow-up"></i> Requests
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('treatments.pending_prices') }}">
+                            <i class="fas fa-money-check-dollar"></i> Prices
+                        </a>
+                    </li>
                     {% endif %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('reports.reports') }}">
