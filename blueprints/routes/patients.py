@@ -15,6 +15,7 @@ from blueprints.utils import (
     role_required, ROLE_DENTIST, audit,
 )
 from blueprints.repositories import patients as patient_repo
+from blueprints.repositories import clinics as clinic_repo
 from werkzeug.utils import secure_filename
 
 patients_bp = Blueprint('patients', __name__)
@@ -92,9 +93,7 @@ def list_patients():
 @patients_bp.route('/patients/create', methods=['GET', 'POST'])
 @login_required
 def create_patient():
-    user_clinics = list(
-        mongo.db.clinics.find({'owner_id': session['user_id'], 'is_active': True})
-    )
+    user_clinics = clinic_repo.accessible_active(session['user_id'])
 
     if not user_clinics:
         flash('Please create a clinic first before adding patients.', 'warning')
@@ -204,11 +203,19 @@ def create_patient():
                 return render_template('patients/create.html',
                                        clinics=user_clinics, form_data=f)
 
-            inserted_id = patient_repo.create(patient_data)
-            _clinic = next(
-                (c for c in user_clinics if str(c['_id']) == f.get('clinic_id')), None
+            # Access check: the posted clinic must be one the user may work in
+            # (owned or via membership) — prevents creating a patient in another
+            # dentist's clinic by tampering with the form's clinic_id.
+            sel_clinic = clinic_repo.get_accessible(
+                patient_data['clinic_id'], session['user_id']
             )
-            audit('create', 'patient', inserted_id, clinic=_clinic)
+            if not sel_clinic:
+                flash('You cannot add a patient to that clinic.', 'error')
+                return render_template('patients/create.html',
+                                       clinics=user_clinics, form_data=f)
+
+            inserted_id = patient_repo.create(patient_data)
+            audit('create', 'patient', inserted_id, clinic=sel_clinic)
             flash('Patient created successfully!', 'success')
             return redirect(url_for('patients.patient_detail',
                                     patient_id=str(inserted_id)))
@@ -334,25 +341,14 @@ def patient_pdf(patient_id):
 @login_required
 def edit_patient(patient_id):
     try:
-        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
-        if not patient:
+        # Access via the membership seam: clinic owner OR linked staff may edit.
+        patient, clinic = verify_patient_access(patient_id)
+        if not patient or not clinic:
             flash('Patient not found', 'error')
             return redirect(url_for('patients.list_patients'))
 
         _ensure_nested(patient)
-
-        # Enforce ownership: only the clinic owner may edit this patient.
-        clinic = mongo.db.clinics.find_one({
-            '_id': patient['clinic_id'],
-            'owner_id': session['user_id'],
-        })
-        if not clinic:
-            flash('Patient not found', 'error')
-            return redirect(url_for('patients.list_patients'))
-
-        user_clinics = list(
-            mongo.db.clinics.find({'owner_id': session['user_id'], 'is_active': True})
-        )
+        user_clinics = clinic_repo.accessible_active(session['user_id'])
 
         if request.method == 'POST':
             f = request.form

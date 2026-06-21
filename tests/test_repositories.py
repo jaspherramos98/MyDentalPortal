@@ -134,6 +134,32 @@ def test_clinics_accessible_ids_includes_linked_dentist_clinics(db):
     assert clinic_repo.accessible_ids(staff) == [c_active]
 
 
+def test_clinics_get_accessible_owner_staff_and_denied(db, seed_patient):
+    from blueprints.repositories import memberships as membership_repo
+    dentist, staff, outsider = str(ObjectId()), str(ObjectId()), str(ObjectId())
+    _, clinic_id = seed_patient(dentist)
+    # owner sees it
+    assert clinic_repo.get_accessible(clinic_id, dentist)["_id"] == clinic_id
+    # outsider does not
+    assert clinic_repo.get_accessible(clinic_id, outsider) is None
+    # linked staff does
+    membership_repo.create(staff, dentist, role="staff")
+    assert clinic_repo.get_accessible(clinic_id, staff)["_id"] == clinic_id
+
+
+def test_clinics_accessible_active_owned_plus_linked(db):
+    from blueprints.repositories import memberships as membership_repo
+    dentist, staff = str(ObjectId()), str(ObjectId())
+    db.clinics.insert_many([
+        {"_id": ObjectId(), "owner_id": dentist, "name": "B", "is_active": True},
+        {"_id": ObjectId(), "owner_id": dentist, "name": "A", "is_active": True},
+        {"_id": ObjectId(), "owner_id": dentist, "name": "X", "is_active": False},
+    ])
+    membership_repo.create(staff, dentist, role="staff")
+    names = [c["name"] for c in clinic_repo.accessible_active(staff)]
+    assert names == ["A", "B"]  # active only, sorted by name
+
+
 # ── memberships repo ──────────────────────────────────────────────────────────
 def test_memberships_create_and_accessible_owner_ids(db):
     from blueprints.repositories import memberships as membership_repo

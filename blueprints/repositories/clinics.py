@@ -53,5 +53,29 @@ def owned_active_by_name(owner_id):
 
 
 def get_owned(clinic_id, owner_id):
-    """A single clinic only if owner_id owns it; else None."""
+    """A single clinic only if owner_id owns it; else None.
+
+    True-OWNERSHIP check — use for clinic management. For "may this user work in
+    this clinic?" (patients/appointments), use get_accessible."""
     return mongo.db.clinics.find_one({'_id': clinic_id, 'owner_id': owner_id})
+
+
+def get_accessible(clinic_id, user_id):
+    """A single clinic only if the user may WORK IN it — owns it (dentist) or is a
+    staff member of its owning dentist. The accessible counterpart to get_owned.
+    With no memberships this equals get_owned (so existing behaviour is unchanged)."""
+    return mongo.db.clinics.find_one({
+        '_id': clinic_id,
+        'owner_id': {'$in': _membership_repo.accessible_owner_ids(user_id)},
+    })
+
+
+def accessible_active(user_id):
+    """Active clinics the user may work in (owned + via membership), sorted by name.
+    The accessible counterpart to owned_active_by_name (listings + dropdowns)."""
+    owner_ids = _membership_repo.accessible_owner_ids(user_id)
+    return list(
+        mongo.db.clinics
+        .find({'owner_id': {'$in': owner_ids}, 'is_active': True})
+        .sort('name', 1)
+    )
