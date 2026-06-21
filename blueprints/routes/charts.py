@@ -11,7 +11,7 @@ from bson.objectid import ObjectId
 from datetime import datetime
 import traceback
 
-from blueprints.utils import login_required, verify_patient_access
+from blueprints.utils import login_required, verify_patient_access, audit
 from blueprints.repositories import charts as charts_repo
 
 charts_bp = Blueprint('charts', __name__)
@@ -181,6 +181,7 @@ def update_chart(patient_id):
             data.pop(key, None)
 
         charts_repo.upsert(patient_id, data, session['user_id'])
+        audit('update', 'chart', patient_id, clinic=clinic)
         return jsonify({'success': True, 'message': 'Chart updated successfully'})
 
     except Exception as e:

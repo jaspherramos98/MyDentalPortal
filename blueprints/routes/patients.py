@@ -12,7 +12,7 @@ import traceback
 from extensions import mongo
 from blueprints.utils import (
     login_required, user_clinic_ids as _get_user_clinic_ids, verify_patient_access,
-    role_required, ROLE_DENTIST,
+    role_required, ROLE_DENTIST, audit,
 )
 from blueprints.repositories import patients as patient_repo
 from werkzeug.utils import secure_filename
@@ -205,6 +205,10 @@ def create_patient():
                                        clinics=user_clinics, form_data=f)
 
             inserted_id = patient_repo.create(patient_data)
+            _clinic = next(
+                (c for c in user_clinics if str(c['_id']) == f.get('clinic_id')), None
+            )
+            audit('create', 'patient', inserted_id, clinic=_clinic)
             flash('Patient created successfully!', 'success')
             return redirect(url_for('patients.patient_detail',
                                     patient_id=str(inserted_id)))
@@ -415,6 +419,7 @@ def edit_patient(patient_id):
                 'updated_at': datetime.utcnow(),
             }
             patient_repo.update_set(patient_id, update_data)
+            audit('update', 'patient', patient_id, clinic=clinic)
             flash('Patient updated successfully!', 'success')
             return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
@@ -445,6 +450,7 @@ def delete_patient(patient_id):
                 {'_id': ObjectId(patient_id)},
                 {'$set': {'is_active': False, 'updated_at': datetime.utcnow()}},
             )
+            audit('delete', 'patient', patient_id, clinic=clinic)
             flash('Patient record deleted', 'success')
         else:
             flash('Patient not found', 'error')

@@ -254,6 +254,9 @@ def init_database():
         # Multi-staff: staff<->dentist links (access seam reads by user_id).
         mongo.db.memberships.create_index([("user_id", 1), ("is_active", 1)])
         mongo.db.memberships.create_index("dentist_id")
+        # Audit trail: nested viewer reads by dentist, newest-first.
+        mongo.db.audit_log.create_index([("dentist_id", 1), ("timestamp", -1)])
+        mongo.db.audit_log.create_index("timestamp")
 
         if mongo.db.users.count_documents({}) == 0:
             mongo.db.users.insert_one({
