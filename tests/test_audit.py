@@ -46,6 +46,27 @@ def test_find_for_dentist_and_find_all(db):
     assert len(audit_repo.find_all()) == 2
 
 
+def test_count_helpers(db):
+    d1 = str(ObjectId())
+    audit_repo.record('create', 'patient', 'a', dentist_id=d1)
+    audit_repo.record('create', 'patient', 'b', dentist_id=d1)
+    audit_repo.record('login', 'auth', 'x')  # no dentist
+    assert audit_repo.count_for_dentist(d1) == 2
+    assert audit_repo.count_all() == 3
+
+
+def test_find_pagination_skip_limit(db):
+    d = str(ObjectId())
+    for i in range(5):
+        audit_repo.record('create', 'patient', str(i), dentist_id=d)
+    page1 = audit_repo.find_for_dentist(d, limit=2, skip=0)
+    page2 = audit_repo.find_for_dentist(d, limit=2, skip=2)
+    assert len(page1) == 2 and len(page2) == 2
+    ids1 = {e['entity_id'] for e in page1}
+    ids2 = {e['entity_id'] for e in page2}
+    assert ids1.isdisjoint(ids2)  # newest-first pages don't overlap
+
+
 # ── session-aware helper ──────────────────────────────────────────────────────
 def test_audit_helper_reads_session_and_derives_dentist(app, db):
     actor, dentist, clinic_id = str(ObjectId()), str(ObjectId()), ObjectId()

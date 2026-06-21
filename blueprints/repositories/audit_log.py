@@ -40,8 +40,18 @@ def find_for_dentist(dentist_id, limit=100, skip=0):
     )
 
 
+def count_for_dentist(dentist_id):
+    """Total audit entries owned by a dentist (for pagination)."""
+    return mongo.db.audit_log.count_documents({'dentist_id': dentist_id})
+
+
 def find_all(limit=100, skip=0):
     """All audit entries, newest first (app-admin view)."""
     return list(
         mongo.db.audit_log.find({}).sort('timestamp', -1).skip(skip).limit(limit)
     )
+
+
+def count_all():
+    """Total audit entries (for pagination, admin view)."""
+    return mongo.db.audit_log.count_documents({})
