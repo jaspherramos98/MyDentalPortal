@@ -80,6 +80,13 @@
                             <i class="fas fa-clinic-medical"></i> Clinics
                         </a>
                     </li>
+                    {% if session.user_role != 'staff' %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('staff.list_staff') }}">
+                            <i class="fas fa-user-nurse"></i> Staff
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('reports.reports') }}">
                             <i class="fas fa-chart-line"></i> Performance

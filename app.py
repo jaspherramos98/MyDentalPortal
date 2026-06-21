@@ -50,6 +50,7 @@ from blueprints.routes.appointments import appointments_bp
 from blueprints.routes.uploads import uploads_bp
 from blueprints.routes.admin import admin_bp
 from blueprints.routes.reports import reports_bp
+from blueprints.routes.staff import staff_bp
 from blueprints.utils import is_admin
 
 app.register_blueprint(auth_bp)
@@ -62,6 +63,7 @@ app.register_blueprint(appointments_bp)
 app.register_blueprint(uploads_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(reports_bp)
+app.register_blueprint(staff_bp)
 
 # ---------------------------------------------------------------------------
 # Template helpers
@@ -257,6 +259,9 @@ def init_database():
         # Audit trail: nested viewer reads by dentist, newest-first.
         mongo.db.audit_log.create_index([("dentist_id", 1), ("timestamp", -1)])
         mongo.db.audit_log.create_index("timestamp")
+        # Staff access codes: single-use lookup by hash.
+        mongo.db.access_codes.create_index("code_hash")
+        mongo.db.access_codes.create_index("dentist_id")
 
         if mongo.db.users.count_documents({}) == 0:
             mongo.db.users.insert_one({

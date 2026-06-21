@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Staff{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-user-nurse"></i> Staff</h2>
+        <form method="POST" action="{{ url_for('staff.generate_code') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-key"></i> Generate access code
+            </button>
+        </form>
+    </div>
+
+    <p class="text-muted">
+        Generate a single-use access code and share it with a new staff member.
+        They register at <strong>{{ url_for('auth.join', _external=True) }}</strong>
+        using the code, which links them to your clinics. Codes expire after 7 days
+        and can only be used once.
+    </p>
+
+    <!-- Linked staff -->
+    <div class="card mb-4">
+        <div class="card-header"><i class="fas fa-users"></i> Linked staff</div>
+        <div class="card-body p-0">
+            {% if staff %}
+            <table class="table mb-0">
+                <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+                <tbody>
+                    {% for s in staff %}
+                    <tr>
+                        <td>{{ s.name }}</td>
+                        <td>{{ s.email }}</td>
+                        <td><span class="badge bg-secondary">{{ s.role }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="p-3 text-muted">No staff linked yet.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Access codes -->
+    <div class="card">
+        <div class="card-header"><i class="fas fa-key"></i> Access codes</div>
+        <div class="card-body p-0">
+            {% if codes %}
+            <table class="table mb-0">
+                <thead><tr><th>Created</th><th>Expires</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                    {% for c in codes %}
+                    <tr>
+                        <td>{{ c.created_at | datefmt('%b %d, %Y') }}</td>
+                        <td>{{ c.expires_at | datefmt('%b %d, %Y') }}</td>
+                        <td>
+                            {% if c.used %}
+                                <span class="badge bg-success">Used</span>
+                            {% elif c.revoked %}
+                                <span class="badge bg-secondary">Revoked</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Active</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if not c.used and not c.revoked %}
+                            <form method="POST" action="{{ url_for('staff.revoke_code', code_id=c._id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Revoke</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="p-3 text-muted">No access codes generated yet.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
