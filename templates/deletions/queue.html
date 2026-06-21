@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Deletion Requests{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-3"><i class="fas fa-trash-can-arrow-up"></i> Deletion Requests</h2>
+    <p class="text-muted small">
+        Staff can request a record be deleted; only you (or an admin) can approve it.
+        Approving performs the deletion; rejecting leaves the record untouched.
+    </p>
+
+    <div class="card">
+        <div class="card-body p-0">
+            {% if requests %}
+            <table class="table mb-0 align-middle">
+                <thead>
+                    <tr><th>Requested</th><th>What</th><th>Requested by</th><th class="text-end">Action</th></tr>
+                </thead>
+                <tbody>
+                    {% for r in requests %}
+                    <tr>
+                        <td class="text-nowrap small">{{ r.requested_at | datefmt('%b %d, %Y %H:%M') }}</td>
+                        <td>
+                            <span class="badge bg-danger-subtle text-danger">{{ r.label }}</span>
+                            <code class="small text-muted">{{ r.entity_id[:8] }}…</code>
+                        </td>
+                        <td>{{ r.requested_by_name }}</td>
+                        <td class="text-end">
+                            <div class="d-inline-flex gap-2">
+                                <form method="POST" action="{{ url_for('deletions.approve', request_id=r._id) }}"
+                                      onsubmit="return confirm('Approve and permanently apply this deletion?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-danger">Approve</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('deletions.reject', request_id=r._id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Reject</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="p-3 text-muted">No pending deletion requests.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -65,6 +65,7 @@ from blueprints.routes.uploads import uploads_bp
 from blueprints.routes.admin import admin_bp
 from blueprints.routes.reports import reports_bp
 from blueprints.routes.staff import staff_bp
+from blueprints.routes.deletions import deletions_bp
 from blueprints.utils import is_admin
 
 app.register_blueprint(auth_bp)
@@ -78,6 +79,7 @@ app.register_blueprint(uploads_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(reports_bp)
 app.register_blueprint(staff_bp)
+app.register_blueprint(deletions_bp)
 
 # ---------------------------------------------------------------------------
 # Template helpers
@@ -276,6 +278,9 @@ def init_database():
         # Staff access codes: single-use lookup by hash.
         mongo.db.access_codes.create_index("code_hash")
         mongo.db.access_codes.create_index("dentist_id")
+        # Deletion requests: review queue reads by dentist + status.
+        mongo.db.deletion_requests.create_index([("dentist_id", 1), ("status", 1)])
+        mongo.db.deletion_requests.create_index([("entity_type", 1), ("entity_id", 1)])
 
         if mongo.db.users.count_documents({}) == 0:
             mongo.db.users.insert_one({

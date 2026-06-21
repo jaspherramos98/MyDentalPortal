@@ -41,6 +41,18 @@
                 <a href="{{ url_for('treatments.add_treatment', patient_id=patient._id) }}" class="btn btn-outline-success">
                     <i class="fas fa-plus"></i> Add Treatment
                 </a>
+                {% if session.user_role == 'staff' %}
+                <form method="POST" action="{{ url_for('deletions.request_deletion') }}"
+                      class="d-inline"
+                      onsubmit="return confirm('Request deletion of this patient? A dentist must approve it.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="entity_type" value="patient">
+                    <input type="hidden" name="entity_id" value="{{ patient._id }}">
+                    <button type="submit" class="btn btn-outline-danger">
+                        <i class="fas fa-trash"></i> Request deletion
+                    </button>
+                </form>
+                {% else %}
                 <form method="POST" action="{{ url_for('patients.delete_patient', patient_id=patient._id) }}"
                       class="d-inline"
                       onsubmit="return confirm('Delete {{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}? The record is removed from the active list.');">
@@ -49,6 +61,7 @@
                         <i class="fas fa-trash"></i> Delete
                     </button>
                 </form>
+                {% endif %}
             </div>
         </div>
 
@@ -95,6 +108,18 @@
                             </div>
                         </form>
                         {% if patient.get('photo_file_id') %}
+                        {% if session.user_role == 'staff' %}
+                        <form method="POST" action="{{ url_for('deletions.request_deletion') }}"
+                              class="mt-1" data-no-guard
+                              onsubmit="return confirm('Request removal of this photo? A dentist must approve it.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="entity_type" value="photo">
+                            <input type="hidden" name="entity_id" value="{{ patient._id }}">
+                            <button type="submit" class="btn btn-sm btn-link text-danger">
+                                <i class="fas fa-trash"></i> Request photo removal
+                            </button>
+                        </form>
+                        {% else %}
                         <form method="POST"
                               action="{{ url_for('uploads.delete_photo', patient_id=patient._id) }}"
                               class="mt-1" data-no-guard
@@ -104,6 +129,7 @@
                                 <i class="fas fa-trash"></i> Remove photo
                             </button>
                         </form>
+                        {% endif %}
                         {% endif %}
                         </div>
 
@@ -560,6 +586,18 @@
                                                            title="Edit treatment (for partial payments)">
                                                             <i class="fas fa-edit"></i>
                                                         </a>
+                                                        {% if session.user_role == 'staff' %}
+                                                        <form method="POST" class="d-inline"
+                                                              action="{{ url_for('deletions.request_deletion') }}"
+                                                              onsubmit="return confirm('Request deletion of this treatment? A dentist must approve it.');">
+                                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                            <input type="hidden" name="entity_type" value="treatment">
+                                                            <input type="hidden" name="entity_id" value="{{ treatment._id }}">
+                                                            <button type="submit" class="btn btn-outline-danger" title="Request deletion">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                        </form>
+                                                        {% else %}
                                                         <form method="POST" class="d-inline"
                                                               action="{{ url_for('treatments.delete_treatment', treatment_id=treatment._id) }}"
                                                               onsubmit="return confirm('Delete this treatment record? This cannot be undone.');">
@@ -568,6 +606,7 @@
                                                                 <i class="fas fa-trash"></i>
                                                             </button>
                                                         </form>
+                                                        {% endif %}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -622,6 +661,18 @@
                                                     <small class="text-muted">
                                                         <i class="fas fa-clock"></i> {{ p.created_at | datefmt('%B %d, %Y') }}
                                                     </small>
+                                                    {% if session.user_role == 'staff' %}
+                                                    <form method="POST"
+                                                          action="{{ url_for('deletions.request_deletion') }}"
+                                                          onsubmit="return confirm('Request deletion of this prescription? A dentist must approve it.');">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <input type="hidden" name="entity_type" value="prescription">
+                                                        <input type="hidden" name="entity_id" value="{{ p._id }}">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Request deletion">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                    {% else %}
                                                     <form method="POST"
                                                           action="{{ url_for('uploads.delete_prescription', prescription_id=p._id) }}"
                                                           onsubmit="return confirm('Delete this prescription?');">
@@ -630,6 +681,7 @@
                                                             <i class="fas fa-trash"></i>
                                                         </button>
                                                     </form>
+                                                    {% endif %}
                                                 </div>
                                                 {% if p.description %}
                                                 <p class="mb-2" style="white-space: pre-wrap;">{{ p.description }}</p>
@@ -710,6 +762,18 @@
                                                             data-bs-toggle="modal" data-bs-target="#renameModal{{ f._id }}">
                                                         <i class="fas fa-pen"></i>
                                                     </button>
+                                                    {% if session.user_role == 'staff' %}
+                                                    <form method="POST" class="d-inline"
+                                                          action="{{ url_for('deletions.request_deletion') }}"
+                                                          onsubmit="return confirm('Request deletion of this file? A dentist must approve it.');">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <input type="hidden" name="entity_type" value="file">
+                                                        <input type="hidden" name="entity_id" value="{{ f._id }}">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Request deletion">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                    {% else %}
                                                     <form method="POST" class="d-inline"
                                                           action="{{ url_for('uploads.delete_file', file_doc_id=f._id) }}"
                                                           onsubmit="return confirm('Delete this file?');">
@@ -718,6 +782,7 @@
                                                             <i class="fas fa-trash"></i>
                                                         </button>
                                                     </form>
+                                                    {% endif %}
 
                                                     <!-- Rename modal -->
                                                     <div class="modal fade" id="renameModal{{ f._id }}" tabindex="-1">
