@@ -27,23 +27,48 @@ def test_patients_get_invalid_id_returns_none(db):
     assert patient_repo.get("not-an-object-id") is None
 
 
-def test_patients_get_for_owner_grants_owner(db, seed_patient):
+def test_patients_get_for_accessor_grants_owner(db, seed_patient):
     owner = str(ObjectId())
     patient_id, clinic_id = seed_patient(owner)
-    patient, clinic = patient_repo.get_for_owner(str(patient_id), owner)
+    patient, clinic = patient_repo.get_for_accessor(str(patient_id), owner)
     assert patient["_id"] == patient_id
     assert clinic["_id"] == clinic_id
 
 
-def test_patients_get_for_owner_denies_other(db, seed_patient):
+def test_patients_get_for_accessor_denies_other(db, seed_patient):
     patient_id, _ = seed_patient(owner_id=str(ObjectId()))
-    patient, clinic = patient_repo.get_for_owner(str(patient_id), str(ObjectId()))
+    patient, clinic = patient_repo.get_for_accessor(str(patient_id), str(ObjectId()))
     assert patient is not None       # patient exists...
     assert clinic is None            # ...but access is denied
 
 
-def test_patients_get_for_owner_missing(db):
-    assert patient_repo.get_for_owner(str(ObjectId()), str(ObjectId())) == (None, None)
+def test_patients_get_for_accessor_missing(db):
+    assert patient_repo.get_for_accessor(str(ObjectId()), str(ObjectId())) == (None, None)
+
+
+def test_patients_get_for_accessor_grants_linked_staff(db, seed_patient):
+    """A staff member linked to the dentist may access the dentist's patients."""
+    from blueprints.repositories import memberships as membership_repo
+    dentist = str(ObjectId())
+    staff = str(ObjectId())
+    patient_id, clinic_id = seed_patient(dentist)
+    membership_repo.create(staff, dentist, role="staff", created_by=dentist)
+    patient, clinic = patient_repo.get_for_accessor(str(patient_id), staff)
+    assert patient["_id"] == patient_id
+    assert clinic is not None and clinic["_id"] == clinic_id
+
+
+def test_patients_get_for_accessor_denies_inactive_membership(db, seed_patient):
+    """A revoked (inactive) membership grants no access."""
+    from blueprints.repositories import memberships as membership_repo
+    dentist = str(ObjectId())
+    staff = str(ObjectId())
+    patient_id, _ = seed_patient(dentist)
+    membership_repo.create(staff, dentist, role="staff")
+    membership_repo.deactivate(staff, dentist)
+    patient, clinic = patient_repo.get_for_accessor(str(patient_id), staff)
+    assert patient is not None
+    assert clinic is None
 
 
 def test_ensure_nested_fills_and_preserves():
@@ -81,6 +106,61 @@ def test_clinics_owned_filters(db):
     assert len(clinic_repo.owned_by(owner, active_only=False)) == 2
     assert clinic_repo.get_owned(active, owner)["_id"] == active
     assert clinic_repo.get_owned(active, str(ObjectId())) is None
+
+
+def test_clinics_accessible_ids_owned_only_without_memberships(db):
+    """No memberships -> accessible_ids == owned_ids (behaviour-identical)."""
+    owner = str(ObjectId())
+    mine = ObjectId()
+    db.clinics.insert_many([
+        {"_id": mine, "owner_id": owner, "is_active": True},
+        {"_id": ObjectId(), "owner_id": str(ObjectId()), "is_active": True},
+    ])
+    assert clinic_repo.accessible_ids(owner) == [mine]
+
+
+def test_clinics_accessible_ids_includes_linked_dentist_clinics(db):
+    """Staff see their own (none) + every active clinic of their dentist."""
+    from blueprints.repositories import memberships as membership_repo
+    dentist = str(ObjectId())
+    staff = str(ObjectId())
+    c_active = ObjectId()
+    db.clinics.insert_many([
+        {"_id": c_active, "owner_id": dentist, "is_active": True},
+        {"_id": ObjectId(), "owner_id": dentist, "is_active": False},     # inactive
+        {"_id": ObjectId(), "owner_id": str(ObjectId()), "is_active": True},  # other dentist
+    ])
+    membership_repo.create(staff, dentist, role="staff")
+    assert clinic_repo.accessible_ids(staff) == [c_active]
+
+
+# ── memberships repo ──────────────────────────────────────────────────────────
+def test_memberships_create_and_accessible_owner_ids(db):
+    from blueprints.repositories import memberships as membership_repo
+    user = str(ObjectId())
+    d1, d2 = str(ObjectId()), str(ObjectId())
+    membership_repo.create(user, d1, role="staff")
+    membership_repo.create(user, d2, role="staff")
+    assert set(membership_repo.dentist_ids_for(user)) == {d1, d2}
+    # accessible_owner_ids always includes the user themselves (their own clinics).
+    assert set(membership_repo.accessible_owner_ids(user)) == {user, d1, d2}
+
+
+def test_memberships_deactivate_drops_from_reads(db):
+    from blueprints.repositories import memberships as membership_repo
+    user, dentist = str(ObjectId()), str(ObjectId())
+    membership_repo.create(user, dentist, role="staff")
+    membership_repo.deactivate(user, dentist)
+    assert membership_repo.dentist_ids_for(user) == []
+    assert membership_repo.accessible_owner_ids(user) == [user]
+
+
+def test_memberships_list_for_dentist(db):
+    from blueprints.repositories import memberships as membership_repo
+    dentist = str(ObjectId())
+    membership_repo.create(str(ObjectId()), dentist, role="staff")
+    membership_repo.create(str(ObjectId()), dentist, role="staff")
+    assert len(membership_repo.list_for_dentist(dentist)) == 2
 
 
 # ── charts repo ─────────────────────────────────────────────────────────────

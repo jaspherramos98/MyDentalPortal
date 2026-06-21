@@ -62,6 +62,30 @@ def test_verify_patient_access_other_users_clinic_denied(app, db, seed_patient):
     assert clinic is None
 
 
+def test_verify_patient_access_linked_staff_granted(app, db, seed_patient):
+    """A staff member linked to the dentist passes the access seam."""
+    from blueprints.repositories import memberships as membership_repo
+    dentist = str(ObjectId())
+    staff = str(ObjectId())
+    patient_id, clinic_id = seed_patient(dentist)
+    membership_repo.create(staff, dentist, role="staff")
+    with app.test_request_context():
+        session["user_id"] = staff
+        patient, clinic = verify_patient_access(str(patient_id))
+    assert patient is not None and patient["_id"] == patient_id
+    assert clinic is not None and clinic["_id"] == clinic_id
+
+
+def test_verify_patient_access_unlinked_user_denied(app, db, seed_patient):
+    """A user with no membership to the dentist is denied."""
+    dentist = str(ObjectId())
+    patient_id, _ = seed_patient(dentist)
+    with app.test_request_context():
+        session["user_id"] = str(ObjectId())  # no membership
+        _, clinic = verify_patient_access(str(patient_id))
+    assert clinic is None
+
+
 def test_verify_patient_access_missing_patient(app, db):
     with app.test_request_context():
         session["user_id"] = str(ObjectId())
@@ -87,6 +111,22 @@ def test_user_clinic_ids_returns_only_active_owned(app, db):
         session["user_id"] = owner
         ids = user_clinic_ids()
     assert ids == [mine_active]
+
+
+def test_user_clinic_ids_includes_linked_dentist_clinics(app, db):
+    """Staff's accessible clinics include their linked dentist's active clinics."""
+    from blueprints.repositories import memberships as membership_repo
+    dentist = str(ObjectId())
+    staff = str(ObjectId())
+    dentist_clinic = ObjectId()
+    db.clinics.insert_one(
+        {"_id": dentist_clinic, "owner_id": dentist, "is_active": True}
+    )
+    membership_repo.create(staff, dentist, role="staff")
+    with app.test_request_context():
+        session["user_id"] = staff
+        ids = user_clinic_ids()
+    assert ids == [dentist_clinic]
 
 
 # ── decorators ──────────────────────────────────────────────────────────────

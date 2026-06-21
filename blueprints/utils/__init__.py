@@ -31,18 +31,24 @@ def login_required(f):
 
 
 def user_clinic_ids():
-    """ObjectIds of the active clinics owned by the current user."""
-    return _clinic_repo.owned_ids(session['user_id'])
+    """ObjectIds of the active clinics the current user may work in.
+
+    Owned clinics (dentist) PLUS clinics owned by any dentist the user is a staff
+    member of. The multi-staff listing seam.
+    """
+    return _clinic_repo.accessible_ids(session['user_id'])
 
 
 def verify_patient_access(patient_id):
-    """Return (patient, clinic) only if the current user owns the patient's clinic.
+    """Return (patient, clinic) only if the current user may access the patient.
 
-    Returns (None, None) for a missing/invalid id; (patient, None) for a patient
-    in someone else's clinic — the caller must treat a None clinic as access
-    denied. Delegates to the patients repository (the multi-staff access seam).
+    Access = the patient's clinic is owned by the user (dentist) or by a dentist
+    the user is a staff member of. Returns (None, None) for a missing/invalid id;
+    (patient, None) for a patient the user may not access — the caller must treat
+    a None clinic as access denied. Delegates to the patients repository (the
+    multi-staff access seam).
     """
-    return _patient_repo.get_for_owner(patient_id, session['user_id'])
+    return _patient_repo.get_for_accessor(patient_id, session['user_id'])
 
 
 def is_admin():
