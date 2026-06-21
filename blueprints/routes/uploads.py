@@ -20,7 +20,10 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 from PIL import Image
 
-from blueprints.utils import login_required, verify_patient_access as _verify_patient_access
+from blueprints.utils import (
+    login_required, verify_patient_access as _verify_patient_access,
+    role_required, ROLE_DENTIST,
+)
 from blueprints.repositories import uploads as uploads_repo
 from blueprints.repositories import patients as patient_repo
 
@@ -168,7 +171,7 @@ def patient_photo(patient_id):
 
 
 @uploads_bp.route('/patients/<patient_id>/photo/delete', methods=['POST'])
-@login_required
+@role_required(ROLE_DENTIST)  # deleting records/files is dentist/admin only (staff: request later)
 def delete_photo(patient_id):
     patient, clinic = _verify_patient_access(patient_id)
     if not clinic:
@@ -246,7 +249,7 @@ def prescription_image(prescription_id):
 
 
 @uploads_bp.route('/prescriptions/<prescription_id>/delete', methods=['POST'])
-@login_required
+@role_required(ROLE_DENTIST)  # deleting records/files is dentist/admin only (staff: request later)
 def delete_prescription(prescription_id):
     pres = uploads_repo.get_prescription(prescription_id)
     if pres:
@@ -347,7 +350,7 @@ def rename_file(file_doc_id):
 
 
 @uploads_bp.route('/files/<file_doc_id>/delete', methods=['POST'])
-@login_required
+@role_required(ROLE_DENTIST)  # deleting records/files is dentist/admin only (staff: request later)
 def delete_file(file_doc_id):
     meta = uploads_repo.get_file(file_doc_id)
     if meta:

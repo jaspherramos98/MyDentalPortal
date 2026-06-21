@@ -9,7 +9,10 @@ from bson.objectid import ObjectId
 from datetime import datetime
 import traceback
 
-from blueprints.utils import login_required, verify_patient_access as _verify_patient_access
+from blueprints.utils import (
+    login_required, verify_patient_access as _verify_patient_access,
+    role_required, ROLE_DENTIST,
+)
 from blueprints.repositories import treatments as treatment_repo
 
 treatments_bp = Blueprint('treatments', __name__)
@@ -151,7 +154,7 @@ def mark_paid(treatment_id):
 
 # ── DELETE TREATMENT ─────────────────────────────────────────────────────
 @treatments_bp.route('/treatments/<treatment_id>/delete', methods=['POST'])
-@login_required
+@role_required(ROLE_DENTIST)  # deleting a treatment record is dentist/admin only
 def delete_treatment(treatment_id):
     try:
         treatment = treatment_repo.get(treatment_id)

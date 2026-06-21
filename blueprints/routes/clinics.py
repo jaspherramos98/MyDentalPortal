@@ -10,7 +10,7 @@ from datetime import datetime
 import traceback
 
 from extensions import mongo
-from blueprints.utils import login_required
+from blueprints.utils import login_required, role_required, ROLE_DENTIST
 
 clinics_bp = Blueprint('clinics', __name__)
 
@@ -49,7 +49,7 @@ def list_clinics():
 
 
 @clinics_bp.route('/clinics/create', methods=['GET', 'POST'])
-@login_required
+@role_required(ROLE_DENTIST)  # clinic management is dentist/admin only (staff can't)
 def create_clinic():
     if request.method == 'POST':
         name = (request.form.get('name') or '').strip()
@@ -88,7 +88,7 @@ def create_clinic():
 
 
 @clinics_bp.route('/clinics/<clinic_id>/edit', methods=['GET', 'POST'])
-@login_required
+@role_required(ROLE_DENTIST)  # clinic settings = dentist/admin only
 def edit_clinic(clinic_id):
     try:
         clinic = mongo.db.clinics.find_one({
@@ -123,7 +123,7 @@ def edit_clinic(clinic_id):
 
 
 @clinics_bp.route('/clinics/<clinic_id>/delete', methods=['POST'])
-@login_required
+@role_required(ROLE_DENTIST)  # clinic management is dentist/admin only
 def delete_clinic(clinic_id):
     try:
         mongo.db.clinics.update_one(
