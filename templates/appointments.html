@@ -1244,7 +1244,10 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                 appointmentClinic.className = 'appointment-clinic';
                 appointmentClinic.style.fontSize = '10px';
                 appointmentClinic.style.color = '#666';
-                appointmentClinic.innerHTML = `<i class="fas fa-building"></i> ${clinicName}`;
+                // Icon as HTML, clinic name as a text node (never innerHTML) so a
+                // crafted clinic name can't inject markup (DOM-XSS safe).
+                appointmentClinic.innerHTML = '<i class="fas fa-building"></i> ';
+                appointmentClinic.append(clinicName);
                 apt.appendChild(appointmentClinic);
             }
             
@@ -1634,7 +1637,9 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             const badge = document.getElementById('currentViewBadge');
             if (currentClinic) {
                 const clinicName = userClinics.find(c => c.id === currentClinic)?.name || 'Unknown Clinic';
-                badge.innerHTML = `<i class="fas fa-building"></i> ${clinicName}`;
+                // Clinic name as a text node (not innerHTML) — DOM-XSS safe.
+                badge.innerHTML = '<i class="fas fa-building"></i> ';
+                badge.append(clinicName);
             } else {
                 badge.innerHTML = `<i class="fas fa-building"></i> All Clinics`;
             }
@@ -1710,10 +1715,15 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             const notification = document.createElement('div');
             notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
             notification.style.cssText = 'top: 100px; right: 20px; z-index: 9999; min-width: 300px;';
-            notification.innerHTML = `
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
+            // Message as a text node (not innerHTML) so any user-derived content in
+            // it (e.g. a clinic name) can't inject markup — DOM-XSS safe. The close
+            // button is the only HTML.
+            notification.append(message);
+            const closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.className = 'btn-close';
+            closeBtn.setAttribute('data-bs-dismiss', 'alert');
+            notification.appendChild(closeBtn);
             
             document.body.appendChild(notification);
             
