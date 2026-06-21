@@ -7,6 +7,7 @@ from flask import (
 )
 from bson.objectid import ObjectId
 from datetime import datetime
+import re
 import traceback
 
 from extensions import mongo
@@ -45,11 +46,14 @@ def list_patients():
             query['clinic_id'] = {'$in': clinic_ids}
 
         if search_query:
+            # Escape so the user's text is matched literally — never interpreted
+            # as a regex (prevents ReDoS / regex injection against the DB).
+            safe_q = re.escape(search_query)
             query['$or'] = [
-                {'personal_info.first_name': {'$regex': search_query, '$options': 'i'}},
-                {'personal_info.last_name': {'$regex': search_query, '$options': 'i'}},
-                {'personal_info.nickname': {'$regex': search_query, '$options': 'i'}},
-                {'contact_info.cell_phone': {'$regex': search_query, '$options': 'i'}},
+                {'personal_info.first_name': {'$regex': safe_q, '$options': 'i'}},
+                {'personal_info.last_name': {'$regex': safe_q, '$options': 'i'}},
+                {'personal_info.nickname': {'$regex': safe_q, '$options': 'i'}},
+                {'contact_info.cell_phone': {'$regex': safe_q, '$options': 'i'}},
             ]
 
         page = max(1, request.args.get('page', 1, type=int))
