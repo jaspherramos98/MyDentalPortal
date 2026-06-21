@@ -36,6 +36,17 @@ def find_for_clinics(clinic_ids, start_date=None, fields=None):
     return list(mongo.db.treatment_records.find(query, fields))
 
 
+def find_pending_prices(clinic_ids=None):
+    """Treatments whose price is awaiting dentist confirmation (price_confirmed ==
+    False). `clinic_ids=None` = all clinics (admin); otherwise scope to those.
+    Legacy records (no field) are treated as confirmed, so `== False` deliberately
+    excludes them. Newest first."""
+    query = {'price_confirmed': False}
+    if clinic_ids is not None:
+        query['clinic_id'] = {'$in': clinic_ids}
+    return list(mongo.db.treatment_records.find(query).sort('date', -1))
+
+
 def insert(doc):
     """Insert a treatment document; return the new _id (str)."""
     return str(mongo.db.treatment_records.insert_one(doc).inserted_id)

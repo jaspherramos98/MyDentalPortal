@@ -563,6 +563,16 @@
                                                     {% if treatment.balance > 0 %}
                                                     <br><small class="text-danger">Balance: {{ clinic.get("currency", "PHP") }} {{ "%.2f"|format(treatment.balance) }}</small>
                                                     {% endif %}
+                                                    {% if not treatment.get('price_confirmed', True) %}
+                                                    <br><span class="badge bg-warning text-dark" title="Awaiting dentist confirmation">Price pending</span>
+                                                    {% if session.user_role != 'staff' %}
+                                                    <form method="POST" class="d-inline"
+                                                          action="{{ url_for('treatments.confirm_price', treatment_id=treatment._id) }}">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <button type="submit" class="btn btn-sm btn-link p-0 ms-1">Confirm</button>
+                                                    </form>
+                                                    {% endif %}
+                                                    {% endif %}
                                                 </td>
                                                 <td>
                                                     <span class="badge bg-{{ 'success' if treatment.balance == 0 else 'warning' }}">

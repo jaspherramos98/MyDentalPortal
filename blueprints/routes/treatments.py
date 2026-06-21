@@ -11,11 +11,18 @@ import traceback
 
 from blueprints.utils import (
     login_required, verify_patient_access as _verify_patient_access,
-    role_required, ROLE_DENTIST, audit,
+    role_required, ROLE_DENTIST, ROLE_STAFF, is_admin,
+    user_clinic_ids as _user_clinic_ids, audit,
 )
 from blueprints.repositories import treatments as treatment_repo
+from blueprints.repositories import patients as patient_repo
 
 treatments_bp = Blueprint('treatments', __name__)
+
+
+def _is_price_confirmer():
+    """Dentist/admin may set a confirmed price; staff can only propose one."""
+    return is_admin() or session.get('user_role') != ROLE_STAFF
 
 
 # ── ADD TREATMENT ────────────────────────────────────────────────────────
@@ -56,8 +63,18 @@ def add_treatment(patient_id):
                 'updated_at': datetime.utcnow(),
             }
 
+            # Price-confirmation: a dentist/admin's price is confirmed immediately;
+            # a staff member's price is PENDING until a dentist confirms it.
+            confirmer = _is_price_confirmer()
+            treatment['price_set_by'] = session['user_id']
+            treatment['price_confirmed'] = confirmer
+            treatment['price_confirmed_by'] = session['user_id'] if confirmer else None
+            treatment['price_confirmed_at'] = datetime.utcnow() if confirmer else None
+
             tid = treatment_repo.insert(treatment)
             audit('create', 'treatment', tid, clinic=clinic)
+            if not confirmer:
+                audit('price_proposed', 'treatment', tid, clinic=clinic)
             flash('Treatment record added successfully!', 'success')
             return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
@@ -110,8 +127,27 @@ def edit_treatment(treatment_id):
                 'next_appointment': f.get('next_appointment', ''),
                 'updated_at': datetime.utcnow(),
             }
+
+            # Price-confirmation on edit: a dentist/admin save confirms the price;
+            # a staff edit that CHANGES the amount re-opens it as pending (a staff
+            # edit that leaves the amount alone doesn't touch confirmation state).
+            confirmer = _is_price_confirmer()
+            price_proposed = False
+            if confirmer:
+                update['price_confirmed'] = True
+                update['price_confirmed_by'] = session['user_id']
+                update['price_confirmed_at'] = datetime.utcnow()
+            elif update['amount_charged'] != float(treatment.get('amount_charged') or 0):
+                update['price_confirmed'] = False
+                update['price_set_by'] = session['user_id']
+                update['price_confirmed_by'] = None
+                update['price_confirmed_at'] = None
+                price_proposed = True
+
             treatment_repo.update_set(treatment_id, update)
             audit('update', 'treatment', treatment_id, clinic=clinic)
+            if price_proposed:
+                audit('price_proposed', 'treatment', treatment_id, clinic=clinic)
             flash('Treatment updated successfully!', 'success')
             return redirect(url_for('patients.patient_detail',
                                     patient_id=str(treatment['patient_id'])))
@@ -174,6 +210,45 @@ def delete_treatment(treatment_id):
         print(f"Delete treatment error: {e}")
         flash('Error deleting treatment', 'error')
     return redirect(url_for('patients.list_patients'))
+
+
+# ── PRICING: confirm a staff-proposed price ──────────────────────────────────
+@treatments_bp.route('/treatments/<treatment_id>/confirm-price', methods=['POST'])
+@role_required(ROLE_DENTIST)
+def confirm_price(treatment_id):
+    """Dentist/admin confirms a pending (staff-proposed) treatment price."""
+    treatment = treatment_repo.get(treatment_id)
+    if treatment:
+        patient, clinic = _verify_patient_access(str(treatment['patient_id']))
+        if clinic:
+            treatment_repo.update_set(treatment_id, {
+                'price_confirmed': True,
+                'price_confirmed_by': session['user_id'],
+                'price_confirmed_at': datetime.utcnow(),
+            })
+            audit('price_confirmed', 'treatment', treatment_id, clinic=clinic)
+            flash('Price confirmed.', 'success')
+            if request.form.get('from') == 'queue':
+                return redirect(url_for('treatments.pending_prices'))
+            return redirect(url_for('patients.patient_detail',
+                                    patient_id=str(treatment['patient_id'])))
+    flash('Access denied or treatment not found', 'error')
+    return redirect(url_for('patients.list_patients'))
+
+
+# ── PRICING: dentist/admin review queue of pending prices ─────────────────────
+@treatments_bp.route('/treatments/pending-prices')
+@role_required(ROLE_DENTIST)
+def pending_prices():
+    """Treatments awaiting price confirmation: dentist sees their clinics, admin
+    sees all."""
+    clinic_ids = None if is_admin() else _user_clinic_ids()
+    rows = treatment_repo.find_pending_prices(clinic_ids)
+    for r in rows:
+        p = patient_repo.get(str(r.get('patient_id')))
+        pi = (p or {}).get('personal_info', {})
+        r['patient_name'] = f"{pi.get('first_name', '')} {pi.get('last_name', '')}".strip() or '—'
+    return render_template('treatments/pending_prices.html', treatments=rows)
 
 
 # ── JSON API (for AJAX calls from patient detail page) ───────────────────
