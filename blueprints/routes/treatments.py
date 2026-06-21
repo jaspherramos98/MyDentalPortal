@@ -11,7 +11,7 @@ import traceback
 
 from blueprints.utils import (
     login_required, verify_patient_access as _verify_patient_access,
-    role_required, ROLE_DENTIST,
+    role_required, ROLE_DENTIST, audit,
 )
 from blueprints.repositories import treatments as treatment_repo
 
@@ -56,7 +56,8 @@ def add_treatment(patient_id):
                 'updated_at': datetime.utcnow(),
             }
 
-            treatment_repo.insert(treatment)
+            tid = treatment_repo.insert(treatment)
+            audit('create', 'treatment', tid, clinic=clinic)
             flash('Treatment record added successfully!', 'success')
             return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
@@ -110,6 +111,7 @@ def edit_treatment(treatment_id):
                 'updated_at': datetime.utcnow(),
             }
             treatment_repo.update_set(treatment_id, update)
+            audit('update', 'treatment', treatment_id, clinic=clinic)
             flash('Treatment updated successfully!', 'success')
             return redirect(url_for('patients.patient_detail',
                                     patient_id=str(treatment['patient_id'])))
@@ -141,6 +143,7 @@ def mark_paid(treatment_id):
                     'balance': 0.0,
                     'updated_at': datetime.utcnow(),
                 })
+                audit('mark_paid', 'treatment', treatment_id, clinic=clinic)
                 flash('Treatment marked as fully paid.', 'success')
                 return redirect(url_for('patients.patient_detail',
                                         patient_id=str(treatment['patient_id'])))
@@ -162,6 +165,7 @@ def delete_treatment(treatment_id):
             patient, clinic = _verify_patient_access(str(treatment['patient_id']))
             if clinic:
                 treatment_repo.delete(treatment_id)
+                audit('delete', 'treatment', treatment_id, clinic=clinic)
                 flash('Treatment record deleted', 'success')
                 return redirect(url_for('patients.patient_detail',
                                         patient_id=str(treatment['patient_id'])))

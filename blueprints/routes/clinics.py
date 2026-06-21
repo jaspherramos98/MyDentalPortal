@@ -10,7 +10,7 @@ from datetime import datetime
 import traceback
 
 from extensions import mongo
-from blueprints.utils import login_required, role_required, ROLE_DENTIST
+from blueprints.utils import login_required, role_required, ROLE_DENTIST, audit
 
 clinics_bp = Blueprint('clinics', __name__)
 
@@ -76,7 +76,8 @@ def create_clinic():
                 'created_at': datetime.utcnow(),
                 'updated_at': datetime.utcnow(),
             }
-            mongo.db.clinics.insert_one(clinic_data)
+            result = mongo.db.clinics.insert_one(clinic_data)
+            audit('create', 'clinic', result.inserted_id, dentist_id=session['user_id'])
             flash(f'Clinic "{name}" created successfully!', 'success')
             return redirect(url_for('clinics.list_clinics'))
         except Exception as e:
@@ -112,6 +113,7 @@ def edit_clinic(clinic_id):
                     'updated_at': datetime.utcnow(),
                 }},
             )
+            audit('update', 'clinic', clinic_id, clinic=clinic)
             flash('Clinic updated successfully!', 'success')
             return redirect(url_for('clinics.list_clinics'))
 
@@ -130,6 +132,7 @@ def delete_clinic(clinic_id):
             {'_id': ObjectId(clinic_id), 'owner_id': session['user_id']},
             {'$set': {'is_active': False, 'updated_at': datetime.utcnow()}},
         )
+        audit('delete', 'clinic', clinic_id, dentist_id=session['user_id'])
         flash('Clinic deleted successfully', 'success')
     except Exception as e:
         print(f"Delete clinic error: {e}")

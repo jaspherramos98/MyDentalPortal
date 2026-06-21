@@ -22,7 +22,7 @@ from PIL import Image
 
 from blueprints.utils import (
     login_required, verify_patient_access as _verify_patient_access,
-    role_required, ROLE_DENTIST,
+    role_required, ROLE_DENTIST, audit,
 )
 from blueprints.repositories import uploads as uploads_repo
 from blueprints.repositories import patients as patient_repo
@@ -137,6 +137,7 @@ def set_photo(patient_id):
         'photo_ext': ext,
         'photo_content_type': CONTENT_TYPES.get(ext, 'application/octet-stream'),
     })
+    audit('update', 'photo', patient_id, clinic=clinic)
     flash('Patient photo updated.', 'success')
     return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
@@ -179,6 +180,7 @@ def delete_photo(patient_id):
         return redirect(url_for('patients.list_patients'))
     uploads_repo.delete_blob(patient.get('photo_file_id'))
     patient_repo.unset(patient_id, ['photo_file_id', 'photo_ext', 'photo_content_type'])
+    audit('delete', 'photo', patient_id, clinic=clinic)
     flash('Patient photo removed.', 'success')
     return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
@@ -219,7 +221,8 @@ def add_prescription(patient_id):
         doc['image_file_id'] = _store(data, upload.filename, ext)
         doc['image_name'] = secure_filename(upload.filename)
 
-    uploads_repo.insert_prescription(doc)
+    pres_id = uploads_repo.insert_prescription(doc)
+    audit('create', 'prescription', pres_id, clinic=clinic)
     flash('Prescription saved.', 'success')
     return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
@@ -257,6 +260,7 @@ def delete_prescription(prescription_id):
         if clinic:
             uploads_repo.delete_blob(pres.get('image_file_id'))
             uploads_repo.delete_prescription(pres['_id'])
+            audit('delete', 'prescription', prescription_id, clinic=clinic)
             flash('Prescription deleted.', 'success')
             return redirect(url_for('patients.patient_detail',
                                     patient_id=str(pres['patient_id'])))
@@ -287,7 +291,7 @@ def add_file(patient_id):
 
     display_name = (request.form.get('display_name') or '').strip() or upload.filename
 
-    uploads_repo.insert_file({
+    file_doc_id = uploads_repo.insert_file({
         'patient_id': ObjectId(patient_id),
         'clinic_id': clinic['_id'],
         'file_id': _store(data, upload.filename, ext),
@@ -298,6 +302,7 @@ def add_file(patient_id):
         'created_by': session['user_id'],
         'created_at': datetime.utcnow(),
     })
+    audit('create', 'file', file_doc_id, clinic=clinic)
     flash('File uploaded.', 'success')
     return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
@@ -340,6 +345,7 @@ def rename_file(file_doc_id):
             new_name = (request.form.get('display_name') or '').strip()
             if new_name:
                 uploads_repo.update_file_set(meta['_id'], {'display_name': new_name[:200]})
+                audit('update', 'file', file_doc_id, clinic=clinic)
                 flash('File renamed.', 'success')
             else:
                 flash('New name cannot be empty.', 'error')
@@ -358,6 +364,7 @@ def delete_file(file_doc_id):
         if clinic:
             uploads_repo.delete_blob(meta['file_id'])
             uploads_repo.delete_file(meta['_id'])
+            audit('delete', 'file', file_doc_id, clinic=clinic)
             flash('File deleted.', 'success')
             return redirect(url_for('patients.patient_detail',
                                     patient_id=str(meta['patient_id'])))

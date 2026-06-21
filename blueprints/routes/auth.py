@@ -11,8 +11,22 @@ import re
 
 from extensions import limiter
 from blueprints.repositories import users as user_repo
+from blueprints.repositories import audit_log as audit_repo
 
 auth_bp = Blueprint('auth', __name__)
+
+
+def _audit_auth(action, user=None):
+    """Best-effort auth audit entry. Stores the acted-on account id + role, never
+    the raw email/password. Never raises — auth must not break on a log failure."""
+    try:
+        uid = str(user['_id']) if user else None
+        audit_repo.record(
+            action, 'auth', entity_id=uid,
+            actor_user_id=uid, actor_role=(user or {}).get('role'),
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"[ERROR] auth audit failed: {e}")
 
 # Pre-computed hash so failed logins stay roughly constant-time: we always run a
 # password check even when the email doesn't exist, so a missing account can't be
@@ -70,6 +84,7 @@ def login():
                 # Account lifecycle gate (approval + active/deactivated).
                 block = account_block_reason(user)
                 if block:
+                    _audit_auth('login_failed', user)  # correct password, blocked account
                     flash(block[1], block[0])
                     return render_template('auth/login.html')
 
@@ -79,11 +94,13 @@ def login():
                 session['user_role'] = user.get('role', 'dentist')
                 session.permanent = True
 
+                _audit_auth('login', user)
                 if request.is_json:
                     return jsonify({'success': True, 'redirect': url_for('main.dashboard')})
                 flash('Login successful!', 'success')
                 return redirect(url_for('main.dashboard'))
 
+            _audit_auth('login_failed', user)  # user is None for an unknown email
             flash('Invalid email or password', 'error')
         except Exception as e:
             print(f"Login error: {e}")
@@ -162,6 +179,13 @@ def register():
 @auth_bp.route('/logout', methods=['POST'])
 def logout():
     # POST + CSRF token so a malicious page can't force-logout a user.
+    uid = session.get('user_id')
+    if uid:
+        try:
+            audit_repo.record('logout', 'auth', entity_id=uid, actor_user_id=uid,
+                              actor_role=session.get('user_role'))
+        except Exception as e:  # noqa: BLE001
+            print(f"[ERROR] auth audit failed: {e}")
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('auth.login'))

@@ -8,7 +8,7 @@ from flask import (
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta
 
-from blueprints.utils import login_required, user_clinic_ids as _user_clinic_ids
+from blueprints.utils import login_required, user_clinic_ids as _user_clinic_ids, audit
 from blueprints.repositories import appointments as appt_repo
 from blueprints.repositories import clinics as clinic_repo
 from blueprints.repositories import patients as patient_repo
@@ -198,6 +198,7 @@ def create_appointment():
                 pass
 
         appt_id = appt_repo.insert(appt)
+        audit('create', 'appointment', appt_id, clinic=clinic)
         return jsonify({
             'success': True,
             'appointment_id': appt_id,
@@ -255,6 +256,8 @@ def update_appointment(appt_id):
                 update[field] = val
 
         appt_repo.update_set(appt_id, update)
+        action = 'cancel' if data.get('status') == 'cancelled' else 'update'
+        audit(action, 'appointment', appt_id, clinic=clinic)
         return jsonify({'success': True, 'message': 'Updated'})
     except Exception as e:
         print(f"Update appointment error: {e}")
@@ -275,6 +278,7 @@ def delete_appointment(appt_id):
             return jsonify({'success': False, 'error': 'Access denied'}), 403
 
         appt_repo.soft_delete(appt_id)
+        audit('delete', 'appointment', appt_id, clinic=clinic)
         return jsonify({'success': True, 'message': 'Deleted'})
     except Exception as e:
         print(f"Delete appointment error: {e}")

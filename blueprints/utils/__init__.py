@@ -11,6 +11,7 @@ from flask import session, redirect, url_for, current_app, abort
 
 from blueprints.repositories import patients as _patient_repo
 from blueprints.repositories import clinics as _clinic_repo
+from blueprints.repositories import audit_log as _audit_repo
 
 
 # Role vocabulary. App Admin is a global superset; Dentist owns clinics; Staff
@@ -94,3 +95,28 @@ def role_required(*roles):
             abort(403)
         return decorated
     return decorator
+
+
+def audit(action, entity_type, entity_id=None, clinic=None, dentist_id=None):
+    """Best-effort audit-log write, attributed to the current session user.
+
+    Pass the ``clinic`` dict (as returned by ``verify_patient_access``) and the
+    owning dentist + clinic_id are derived from it for the nested viewer. NEVER
+    pass PHI — only the action + identifiers are stored (see audit_log repo).
+
+    Deliberately swallows errors: an audit-log failure must not break the user's
+    actual action. A failure is printed (and so reaches Sentry-adjacent logs).
+    """
+    try:
+        clinic_id = None
+        if clinic is not None:
+            clinic_id = clinic.get('_id')
+            dentist_id = dentist_id or clinic.get('owner_id')
+        _audit_repo.record(
+            action, entity_type, entity_id,
+            actor_user_id=session.get('user_id'),
+            actor_role=session.get('user_role', ROLE_DENTIST),
+            clinic_id=clinic_id, dentist_id=dentist_id,
+        )
+    except Exception as e:  # noqa: BLE001 - audit must never break the request
+        print(f"[ERROR] audit log write failed: {e}")
