@@ -68,10 +68,7 @@ def _has_time_conflict(clinic_id, date, time_str, duration, exclude_id=None):
 @login_required
 def appointments():
     try:
-        user_clinics = sorted(
-            clinic_repo.owned_by(session['user_id']),
-            key=lambda c: c.get('name', ''),
-        )
+        user_clinics = clinic_repo.accessible_active(session['user_id'])
         if not user_clinics:
             flash('Create a clinic first before managing appointments.', 'warning')
             return redirect(url_for('clinics.create_clinic'))
@@ -157,7 +154,7 @@ def create_appointment():
         if str(data['date']) < _today_str():
             return jsonify({'success': False, 'error': 'The appointment date cannot be in the past.'}), 400
 
-        clinic = clinic_repo.get_owned(ObjectId(data['clinic_id']), session['user_id'])
+        clinic = clinic_repo.get_accessible(ObjectId(data['clinic_id']), session['user_id'])
         if not clinic:
             return jsonify({'success': False, 'error': 'Invalid clinic'}), 403
 
@@ -219,7 +216,7 @@ def update_appointment(appt_id):
         if not appt:
             return jsonify({'success': False, 'error': 'Not found'}), 404
 
-        clinic = clinic_repo.get_owned(appt['clinic_id'], session['user_id'])
+        clinic = clinic_repo.get_accessible(appt['clinic_id'], session['user_id'])
         if not clinic:
             return jsonify({'success': False, 'error': 'Access denied'}), 403
 
@@ -273,7 +270,7 @@ def delete_appointment(appt_id):
         if not appt:
             return jsonify({'success': False, 'error': 'Not found'}), 404
 
-        clinic = clinic_repo.get_owned(appt['clinic_id'], session['user_id'])
+        clinic = clinic_repo.get_accessible(appt['clinic_id'], session['user_id'])
         if not clinic:
             return jsonify({'success': False, 'error': 'Access denied'}), 403
 
