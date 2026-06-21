@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Activity{% endblock %}
+
+{% macro entry_table(rows) %}
+<table class="table table-sm mb-0 align-middle">
+    <thead>
+        <tr><th>When</th><th>Who</th><th>Action</th><th>What</th></tr>
+    </thead>
+    <tbody>
+        {% for e in rows %}
+        <tr>
+            <td class="text-nowrap small">{{ e.timestamp | datefmt('%b %d, %Y %H:%M') }}</td>
+            <td>
+                {{ e.actor_name }}
+                <span class="badge bg-secondary">{{ e.actor_role or '—' }}</span>
+            </td>
+            <td><span class="badge bg-info text-dark">{{ e.action }}</span></td>
+            <td>
+                {{ e.entity_type }}
+                {% if e.entity_id %}<code class="small text-muted">{{ e.entity_id[:8] }}…</code>{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endmacro %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2><i class="fas fa-clock-rotate-left"></i> Activity</h2>
+        <span class="text-muted small">{{ total }} entr{{ 'y' if total == 1 else 'ies' }}</span>
+    </div>
+    <p class="text-muted small">
+        {% if admin %}All clinics, grouped by dentist.{% else %}Activity in your clinics (you + your staff).{% endif %}
+        Records the action only — never patient details.
+    </p>
+
+    {% if admin %}
+        {% for did, g in grouped.items() %}
+        <div class="card mb-3">
+            <div class="card-header"><i class="fas fa-user-md"></i> {{ g.dentist_name }}</div>
+            <div class="card-body p-0">{{ entry_table(g.entries) }}</div>
+        </div>
+        {% else %}
+        <div class="card"><div class="card-body text-muted">No activity yet.</div></div>
+        {% endfor %}
+    {% else %}
+        <div class="card"><div class="card-body p-0">
+            {% if entries %}{{ entry_table(entries) }}
+            {% else %}<div class="p-3 text-muted">No activity yet.</div>{% endif %}
+        </div></div>
+    {% endif %}
+
+    {% if total_pages > 1 %}
+    <nav class="mt-3">
+        <ul class="pagination justify-content-center">
+            <li class="page-item {{ 'disabled' if page <= 1 }}">
+                <a class="page-link" href="{{ url_for('main.activity', page=page-1) }}">Previous</a>
+            </li>
+            <li class="page-item disabled"><span class="page-link">Page {{ page }} of {{ total_pages }}</span></li>
+            <li class="page-item {{ 'disabled' if page >= total_pages }}">
+                <a class="page-link" href="{{ url_for('main.activity', page=page+1) }}">Next</a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

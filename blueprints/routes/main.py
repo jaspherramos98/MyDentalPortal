@@ -8,13 +8,16 @@ from flask import (
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 
-from blueprints.utils import login_required
+from blueprints.utils import login_required, role_required, ROLE_DENTIST, is_admin
 from blueprints.repositories import users as user_repo
 from blueprints.repositories import clinics as clinic_repo
 from blueprints.repositories import patients as patient_repo
 from blueprints.repositories import appointments as appt_repo
+from blueprints.repositories import audit_log as audit_repo
 
 main_bp = Blueprint('main', __name__)
+
+AUDIT_PAGE_SIZE = 50
 
 
 @main_bp.route('/')
@@ -22,6 +25,57 @@ def index():
     if 'user_id' in session:
         return redirect(url_for('main.dashboard'))
     return redirect(url_for('auth.login'))
+
+
+@main_bp.route('/activity')
+@role_required(ROLE_DENTIST)
+def activity():
+    """Audit-log viewer (nested scope): staff get 403 (role gate); a dentist sees
+    their own clinics' activity (self + their staff); an app admin sees everything,
+    grouped by owning dentist. Entries are PHI-free (see audit_log repo)."""
+    page = max(1, request.args.get('page', 1, type=int))
+    skip = (page - 1) * AUDIT_PAGE_SIZE
+    admin = is_admin()
+
+    if admin:
+        entries = audit_repo.find_all(AUDIT_PAGE_SIZE, skip)
+        total = audit_repo.count_all()
+    else:
+        dentist_id = session['user_id']
+        entries = audit_repo.find_for_dentist(dentist_id, AUDIT_PAGE_SIZE, skip)
+        total = audit_repo.count_for_dentist(dentist_id)
+
+    # Resolve actor/dentist ids to display names (cached). Names of *users* (staff/
+    # dentists), never patient PHI — the entries themselves carry no patient data.
+    name_cache = {}
+
+    def name_of(uid):
+        if not uid:
+            return '—'
+        if uid not in name_cache:
+            u = user_repo.get(uid)
+            name_cache[uid] = (u.get('name') or u.get('email') or uid) if u else uid
+        return name_cache[uid]
+
+    for e in entries:
+        e['actor_name'] = name_of(e.get('actor_user_id'))
+        e['dentist_name'] = name_of(e.get('dentist_id'))
+
+    # Admin view groups by owning dentist; dentist view is a flat list.
+    grouped = None
+    if admin:
+        grouped = {}
+        for e in entries:
+            key = e.get('dentist_id') or '—'
+            grouped.setdefault(key, {'dentist_name': e['dentist_name'], 'entries': []})
+            grouped[key]['entries'].append(e)
+
+    total_pages = max(1, (total + AUDIT_PAGE_SIZE - 1) // AUDIT_PAGE_SIZE)
+    return render_template(
+        'audit/activity.html',
+        entries=entries, grouped=grouped, admin=admin,
+        page=page, total_pages=total_pages, total=total,
+    )
 
 
 @main_bp.route('/dashboard')

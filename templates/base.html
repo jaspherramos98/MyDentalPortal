@@ -86,6 +86,11 @@
                             <i class="fas fa-user-nurse"></i> Staff
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.activity') }}">
+                            <i class="fas fa-clock-rotate-left"></i> Activity
+                        </a>
+                    </li>
                     {% endif %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('reports.reports') }}">
