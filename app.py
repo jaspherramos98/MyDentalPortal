@@ -251,6 +251,9 @@ def init_database():
         mongo.db.patient_files.create_index("patient_id")
         mongo.db.appointments.create_index([("clinic_id", 1), ("date", 1)])
         mongo.db.appointments.create_index("patient_id")
+        # Multi-staff: staff<->dentist links (access seam reads by user_id).
+        mongo.db.memberships.create_index([("user_id", 1), ("is_active", 1)])
+        mongo.db.memberships.create_index("dentist_id")
 
         if mongo.db.users.count_documents({}) == 0:
             mongo.db.users.insert_one({

@@ -6,6 +6,7 @@ from bson.errors import InvalidId
 
 from extensions import mongo
 from blueprints.models import validate_patient
+from blueprints.repositories import memberships as _membership_repo
 
 
 # Every nested dict the detail/list templates may access — keep in sync with
@@ -53,22 +54,24 @@ def active_in_clinics(clinic_ids, sort_field='personal_info.first_name'):
     )
 
 
-def get_for_owner(patient_id, owner_id):
-    """Return (patient, clinic) scoped to an owner — the access-control seam.
+def get_for_accessor(patient_id, user_id):
+    """Return (patient, clinic) if user_id may access the patient — the access seam.
+
+    Access = the patient's clinic is owned by the user (dentist) OR by a dentist
+    the user is a staff member of (membership). This is THE single multi-staff
+    access check; routes call it via ``utils.verify_patient_access``.
 
     * (None, None)        -> patient missing or id malformed.
-    * (patient, None)     -> patient exists but owner does NOT own its clinic;
+    * (patient, None)     -> patient exists but the user may NOT access its clinic;
                              the caller must treat this as access denied.
     * (patient, clinic)   -> access granted.
-
-    Multi-staff later changes ONLY this function (owner_id -> membership lookup).
     """
     patient = get(patient_id)
     if not patient:
         return None, None
     clinic = mongo.db.clinics.find_one({
         '_id': patient['clinic_id'],
-        'owner_id': owner_id,
+        'owner_id': {'$in': _membership_repo.accessible_owner_ids(user_id)},
     })
     return patient, clinic
 

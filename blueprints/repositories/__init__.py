@@ -4,6 +4,7 @@
 #
 # Why this exists: routes used to query mongo.db directly and re-implement the
 # same access-control check in several places. Centralising reads/writes here
-# gives multi-staff/audit-log/pricing work a single seam to change later — e.g.
-# swapping owner-based access for membership-based access touches ONE function
-# (patients.get_for_owner) instead of every route.
+# gives multi-staff/audit-log/pricing work a single seam to change. The
+# membership-based access swap landed here: patients.get_for_accessor +
+# clinics.accessible_ids resolve "who can touch this?" via memberships, so routes
+# never re-implement it.

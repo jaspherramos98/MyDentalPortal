@@ -1,7 +1,14 @@
 # File: MyDentalPortal/blueprints/repositories/clinics.py
-# Clinic reads scoped to an owner. Thin wrapper over mongo.db.
+# Clinic reads. Thin wrapper over mongo.db.
+#
+# Two scoping concepts, kept distinct on purpose:
+#   * owned_*  -> clinics a user OWNS (dentist). Use for clinic management
+#                 (create/edit/delete, settings) — staff must NOT widen this.
+#   * accessible_ids -> clinics a user may WORK IN: owned + via staff membership.
+#                 Use for patient/appointment listing scope (the access seam).
 
 from extensions import mongo
+from blueprints.repositories import memberships as _membership_repo
 
 
 def owned_by(owner_id, active_only=True):
@@ -17,6 +24,22 @@ def owned_ids(owner_id):
     return [
         c['_id'] for c in
         mongo.db.clinics.find({'owner_id': owner_id, 'is_active': True}, {'_id': 1})
+    ]
+
+
+def accessible_ids(user_id):
+    """ObjectIds of all active clinics this user may work in: the ones they own
+    (dentist) PLUS the ones owned by any dentist they're a staff member of.
+
+    The multi-staff listing seam (``utils.user_clinic_ids`` delegates here). With
+    no memberships this equals ``owned_ids(user_id)`` — existing single-dentist
+    behaviour is unchanged."""
+    owner_ids = _membership_repo.accessible_owner_ids(user_id)
+    return [
+        c['_id'] for c in
+        mongo.db.clinics.find(
+            {'owner_id': {'$in': owner_ids}, 'is_active': True}, {'_id': 1}
+        )
     ]
 
 
