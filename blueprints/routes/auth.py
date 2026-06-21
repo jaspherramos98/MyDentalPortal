@@ -12,6 +12,8 @@ import re
 from extensions import limiter
 from blueprints.repositories import users as user_repo
 from blueprints.repositories import audit_log as audit_repo
+from blueprints.repositories import access_codes as code_repo
+from blueprints.repositories import memberships as membership_repo
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -174,6 +176,85 @@ def register():
     if 'user_id' in session:
         return redirect(url_for('main.dashboard'))
     return render_template('auth/register.html')
+
+
+@auth_bp.route('/join', methods=['GET', 'POST'])
+def join():
+    """Staff self-registration via a dentist's single-use access code.
+
+    The valid code IS the vetting (decided 2026-06-21): a staff account created
+    this way is active immediately (status=approved) and linked to the dentist via
+    a membership — no separate admin approval. Single-use: the code is consumed.
+    """
+    if request.method == 'POST':
+        data = request.form
+        name = (data.get('name') or '').strip()
+        email = (data.get('email') or '').strip().lower()
+        password = data.get('password') or ''
+        confirm_password = data.get('confirm_password') or ''
+        access_code = (data.get('access_code') or '').strip()
+
+        if not all([name, email, password, access_code]):
+            flash('Please fill in all required fields', 'error')
+            return render_template('auth/join.html')
+        if password != confirm_password:
+            flash('Passwords do not match', 'error')
+            return render_template('auth/join.html')
+        if len(password) < 8:
+            flash('Password must be at least 8 characters long', 'error')
+            return render_template('auth/join.html')
+        if not _valid_email(email):
+            flash('Invalid email address', 'error')
+            return render_template('auth/join.html')
+
+        try:
+            if user_repo.get_by_email(email):
+                flash('Email already registered', 'error')
+                return render_template('auth/join.html')
+
+            # Create the staff account first, then atomically consume the code.
+            # If the code is invalid/expired/used, roll the account back so a bad
+            # code never leaves an orphaned, unlinked user.
+            user_id = user_repo.create({
+                'name': name,
+                'email': email,
+                'password': generate_password_hash(password),
+                'role': 'staff',
+                'status': 'approved',     # the access code is the vetting
+                'created_at': datetime.utcnow(),
+                'updated_at': datetime.utcnow(),
+                'is_active': True,
+            })
+
+            code_doc = code_repo.consume(access_code, used_by=user_id)
+            if not code_doc:
+                user_repo.delete(user_id)  # roll back — bad/expired/used code
+                flash('That access code is invalid, expired, or already used.', 'error')
+                return render_template('auth/join.html')
+
+            dentist_id = code_doc['dentist_id']
+            membership_id = membership_repo.create(
+                user_id, dentist_id, role='staff', created_by=dentist_id,
+            )
+            try:
+                audit_repo.record('join', 'membership', entity_id=str(membership_id),
+                                  actor_user_id=user_id, actor_role='staff',
+                                  dentist_id=dentist_id)
+            except Exception as e:  # noqa: BLE001
+                print(f"[ERROR] join audit failed: {e}")
+
+            flash('Account created. You can now log in.', 'success')
+            return redirect(url_for('auth.login'))
+
+        except Exception as e:
+            print(f"Staff join error: {e}")
+            flash('Registration failed. Please try again.', 'error')
+            return render_template('auth/join.html')
+
+    # GET
+    if 'user_id' in session:
+        return redirect(url_for('main.dashboard'))
+    return render_template('auth/join.html')
 
 
 @auth_bp.route('/logout', methods=['POST'])

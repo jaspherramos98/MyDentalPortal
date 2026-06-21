@@ -29,6 +29,15 @@ def create(doc):
     return str(mongo.db.users.insert_one(doc).inserted_id)
 
 
+def delete(user_id):
+    """Hard-delete a user (used to roll back a half-finished staff signup when the
+    access code turns out invalid). Returns the DeleteResult."""
+    try:
+        return mongo.db.users.delete_one({'_id': ObjectId(user_id)})
+    except (InvalidId, TypeError):
+        return None
+
+
 def update_set(user_id, fields):
     """Apply a ``$set`` to one user (by _id). Returns the UpdateResult so callers
     can inspect matched_count (e.g. admin password reset)."""

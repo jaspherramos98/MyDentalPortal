@@ -1,0 +1,73 @@
+<!-- File: MyDentalPortal/templates/auth/join.html -->
+<!-- Staff self-registration via a dentist's single-use access code. -->
+
+{% extends "base.html" %}
+
+{% block title %}Join as Staff - Dental Portal{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    <i class="fas fa-user-nurse fa-3x text-primary mb-3"></i>
+                    <h3>Join as Staff</h3>
+                    <p class="text-muted">
+                        Enter the access code your dentist gave you to create your account.
+                    </p>
+                </div>
+
+                <form method="POST" action="{{ url_for('auth.join') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Full Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="email" name="email"
+                               placeholder="your-email@example.com" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password"
+                               placeholder="At least 8 characters" minlength="8" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirm Password</label>
+                        <input type="password" class="form-control" id="confirm_password"
+                               name="confirm_password" minlength="8" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="access_code" class="form-label">Access Code</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-key"></i></span>
+                            <input type="text" class="form-control" id="access_code"
+                                   name="access_code" placeholder="Paste your access code" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 mb-3">
+                        <i class="fas fa-user-plus"></i> Create account
+                    </button>
+                </form>
+
+                <div class="text-center">
+                    <p class="mb-0">
+                        Already have an account?
+                        <a href="{{ url_for('auth.login') }}" class="text-decoration-none fw-bold">
+                            Log in
+                        </a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
