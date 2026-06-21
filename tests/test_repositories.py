@@ -189,6 +189,18 @@ def test_memberships_list_for_dentist(db):
     assert len(membership_repo.list_for_dentist(dentist)) == 2
 
 
+def test_memberships_get_and_revoke_by_id(db):
+    from blueprints.repositories import memberships as membership_repo
+    user, dentist = str(ObjectId()), str(ObjectId())
+    mid = membership_repo.create(user, dentist, role="staff")
+    assert membership_repo.get(str(mid))["user_id"] == user
+    assert membership_repo.revoke_by_id(str(mid)).modified_count == 1
+    assert membership_repo.dentist_ids_for(user) == []   # revoked -> no access
+    # malformed ids are safe
+    assert membership_repo.get("not-an-id") is None
+    assert membership_repo.revoke_by_id("not-an-id") is None
+
+
 # ── charts repo ─────────────────────────────────────────────────────────────
 def test_charts_insert_get_and_upsert(db):
     patient_id = ObjectId()

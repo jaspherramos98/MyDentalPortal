@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Admin Panel{% endblock %}
+
+{% macro role_form(u) %}
+<form method="POST" action="{{ url_for('admin.set_role', user_id=u._id) }}" class="d-inline-flex gap-1">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <select name="role" class="form-select form-select-sm" style="width:auto;">
+        <option value="dentist" {{ 'selected' if u.role == 'dentist' }}>dentist</option>
+        <option value="staff" {{ 'selected' if u.role == 'staff' }}>staff</option>
+        <option value="admin" {{ 'selected' if u.role == 'admin' }}>admin</option>
+    </select>
+    <button type="submit" class="btn btn-sm btn-outline-primary">Set role</button>
+</form>
+{% endmacro %}
+
+{% macro active_form(u) %}
+<form method="POST" action="{{ url_for('admin.set_active', user_id=u._id) }}" class="d-inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="active" value="{{ '0' if u.is_active else '1' }}">
+    <button type="submit" class="btn btn-sm {{ 'btn-outline-warning' if u.is_active else 'btn-outline-success' }}">
+        {{ 'Deactivate' if u.is_active else 'Activate' }}
+    </button>
+</form>
+{% endmacro %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-3"><i class="fas fa-users-gear"></i> Admin Panel</h2>
+    <p class="text-muted small">Every dentist and the staff linked to them. Manage roles, account status, and staff links.</p>
+
+    {% for row in rows %}
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <i class="fas fa-user-md"></i> <strong>{{ row.dentist.name }}</strong>
+                <span class="text-muted">&lt;{{ row.dentist.email }}&gt;</span>
+                <span class="badge bg-primary">{{ row.dentist.role }}</span>
+                {% if not row.dentist.is_active %}<span class="badge bg-secondary">inactive</span>{% endif %}
+            </div>
+            <div class="d-flex gap-2">
+                {{ role_form(row.dentist) }}
+                {{ active_form(row.dentist) }}
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if row.staff %}
+            <table class="table mb-0 align-middle">
+                <thead><tr><th>Staff</th><th>Email</th><th>Status</th><th class="text-end">Manage</th></tr></thead>
+                <tbody>
+                    {% for s in row.staff %}
+                    <tr>
+                        <td>{{ s.user.name }} <span class="badge bg-secondary">{{ s.user.role }}</span></td>
+                        <td>{{ s.user.email }}</td>
+                        <td>{% if s.user.is_active %}<span class="badge bg-success">active</span>{% else %}<span class="badge bg-secondary">inactive</span>{% endif %}</td>
+                        <td class="text-end">
+                            <div class="d-inline-flex gap-2 flex-wrap justify-content-end">
+                                {{ role_form(s.user) }}
+                                {{ active_form(s.user) }}
+                                <form method="POST" action="{{ url_for('admin.revoke_membership', membership_id=s.membership_id) }}"
+                                      onsubmit="return confirm('Unlink this staff member from {{ row.dentist.name }}?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Unlink</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="p-3 text-muted">No staff linked.</div>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="card"><div class="card-body text-muted">No dentists registered.</div></div>
+    {% endfor %}
+</div>
+{% endblock %}

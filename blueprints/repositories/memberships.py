@@ -12,6 +12,9 @@
 
 from datetime import datetime
 
+from bson.objectid import ObjectId
+from bson.errors import InvalidId
+
 from extensions import mongo
 
 
@@ -57,5 +60,25 @@ def deactivate(user_id, dentist_id):
     """Soft-revoke a staff link (keep the row for the audit trail)."""
     return mongo.db.memberships.update_one(
         {'user_id': user_id, 'dentist_id': dentist_id},
+        {'$set': {'is_active': False, 'revoked_at': datetime.utcnow()}},
+    )
+
+
+def get(membership_id):
+    """One membership by id, or None for a missing/malformed id."""
+    try:
+        return mongo.db.memberships.find_one({'_id': ObjectId(membership_id)})
+    except (InvalidId, TypeError):
+        return None
+
+
+def revoke_by_id(membership_id):
+    """Soft-revoke a membership by its _id (admin panel). Returns UpdateResult."""
+    try:
+        oid = ObjectId(membership_id)
+    except (InvalidId, TypeError):
+        return None
+    return mongo.db.memberships.update_one(
+        {'_id': oid},
         {'$set': {'is_active': False, 'revoked_at': datetime.utcnow()}},
     )
