@@ -27,6 +27,13 @@ def index():
     return redirect(url_for('auth.login'))
 
 
+@main_bp.route('/privacy')
+def privacy():
+    """Public privacy notice (RA 10173 right-to-be-informed). Static content;
+    clinic-specific details (DPO name/contact) are placeholders to fill in."""
+    return render_template('privacy.html')
+
+
 @main_bp.route('/activity')
 @role_required(ROLE_DENTIST)
 def activity():

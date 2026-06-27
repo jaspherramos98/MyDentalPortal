@@ -207,6 +207,14 @@ def create_patient():
                         'other': (f.get('condition_other') or '').strip(),
                     },
                 },
+                # Data Privacy Act (RA 10173) consent record — proof of lawful
+                # basis at the time the record was created.
+                'privacy_consent': {
+                    'given': f.get('privacy_consent') == 'yes',
+                    'at': datetime.utcnow(),
+                    'version': '1.0',
+                    'by_user_id': session['user_id'],
+                },
                 'created_by': session['user_id'],
                 'created_at': datetime.utcnow(),
                 'updated_at': datetime.utcnow(),
@@ -228,6 +236,13 @@ def create_patient():
                         ci['office_number'], ci['email']]):
                 flash('Please provide at least one contact method '
                       '(home, cell, or office phone, or email).', 'error')
+                return render_template('patients/create.html',
+                                       clinics=user_clinics, form_data=f)
+
+            # Data privacy consent is required to establish lawful basis (RA 10173).
+            if not patient_data['privacy_consent']['given']:
+                flash('Patient data privacy consent is required to create a record.',
+                      'error')
                 return render_template('patients/create.html',
                                        clinics=user_clinics, form_data=f)
 
