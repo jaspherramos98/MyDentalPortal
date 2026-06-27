@@ -148,6 +148,7 @@ def build_patient_pdf(patient, clinic, photo_bytes=None):
     story.append(kv([
         ('Blood Type', mh.get('blood_type')),
         ('Blood Pressure', mh.get('blood_pressure')),
+        ('Weight', mh.get('weight')),
         ('Bleeding Time', mh.get('bleeding_time')),
     ]))
 
