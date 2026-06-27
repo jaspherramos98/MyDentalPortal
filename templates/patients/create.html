@@ -427,7 +427,7 @@
                 <!-- Vital Signs -->
                 <h6 class="mt-4 mb-3">Vital Signs</h6>
                 <div class="row">
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
                         <label for="blood_type" class="form-label">Blood Type</label>
                         <select class="form-select" id="blood_type" name="blood_type">
                             <option value="">Select Blood Type</option>
@@ -441,14 +441,19 @@
                             <option value="O-" {{ 'selected' if form_data.get('blood_type') == 'O-' }}>O-</option>
                         </select>
                     </div>
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
                         <label for="blood_pressure" class="form-label">Blood Pressure</label>
-                        <input type="text" class="form-control" id="blood_pressure" name="blood_pressure" 
+                        <input type="text" class="form-control" id="blood_pressure" name="blood_pressure"
                                placeholder="120/80" value="{{ form_data.get('blood_pressure', '') }}">
                     </div>
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
+                        <label for="weight" class="form-label">Weight</label>
+                        <input type="text" class="form-control" id="weight" name="weight"
+                               placeholder="e.g. 65 kg" value="{{ form_data.get('weight', '') }}">
+                    </div>
+                    <div class="col-md-3 mb-3">
                         <label for="bleeding_time" class="form-label">Bleeding Time</label>
-                        <input type="text" class="form-control" id="bleeding_time" name="bleeding_time" 
+                        <input type="text" class="form-control" id="bleeding_time" name="bleeding_time"
                                value="{{ form_data.get('bleeding_time', '') }}">
                     </div>
                 </div>

@@ -258,17 +258,23 @@
                 <hr>
                 <h5 class="mb-3 text-primary"><i class="fas fa-chart-line me-1"></i> Vital Signs</h5>
                 <div class="row mb-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">Blood Type</label>
                         <input type="text" class="form-control" name="blood_type"
                                value="{{ patient.medical_history.get('blood_type', '') }}">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">Blood Pressure</label>
                         <input type="text" class="form-control" name="blood_pressure"
                                value="{{ patient.medical_history.get('blood_pressure', '') }}">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                        <label class="form-label">Weight</label>
+                        <input type="text" class="form-control" name="weight"
+                               placeholder="e.g. 65 kg"
+                               value="{{ patient.medical_history.get('weight', '') }}">
+                    </div>
+                    <div class="col-md-3">
                         <label class="form-label">Bleeding Time</label>
                         <input type="text" class="form-control" name="bleeding_time"
                                value="{{ patient.medical_history.get('bleeding_time', '') }}">

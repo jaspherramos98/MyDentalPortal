@@ -176,6 +176,7 @@ def create_patient():
                     'current_medications': (f.get('current_medications') or '').strip(),
                     'blood_type': (f.get('blood_type') or '').strip(),
                     'blood_pressure': (f.get('blood_pressure') or '').strip(),
+                    'weight': (f.get('weight') or '').strip(),
                     'bleeding_time': (f.get('bleeding_time') or '').strip(),
                     'allergies': {
                         'local_anesthesia': 'allergy_anesthetic' in f,
@@ -430,6 +431,7 @@ def edit_patient(patient_id):
                 'medical_history.current_medications': (f.get('current_medications') or '').strip(),
                 'medical_history.blood_type': (f.get('blood_type') or '').strip(),
                 'medical_history.blood_pressure': (f.get('blood_pressure') or '').strip(),
+                'medical_history.weight': (f.get('weight') or '').strip(),
                 'medical_history.bleeding_time': (f.get('bleeding_time') or '').strip(),
                 'medical_history.allergies.local_anesthesia': 'allergy_anesthetic' in f,
                 'medical_history.allergies.penicillin': 'allergy_penicillin' in f,
