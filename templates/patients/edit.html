@@ -17,7 +17,7 @@
             — {{ clinic.name }}
         </div>
         <div class="card-body">
-            <form method="POST" action="{{ url_for('patients.edit_patient', patient_id=patient._id) }}">
+            <form method="POST" action="{{ url_for('patients.edit_patient', patient_id=patient._id) }}" id="editPatientForm">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <h5 class="mb-3 text-primary"><i class="fas fa-user me-1"></i> Personal Information</h5>
                 <div class="row mb-3">
@@ -80,7 +80,9 @@
                 </div>
 
                 <hr>
-                <h5 class="mb-3 text-primary"><i class="fas fa-phone me-1"></i> Contact Information</h5>
+                <h5 class="mb-3 text-primary"><i class="fas fa-phone me-1"></i> Contact Information
+                    <small class="text-danger fw-normal">* — provide at least one</small>
+                </h5>
                 <div class="row mb-3">
                     <div class="col-md-12">
                         <label class="form-label">Home Address</label>
@@ -90,22 +92,22 @@
                 <div class="row mb-3">
                     <div class="col-md-3">
                         <label class="form-label">Landline</label>
-                        <input type="text" class="form-control" name="landline"
+                        <input type="text" class="form-control contact-method" name="landline"
                                value="{{ patient.contact_info.get('landline', '') }}">
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Cell Phone</label>
-                        <input type="text" class="form-control" name="cell_phone"
+                        <input type="text" class="form-control contact-method" name="cell_phone"
                                value="{{ patient.contact_info.get('cell_phone', '') }}">
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Office No.</label>
-                        <input type="text" class="form-control" name="office_number"
+                        <input type="text" class="form-control contact-method" name="office_number"
                                value="{{ patient.contact_info.get('office_number', '') }}">
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Email</label>
-                        <input type="email" class="form-control" name="patient_email"
+                        <input type="email" class="form-control contact-method" name="patient_email"
                                value="{{ patient.contact_info.get('email', '') }}">
                     </div>
                 </div>
@@ -411,4 +413,20 @@
         </div>
     </div>
 </div>
+
+<script>
+// Require at least one contact method (landline/cell/office/email) before save.
+document.getElementById('editPatientForm')?.addEventListener('submit', function (e) {
+    const fields = Array.from(document.querySelectorAll('.contact-method'));
+    const hasContact = fields.some(el => el.value.trim().length > 0);
+    if (!hasContact) {
+        e.preventDefault();
+        fields.forEach(el => el.classList.add('is-invalid'));
+        fields[0]?.focus();
+        alert('Please provide at least one contact method (home, cell, or office phone, or email).');
+    } else {
+        fields.forEach(el => el.classList.remove('is-invalid'));
+    }
+});
+</script>
 {% endblock %}

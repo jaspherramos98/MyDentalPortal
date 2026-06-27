@@ -39,6 +39,18 @@ def list_patients():
         search_query = request.args.get('search', '')
         clinic_filter = request.args.get('clinic_id', '')
 
+        # Sort: default alphabetical (last name, then first name). Whitelist the
+        # option so user input can't drive an arbitrary Mongo sort.
+        sort_options = {
+            'name_asc': [('personal_info.last_name', 1), ('personal_info.first_name', 1)],
+            'name_desc': [('personal_info.last_name', -1), ('personal_info.first_name', -1)],
+            'newest': [('created_at', -1)],
+            'oldest': [('created_at', 1)],
+        }
+        sort_by = request.args.get('sort', 'name_asc')
+        if sort_by not in sort_options:
+            sort_by = 'name_asc'
+
         query = {'is_active': True}
         if clinic_filter:
             query['clinic_id'] = ObjectId(clinic_filter)
@@ -63,7 +75,7 @@ def list_patients():
 
         patients = list(
             mongo.db.patients.find(query)
-            .sort('created_at', -1)
+            .sort(sort_options[sort_by])
             .skip((page - 1) * per_page)
             .limit(per_page)
         )
@@ -80,6 +92,7 @@ def list_patients():
             total_pages=total_pages,
             selected_clinic=clinic_filter,
             search_query=search_query,
+            sort_by=sort_by,
         )
     except Exception as e:
         print(f"[ERROR] Patients list: {e}")
@@ -90,6 +103,7 @@ def list_patients():
             patients=[], clinics=[],
             current_page=1, total_pages=1,
             selected_clinic=None, search_query='',
+            sort_by='name_asc',
         )
 
 
@@ -204,6 +218,15 @@ def create_patient():
                                        clinics=user_clinics, form_data=f)
             if not patient_data['personal_info']['last_name']:
                 flash('Last name is required', 'error')
+                return render_template('patients/create.html',
+                                       clinics=user_clinics, form_data=f)
+
+            # Require at least one contact method (mirrors the client-side rule).
+            ci = patient_data['contact_info']
+            if not any([ci['landline'], ci['cell_phone'],
+                        ci['office_number'], ci['email']]):
+                flash('Please provide at least one contact method '
+                      '(home, cell, or office phone, or email).', 'error')
                 return render_template('patients/create.html',
                                        clinics=user_clinics, form_data=f)
 
@@ -356,6 +379,20 @@ def edit_patient(patient_id):
 
         if request.method == 'POST':
             f = request.form
+
+            # Require at least one contact method (mirrors the client-side rule).
+            if not any([
+                (f.get('landline') or '').strip(),
+                (f.get('cell_phone') or '').strip(),
+                (f.get('office_number') or '').strip(),
+                (f.get('patient_email') or '').strip(),
+            ]):
+                flash('Please provide at least one contact method '
+                      '(home, cell, or office phone, or email).', 'error')
+                return render_template('patients/edit.html',
+                                       patient=patient, clinics=user_clinics,
+                                       clinic=clinic)
+
             update_data = {
                 'personal_info.first_name': (f.get('first_name') or '').strip(),
                 'personal_info.last_name': (f.get('last_name') or '').strip(),

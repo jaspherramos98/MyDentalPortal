@@ -128,61 +128,47 @@
 
     <!-- Main Content Grid -->
     <div class="row">
-        <!-- Your Clinics -->
+        <!-- Today's Appointments -->
         <div class="col-md-6 mb-4">
             <div class="card shadow-sm h-100">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-clinic-medical me-2"></i> Your Clinics</h5>
-                    <a href="{{ url_for('clinics.create_clinic') }}" class="btn btn-sm btn-outline-light">
-                        <i class="fas fa-plus"></i> Add Clinic
+                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-calendar-day me-2"></i> Today's Appointments</h5>
+                    <a href="{{ url_for('appointments.appointments') }}" class="btn btn-sm btn-outline-dark">
+                        View Calendar
                     </a>
                 </div>
                 <div class="card-body">
-                    {% if clinics %}
-                        <div class="clinic-list">
-                            {% for clinic in clinics %}
-                            <div class="clinic-item p-3 mb-3 bg-light rounded border-start border-4 border-primary">
+                    {% if today_appointments %}
+                        <div class="appointment-list">
+                            {% for appointment in today_appointments %}
+                            <div class="appointment-card p-3 mb-3 border rounded bg-light border-start border-4 border-warning">
                                 <div class="d-flex justify-content-between align-items-start">
-                                    <div class="flex-grow-1">
-                                        <h6 class="mb-1 text-primary fw-bold">{{ clinic.name }}</h6>
+                                    <div>
+                                        <h6 class="mb-1 fw-bold">{{ appointment.patient_name }}</h6>
                                         <p class="mb-1 text-muted small">
-                                            <i class="fas fa-map-marker-alt me-1"></i>
-                                            {{ clinic.address or 'No address specified' }}
+                                            <i class="fas fa-clock me-1"></i> {{ appointment.time }}
                                         </p>
                                         <p class="mb-0 text-muted small">
-                                            <i class="fas fa-phone me-1"></i>
-                                            {{ clinic.phone or 'No phone' }}
+                                            <i class="fas fa-stethoscope me-1"></i> {{ appointment.type or 'Checkup' }}
                                         </p>
                                     </div>
-                                    <div class="text-end">
-                                        <small class="text-muted">{{ clinic.created_at | datefmt('%m/%d/%Y') }}</small>
-                                        <div class="mt-1">
-                                            <a href="{{ url_for('patients.list_patients') }}?clinic_id={{ clinic._id }}" 
-                                               class="btn btn-sm btn-outline-primary me-1" title="View Patients">
-                                                <i class="fas fa-users"></i>
-                                            </a>
-                                            <a href="{{ url_for('appointments.appointments') }}?clinic_id={{ clinic._id }}" 
-                                               class="btn btn-sm btn-primary" title="View Schedule">
-                                                <i class="fas fa-calendar"></i>
-                                            </a>
-                                        </div>
-                                    </div>
+                                    <span class="badge bg-warning text-dark">{{ appointment.status or 'Scheduled' }}</span>
                                 </div>
                             </div>
                             {% endfor %}
                         </div>
                         <div class="text-center mt-3">
-                            <a href="{{ url_for('clinics.list_clinics') }}" class="btn btn-outline-primary">
-                                <i class="fas fa-clinic-medical me-1"></i> Manage All Clinics
+                            <a href="{{ url_for('appointments.appointments') }}" class="btn btn-outline-warning text-dark">
+                                <i class="fas fa-calendar-day me-1"></i> View Calendar
                             </a>
                         </div>
                     {% else %}
                         <div class="text-center py-5">
-                            <i class="fas fa-clinic-medical fa-4x text-muted mb-3"></i>
-                            <h6 class="text-muted">No clinics yet</h6>
-                            <p class="text-muted small">Add your first clinic to get started!</p>
-                            <a href="{{ url_for('clinics.create_clinic') }}" class="btn btn-primary">
-                                <i class="fas fa-plus me-1"></i> Add Your First Clinic
+                            <i class="fas fa-calendar-day fa-4x text-muted mb-3"></i>
+                            <h6 class="text-muted">No appointments today</h6>
+                            <p class="text-muted small">Your schedule is clear for today.</p>
+                            <a href="{{ url_for('appointments.appointments') }}" class="btn btn-warning text-dark">
+                                <i class="fas fa-calendar me-1"></i> View Calendar
                             </a>
                         </div>
                     {% endif %}
@@ -253,43 +239,71 @@
         </div>
     </div>
 
-    <!-- Today's Appointments -->
-    {% if today_appointments %}
+    <!-- Your Clinics -->
     <div class="row">
         <div class="col-12 mb-4">
             <div class="card shadow-sm">
-                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-calendar-day me-2"></i> Today's Appointments</h5>
-                    <a href="{{ url_for('appointments.appointments') }}" class="btn btn-sm btn-outline-dark">
-                        View Calendar
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-clinic-medical me-2"></i> Your Clinics</h5>
+                    <a href="{{ url_for('clinics.create_clinic') }}" class="btn btn-sm btn-outline-light">
+                        <i class="fas fa-plus"></i> Add Clinic
                     </a>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        {% for appointment in today_appointments %}
-                        <div class="col-md-6 col-lg-4 mb-3">
-                            <div class="appointment-card p-3 border rounded bg-light border-start border-4 border-warning">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <h6 class="mb-1 fw-bold">{{ appointment.patient_name }}</h6>
-                                        <p class="mb-1 text-muted small">
-                                            <i class="fas fa-clock me-1"></i> {{ appointment.time }}
-                                        </p>
-                                        <p class="mb-0 text-muted small">
-                                            <i class="fas fa-stethoscope me-1"></i> {{ appointment.type or 'Checkup' }}
-                                        </p>
+                    {% if clinics %}
+                        <div class="row">
+                            {% for clinic in clinics %}
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <div class="clinic-item p-3 h-100 bg-light rounded border-start border-4 border-primary">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1 text-primary fw-bold">{{ clinic.name }}</h6>
+                                            <p class="mb-1 text-muted small">
+                                                <i class="fas fa-map-marker-alt me-1"></i>
+                                                {{ clinic.address or 'No address specified' }}
+                                            </p>
+                                            <p class="mb-0 text-muted small">
+                                                <i class="fas fa-phone me-1"></i>
+                                                {{ clinic.phone or 'No phone' }}
+                                            </p>
+                                        </div>
+                                        <div class="text-end">
+                                            <small class="text-muted">{{ clinic.created_at | datefmt('%m/%d/%Y') }}</small>
+                                            <div class="mt-1">
+                                                <a href="{{ url_for('patients.list_patients') }}?clinic_id={{ clinic._id }}"
+                                                   class="btn btn-sm btn-outline-primary me-1" title="View Patients">
+                                                    <i class="fas fa-users"></i>
+                                                </a>
+                                                <a href="{{ url_for('appointments.appointments') }}?clinic_id={{ clinic._id }}"
+                                                   class="btn btn-sm btn-primary" title="View Schedule">
+                                                    <i class="fas fa-calendar"></i>
+                                                </a>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <span class="badge bg-warning text-dark">{{ appointment.status or 'Scheduled' }}</span>
                                 </div>
                             </div>
+                            {% endfor %}
                         </div>
-                        {% endfor %}
-                    </div>
+                        <div class="text-center mt-3">
+                            <a href="{{ url_for('clinics.list_clinics') }}" class="btn btn-outline-primary">
+                                <i class="fas fa-clinic-medical me-1"></i> Manage All Clinics
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-clinic-medical fa-4x text-muted mb-3"></i>
+                            <h6 class="text-muted">No clinics yet</h6>
+                            <p class="text-muted small">Add your first clinic to get started!</p>
+                            <a href="{{ url_for('clinics.create_clinic') }}" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i> Add Your First Clinic
+                            </a>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
-    {% endif %}
 
     <!-- Getting Started Guide (only show if no clinics) -->
     {% if not clinics %}
