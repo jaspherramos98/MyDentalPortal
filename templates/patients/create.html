@@ -146,13 +146,15 @@
 
             <!-- Contact Information Section -->
             <div class="form-section">
-                <h5><i class="fas fa-phone"></i> Contact Information</h5>
+                <h5><i class="fas fa-phone"></i> Contact Information
+                    <span class="required">*</span>
+                    <small class="text-muted fw-normal">— provide at least one</small>
+                </h5>
                 <div class="row">
                     <div class="col-md-3 mb-3">
-                        <label for="home_phone" class="form-label">Home Phone <span class="required">*</span></label>
-                        <input type="tel" class="form-control" id="home_phone" name="home_phone" 
-                            value="{{ form_data.get('home_phone', '') }}" required>
-                        <div class="invalid-feedback">Please provide a home phone number.</div>
+                        <label for="home_phone" class="form-label">Home Phone</label>
+                        <input type="tel" class="form-control" id="home_phone" name="home_phone"
+                            value="{{ form_data.get('home_phone', '') }}">
                     </div>
                     <div class="col-md-3 mb-3">
                         <label for="cell_phone" class="form-label">Cell Phone</label>
@@ -768,6 +770,20 @@
                     }
                 }
             });
+
+            // Require at least one contact method (home/cell/office phone or email)
+            const contactIds = ['home_phone', 'cell_phone', 'office_phone', 'email'];
+            const hasContact = contactIds.some(id => {
+                const el = document.getElementById(id);
+                return el && el.value.trim().length > 0;
+            });
+            if (!hasContact) {
+                contactIds.forEach(id => document.getElementById(id)?.classList.add('is-invalid'));
+                errors.push('Please provide at least one contact method (home, cell, or office phone, or email).');
+                isValid = false;
+            } else {
+                contactIds.forEach(id => document.getElementById(id)?.classList.remove('is-invalid'));
+            }
 
             // Check minor guardian requirement
             const age = parseInt(document.getElementById('age')?.value || 0);

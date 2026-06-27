@@ -14,12 +14,16 @@
 </div>
 
 <!-- Search and Filter -->
-<div class="row mb-4">
-    <div class="col-md-8">
+<div class="row mb-4 g-2">
+    <div class="col-md-6">
         <form method="GET" class="d-flex">
-            <input type="text" class="form-control me-2" name="search" 
-                   placeholder="Search patients by name, nickname, or phone..." 
+            <input type="text" class="form-control me-2" name="search"
+                   placeholder="Search patients by name, nickname, or phone..."
                    value="{{ search_query }}">
+            {% if selected_clinic %}
+            <input type="hidden" name="clinic_id" value="{{ selected_clinic }}">
+            {% endif %}
+            <input type="hidden" name="sort" value="{{ sort_by }}">
             <button type="submit" class="btn btn-outline-primary">
                 <i class="fas fa-search"></i>
             </button>
@@ -30,18 +34,35 @@
             {% endif %}
         </form>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <form method="GET">
             {% if search_query %}
             <input type="hidden" name="search" value="{{ search_query }}">
             {% endif %}
-            <select class="form-select" name="clinic_id" onchange="this.form.submit()">
+            <input type="hidden" name="sort" value="{{ sort_by }}">
+            <select class="form-select" name="clinic_id" onchange="this.form.submit()" title="Filter by clinic">
                 <option value="">All Clinics</option>
                 {% for clinic in clinics %}
                 <option value="{{ clinic._id }}" {{ 'selected' if selected_clinic == clinic._id|string }}>
                     {{ clinic.name }}
                 </option>
                 {% endfor %}
+            </select>
+        </form>
+    </div>
+    <div class="col-md-3">
+        <form method="GET">
+            {% if search_query %}
+            <input type="hidden" name="search" value="{{ search_query }}">
+            {% endif %}
+            {% if selected_clinic %}
+            <input type="hidden" name="clinic_id" value="{{ selected_clinic }}">
+            {% endif %}
+            <select class="form-select" name="sort" onchange="this.form.submit()" title="Sort patients">
+                <option value="name_asc" {{ 'selected' if sort_by == 'name_asc' }}>Name (A–Z)</option>
+                <option value="name_desc" {{ 'selected' if sort_by == 'name_desc' }}>Name (Z–A)</option>
+                <option value="newest" {{ 'selected' if sort_by == 'newest' }}>Newest first</option>
+                <option value="oldest" {{ 'selected' if sort_by == 'oldest' }}>Oldest first</option>
             </select>
         </form>
     </div>
