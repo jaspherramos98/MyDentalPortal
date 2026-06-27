@@ -12,7 +12,7 @@ from flask import (
 )
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 
 from blueprints.utils import login_required, user_clinic_ids
@@ -24,13 +24,19 @@ reports_bp = Blueprint('reports', __name__)
 
 CURRENCY_SYMBOLS = {'PHP': '₱', 'USD': '$'}
 
-# Period options shown in the selector → number of months back (None = all time).
-RANGES = {
-    'thismonth': 0,
-    '6m': 5,
-    '12m': 11,
-    'all': None,
+# Period options shown in the selector → human label. The two short ranges
+# (today / this week) bucket the time-series by DAY; the rest bucket by MONTH
+# (a daily axis over months would be unreadable, a monthly axis over a day or
+# week would collapse to a single bar).
+PERIODS = {
+    'today': 'Today',
+    'thisweek': 'This week',
+    'thismonth': 'This month',
+    '6m': 'Last 6 months',
+    '12m': 'Last 12 months',
+    'all': 'All time',
 }
+DAY_BUCKET_RANGES = {'today', 'thisweek'}
 
 
 def _add_months(d, n):
@@ -85,23 +91,37 @@ def reports():
     # Default to "all time" so a clinic's older treatments are never silently
     # hidden behind a rolling window — the user narrows down with the selector.
     rng = request.args.get('range', 'all')
-    if rng not in RANGES:
+    if rng not in PERIODS:
         rng = 'all'
-    period_label = {
-        'thismonth': 'This month', '6m': 'Last 6 months',
-        '12m': 'Last 12 months', 'all': 'All time',
-    }[rng]
+    period_label = PERIODS[rng]
+    bucket = 'day' if rng in DAY_BUCKET_RANGES else 'month'
+
     today = datetime.now()
+    today_start = datetime(today.year, today.month, today.day)
     this_month = datetime(today.year, today.month, 1)
-    months_back = RANGES[rng]
-    start_dt = None if months_back is None else _add_months(this_month, -months_back)
+    if rng == 'today':
+        start_dt = today_start
+    elif rng == 'thisweek':
+        start_dt = today_start - timedelta(days=today.weekday())  # Monday
+    elif rng == 'thismonth':
+        start_dt = this_month
+    elif rng == '6m':
+        start_dt = _add_months(this_month, -5)
+    elif rng == '12m':
+        start_dt = _add_months(this_month, -11)
+    else:  # 'all'
+        start_dt = None
     start_str = start_dt.strftime('%Y-%m-%d') if start_dt else None
+    # Key length / strftime used to bucket a date into the series.
+    key_len = 10 if bucket == 'day' else 7
+    key_fmt = '%Y-%m-%d' if bucket == 'day' else '%Y-%m'
 
     # ── empty scope short-circuit ──
     if not scope_ids:
         return render_template(
             'reports/index.html', clinics=clinics, selected_clinic=sel,
-            selected_range=rng, period_label=period_label, has_data=False, symbol=symbol,
+            selected_range=rng, period_label=period_label, bucket=bucket,
+            has_data=False, symbol=symbol,
             mixed_currency=mixed_currency, kpis={}, charts={},
         )
 
@@ -125,8 +145,8 @@ def reports():
         total_billed += charged
         total_paid += paid
 
-        d = (t.get('date') or '')[:7]   # 'YYYY-MM'
-        if len(d) == 7:
+        d = (t.get('date') or '')[:key_len]   # 'YYYY-MM' or 'YYYY-MM-DD'
+        if len(d) == key_len:
             monthly_paid[d] += paid
             monthly_billed[d] += charged
             if earliest is None or d < earliest:
@@ -162,27 +182,37 @@ def reports():
         new_patients += 1
         ca = p.get('created_at')
         if isinstance(ca, datetime):
-            key = ca.strftime('%Y-%m')
+            key = ca.strftime(key_fmt)
             monthly_new[key] += 1
             if earliest is None or key < earliest:
                 earliest = key
 
-    # ── month axis ──
-    if start_dt is None:
-        # "All time": start at the earliest data month, but cap the axis to a
-        # trailing 24-month window so stray/old dates can't render a giant chart.
-        try:
-            earliest_dt = datetime.strptime((earliest or this_month.strftime('%Y-%m')) + '-01', '%Y-%m-%d')
-        except ValueError:
-            earliest_dt = this_month
-        first = max(earliest_dt, _add_months(this_month, -23))
-        if first > this_month:
-            first = this_month
+    # ── time axis ──
+    if bucket == 'day':
+        # Daily axis from the window start to today inclusive (today = 1 day,
+        # this week = up to 7). start_dt is always set for day buckets.
+        month_keys = []
+        d = start_dt
+        while d <= today_start:
+            month_keys.append(d.strftime('%Y-%m-%d'))
+            d += timedelta(days=1)
+        month_labels = [datetime.strptime(k, '%Y-%m-%d').strftime('%b %d') for k in month_keys]
     else:
-        first = start_dt
-    month_keys = _month_range(first, this_month)
-    # Friendly labels: 'Jan 2026'
-    month_labels = [datetime.strptime(k + '-01', '%Y-%m-%d').strftime('%b %Y') for k in month_keys]
+        if start_dt is None:
+            # "All time": start at the earliest data month, but cap the axis to a
+            # trailing 24-month window so stray/old dates can't render a giant chart.
+            try:
+                earliest_dt = datetime.strptime((earliest or this_month.strftime('%Y-%m')) + '-01', '%Y-%m-%d')
+            except ValueError:
+                earliest_dt = this_month
+            first = max(earliest_dt, _add_months(this_month, -23))
+            if first > this_month:
+                first = this_month
+        else:
+            first = start_dt
+        month_keys = _month_range(first, this_month)
+        # Friendly labels: 'Jan 2026'
+        month_labels = [datetime.strptime(k + '-01', '%Y-%m-%d').strftime('%b %Y') for k in month_keys]
 
     # ── top procedures (top 8 by revenue, rest → 'Other') ──
     proc_sorted = sorted(proc_rev.items(), key=lambda kv: kv[1], reverse=True)
@@ -228,6 +258,7 @@ def reports():
         selected_clinic=sel,
         selected_range=rng,
         period_label=period_label,
+        bucket=bucket,
         has_data=(treatment_count > 0 or new_patients > 0),
         symbol=symbol,
         mixed_currency=mixed_currency,
