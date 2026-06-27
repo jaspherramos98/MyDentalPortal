@@ -16,9 +16,13 @@ class Config:
     MONGO_URI = os.environ.get('MONGO_URI') or 'mongodb://localhost:27017/dental_portal'
 
     # Session
-    PERMANENT_SESSION_LIFETIME = 86400  # 24 hours
+    PERMANENT_SESSION_LIFETIME = 86400  # 24 hours (absolute cap)
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+    # Inactivity (idle) timeout — log a user out after this many seconds with no
+    # requests. Health data should not sit open on an unattended screen. Override
+    # with IDLE_TIMEOUT_SECONDS; 0 disables.
+    IDLE_TIMEOUT_SECONDS = int(os.environ.get('IDLE_TIMEOUT_SECONDS', '1800') or 0)  # 30 min
 
     # Uploads
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB

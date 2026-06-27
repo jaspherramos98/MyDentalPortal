@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Privacy Notice - Dental Portal{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 820px;">
+    <h1 class="mb-1"><i class="fas fa-user-shield text-primary"></i> Privacy Notice</h1>
+    <p class="text-muted">Data Privacy Act of 2012 (Republic Act No. 10173)</p>
+
+    <div class="alert alert-warning py-2 small">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>Template — review with counsel before publishing.</strong>
+        Items in <code>[brackets]</code> must be completed by the clinic / operator.
+    </div>
+
+    <h5 class="mt-4">1. Who we are</h5>
+    <p>This system is operated by <strong>[Operator / Company name]</strong> on behalf of
+    <strong>[Clinic name]</strong>, which is the Personal Information Controller of the
+    patient records stored here. The system operator acts as a Personal Information
+    Processor for the clinic.</p>
+
+    <h5 class="mt-4">2. Data we collect</h5>
+    <ul>
+        <li><strong>Personal information:</strong> name, birthdate, sex, address, contact
+            details, occupation, emergency contact, guardian (for minors).</li>
+        <li><strong>Sensitive personal / health information:</strong> medical and dental
+            history, conditions, allergies, medications, vital signs, treatment records,
+            dental charts, prescriptions, and uploaded photos/documents.</li>
+        <li><strong>Account information</strong> (clinic staff): name, email, professional
+            license number, role.</li>
+    </ul>
+
+    <h5 class="mt-4">3. Why we process it (lawful basis)</h5>
+    <p>To provide and document dental care, manage appointments and billing, and meet
+    legal/record-keeping obligations. Health information is processed with the patient's
+    <strong>consent</strong> and as necessary for medical treatment, consistent with
+    Section 13 of the Data Privacy Act.</p>
+
+    <h5 class="mt-4">4. How we protect it</h5>
+    <p>Access is restricted to authorised, authenticated clinic accounts on a need-to-know
+    basis. Data is encrypted in transit (HTTPS) and at rest, access is logged, and the
+    system applies role-based access control and other technical safeguards.</p>
+
+    <h5 class="mt-4">5. Sharing</h5>
+    <p>We do not sell personal data. It is shared only with the treating clinic's authorised
+    personnel, service providers strictly necessary to run the system (e.g. hosting,
+    database), and where required by law. Service providers are bound by confidentiality
+    and data-processing terms.</p>
+
+    <h5 class="mt-4">6. Retention</h5>
+    <p>Records are kept only as long as necessary for the purposes above and for the period
+    required by applicable medical record-keeping rules <strong>[specify retention
+    period]</strong>, after which they are securely disposed of.</p>
+
+    <h5 class="mt-4">7. Your rights</h5>
+    <p>Under the Data Privacy Act you may: be informed; access your data; object to or
+    withdraw consent for processing; correct inaccurate data; have data erased or blocked;
+    obtain a copy of your data (portability); and be indemnified for damages. To exercise
+    these rights, contact the Data Protection Officer below.</p>
+
+    <h5 class="mt-4">8. Data Protection Officer</h5>
+    <p><strong>[DPO name]</strong><br>
+    Email: <strong>[dpo@email]</strong> &nbsp;|&nbsp; Phone: <strong>[contact number]</strong></p>
+
+    <h5 class="mt-4">9. Complaints</h5>
+    <p>You may also lodge a complaint with the National Privacy Commission (NPC),
+    <a href="https://privacy.gov.ph" target="_blank" rel="noopener">privacy.gov.ph</a>.</p>
+
+    <p class="text-muted small mt-4">Version 1.0 — last updated [date].</p>
+
+    <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary mb-4">
+        <i class="fas fa-arrow-left"></i> Back
+    </a>
+</div>
+{% endblock %}

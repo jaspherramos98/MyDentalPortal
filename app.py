@@ -3,8 +3,9 @@
 # All route logic lives in app/routes/*.py
 
 import os
+import time
 
-from flask import Flask, url_for, session, request
+from flask import Flask, url_for, session, request, redirect, flash
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from werkzeug.security import generate_password_hash
 from datetime import datetime
@@ -136,6 +137,27 @@ def datefmt(value, fmt='%B %d, %Y'):
         return value  # unparseable string — show it raw rather than crash
     return str(value)
 
+@app.before_request
+def enforce_idle_timeout():
+    """Log a logged-in user out after a period of inactivity. Each request
+    refreshes the activity stamp; once the gap exceeds IDLE_TIMEOUT_SECONDS the
+    session is cleared and the user is bounced to login. PHI shouldn't stay open
+    on an unattended machine. Skips static assets so they don't reset the timer."""
+    timeout = app.config.get('IDLE_TIMEOUT_SECONDS') or 0
+    if 'user_id' not in session or timeout <= 0:
+        return
+    if request.endpoint == 'static':
+        return
+    now = int(time.time())
+    last = session.get('last_activity')
+    if last is not None and now - last > timeout:
+        session.clear()
+        flash('You were signed out due to inactivity.', 'info')
+        return redirect(url_for('auth.login'))
+    session.permanent = True
+    session['last_activity'] = now
+
+
 @app.after_request
 def add_security_headers(response):
     """Security headers + no-cache for authenticated pages."""
@@ -144,6 +166,13 @@ def add_security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    # HSTS: force HTTPS for a year on any TLS connection (Render). Only sent on
+    # secure requests so local/dev HTTP is unaffected. No 'preload' yet — that's
+    # a hard-to-reverse browser-list commitment; revisit before opting in.
+    if request.is_secure:
+        response.headers['Strict-Transport-Security'] = (
+            'max-age=31536000; includeSubDomains'
+        )
     # Content-Security-Policy. 'unsafe-inline' is currently required because the
     # templates use inline <script>/onclick handlers and inline styles; the CDN
     # host is allowed for Bootstrap/Font Awesome/jQuery. Tightening to remove
