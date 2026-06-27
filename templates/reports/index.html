@@ -57,6 +57,8 @@
         {% endif %}
         <select name="range" class="form-select form-select-sm" style="width:auto"
                 onchange="this.form.submit()">
+            <option value="today" {{ 'selected' if selected_range=='today' else '' }}>Today</option>
+            <option value="thisweek" {{ 'selected' if selected_range=='thisweek' else '' }}>This week</option>
             <option value="thismonth" {{ 'selected' if selected_range=='thismonth' else '' }}>This month</option>
             <option value="6m"  {{ 'selected' if selected_range=='6m'  else '' }}>Last 6 months</option>
             <option value="12m" {{ 'selected' if selected_range=='12m' else '' }}>Last 12 months</option>
@@ -165,7 +167,7 @@
     </div>
     <div class="col-12">
         <div class="card chart-card">
-            <div class="card-header"><i class="fas fa-user-plus text-warning"></i> New Patients Per Month</div>
+            <div class="card-header"><i class="fas fa-user-plus text-warning"></i> New Patients Per {{ 'Day' if bucket == 'day' else 'Month' }}</div>
             <div class="card-body"><div class="chart-box-sm"><canvas id="patientsChart"></canvas></div></div>
         </div>
     </div>
