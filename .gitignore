@@ -31,7 +31,3 @@ TODO.md
 # Data backups (contain PHI — never commit)
 backups/
 *.backup.zip
-# Elastic Beanstalk Files
-.elasticbeanstalk/*
-!.elasticbeanstalk/*.cfg.yml
-!.elasticbeanstalk/*.global.yml

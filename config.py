@@ -52,11 +52,12 @@ class DevelopmentConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
-    # Secure cookies require HTTPS. Default ON so HTTPS deploys (Render) stay
-    # locked down. Can be disabled with SESSION_COOKIE_SECURE=false for an
-    # HTTP-only portfolio demo (AWS EB single instance) that uses a non-PHI
-    # demo database — never disable this against real patient data.
-    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() != 'false'
+    # Secure cookies require HTTPS, and every production host serves HTTPS
+    # (Render). Not configurable: the SESSION_COOKIE_SECURE=false override
+    # existed only for the HTTP-only AWS EB portfolio demo, torn down
+    # 2026-08-01. A session cookie for a PHI app must never travel in the clear,
+    # so there is no way to turn this off.
+    SESSION_COOKIE_SECURE = True
 
     @classmethod
     def init_app(cls, app):
