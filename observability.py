@@ -4,7 +4,7 @@
 # This app stores patient health data (PHI). Sentry is configured to capture
 # unhandled exceptions for off-box debugging WITHOUT ever shipping patient data
 # to a third party. The hard safety choices:
-#   * No DSN set  -> Sentry is completely disabled (local/dev/showcase stay
+#   * No DSN set  -> Sentry is completely disabled (local/dev stay
 #     silent; only the Render prod host sets SENTRY_DSN). Opt-in by env var.
 #   * include_local_variables=False -> stack-frame locals (which routinely hold
 #     a `patient` dict full of medical history) are NEVER captured.
@@ -60,7 +60,7 @@ def init_sentry():
     """Initialise Sentry iff SENTRY_DSN is set. Returns True if enabled.
 
     Safe to call unconditionally at startup: with no DSN it is a no-op, so
-    dev/local/showcase need no Sentry dependency wiring beyond the package.
+    dev/local need no Sentry dependency wiring beyond the package.
     """
     dsn = (os.environ.get('SENTRY_DSN') or '').strip()
     if not dsn:

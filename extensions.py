@@ -1,6 +1,6 @@
 # File: MyDentalPortal/extensions.py
 # Single source of truth for Flask extensions.
-# All blueprints import mongo from here — never from app.py or app_factory.py.
+# All blueprints import mongo from here — never from app.py (importing it boots the app).
 
 from flask_pymongo import PyMongo
 from flask_limiter import Limiter

@@ -1,15 +1,23 @@
-r"""Seed the DEMO database with a realistic-looking clinic, patients, treatments
-and appointments so the portfolio site (AWS EB) doesn't look empty.
+r"""Seed a LOCAL development database with realistic clinics, patients,
+treatments and appointments — plus the multi-role layout the end-to-end run
+needs (admin-owned clinics, a linked staff user, and a second dentist whose
+clinic the others must never see).
 
 SAFE-GUARDS:
-  * Refuses to run unless the target database name contains "demo" — so it can
-    never accidentally write fake records into the real `dental_portal` data.
-  * Idempotent: every document it creates is tagged {'seed_tag': 'demo'} and
-    re-running first deletes anything with that tag, then re-inserts. Real,
-    hand-entered records (no tag) are never touched.
+  * LOCAL ONLY: refuses any MONGO_URI whose hosts aren't localhost/127.0.0.1,
+    any mongodb+srv:// (Atlas) URI, and any database name containing "prod".
+    Fake records can never land in a deployed database.
+  * Idempotent: every document it creates is tagged {'seed_tag': 'dev'};
+    re-running first deletes everything with that tag, then re-inserts.
+    Hand-entered local records (no tag) are never touched.
 
-Usage:
-    MONGO_URI="mongodb+srv://.../dental_portal_demo?..." python scripts/seed_demo.py
+Usage (defaults to the local dev DB from .env.example):
+    python scripts/seed_dev.py
+    MONGO_URI="mongodb://localhost:27017/dental_portal" python scripts/seed_dev.py
+
+Logins it creates (local only): admin@dental.com / admin123 (if missing),
+staff@dev.local / devpass123 (staff of the admin), dentist2@dev.local /
+devpass123 (separate dentist, separate clinic).
 """
 
 import os
@@ -17,10 +25,15 @@ import random
 import sys
 from datetime import datetime, timedelta
 
+from urllib.parse import urlsplit
+
 from pymongo import MongoClient
 from werkzeug.security import generate_password_hash
 
-SEED_TAG = 'demo'
+SEED_TAG = 'dev'
+DEFAULT_URI = 'mongodb://localhost:27017/dental_portal'
+LOCAL_HOSTS = {'localhost', '127.0.0.1', '::1', '[::1]'}
+DEV_PASSWORD = 'devpass123'
 random.seed(42)  # reproducible
 
 FIRST_NAMES = [
@@ -59,11 +72,36 @@ def _money(lo, hi):
     return float(random.randint(lo, hi) // 50 * 50)  # round to nearest 50
 
 
+def local_only_reason(uri):
+    """None if ``uri`` points at a local, non-prod database; else why it's refused."""
+    parts = urlsplit(uri)
+    if parts.scheme != 'mongodb':
+        return f"scheme '{parts.scheme}' is not a local mongodb:// URI (Atlas uses mongodb+srv)"
+    hosts = parts.netloc.rsplit('@', 1)[-1].split(',')
+    names = {h.rsplit(':', 1)[0] if not h.startswith('[') else h.split(']')[0] + ']'
+             for h in hosts}
+    if not names or not names <= LOCAL_HOSTS:
+        return f'hosts {sorted(names)} are not all local'
+    if 'prod' in parts.path.lower():
+        return 'database name contains "prod"'
+    return None
+
+
+def _dev_user(db, name, email, role, now):
+    return db.users.insert_one({
+        'name': name, 'email': email, 'password': generate_password_hash(DEV_PASSWORD),
+        'license_number': 'DEV-' + name.replace(' ', '').upper(), 'specialty': 'General Dentistry',
+        'role': role, 'status': 'approved', 'is_active': True,
+        'created_at': now, 'updated_at': now, 'seed_tag': SEED_TAG,
+    }).inserted_id
+
+
 def main():
-    uri = os.environ.get('MONGO_URI')
-    if not uri:
-        print('ERROR: MONGO_URI not set.')
-        return 2
+    uri = os.environ.get('MONGO_URI') or DEFAULT_URI
+    reason = local_only_reason(uri)
+    if reason:
+        print(f'REFUSING: {reason}. This script only seeds a LOCAL dev database.')
+        return 3
 
     client = MongoClient(uri, serverSelectionTimeoutMS=10000)
     db = client.get_default_database()
@@ -71,14 +109,9 @@ def main():
         print('ERROR: no database name in MONGO_URI.')
         return 2
 
-    if 'demo' not in db.name.lower():
-        print(f"REFUSING: database '{db.name}' does not look like a demo DB. "
-              "This script only seeds a *demo* database to protect real data.")
-        return 3
+    print(f'Seeding dev data into local database: {db.name}')
 
-    print(f'Seeding demo data into database: {db.name}')
-
-    # ── ensure the admin user exists (owner of the demo clinics) ──
+    # ── ensure the admin user exists (owner of the main dev clinics) ──
     admin = db.users.find_one({'email': 'admin@dental.com'})
     if not admin:
         admin_id = db.users.insert_one({
@@ -94,13 +127,37 @@ def main():
         admin_id = admin['_id']
     owner_id = str(admin_id)  # clinics store owner_id as the session string id
 
-    # ── wipe any previous demo-tagged docs (idempotent) ──
-    for coll in ('clinics', 'patients', 'treatment_records', 'appointments'):
+    # ── wipe any previous dev-tagged docs (idempotent) ──
+    for coll in ('clinics', 'patients', 'treatment_records', 'appointments',
+                 'users', 'memberships'):
         deleted = db[coll].delete_many({'seed_tag': SEED_TAG}).deleted_count
         if deleted:
-            print(f'  cleared {deleted} previous demo {coll}')
+            print(f'  cleared {deleted} previous dev {coll}')
 
     now = datetime.utcnow()
+
+    # ── multi-role layout: staff linked to the admin + a separate dentist ──
+    staff_id = _dev_user(db, 'Staff One', 'staff@dev.local', 'staff', now)
+    db.memberships.insert_one({
+        'user_id': str(staff_id), 'dentist_id': owner_id, 'role': 'staff',
+        'is_active': True, 'created_at': now, 'seed_tag': SEED_TAG,
+    })
+    dentist2_id = str(_dev_user(db, 'Dentist Two', 'dentist2@dev.local', 'dentist', now))
+    other_clinic = db.clinics.insert_one({
+        'name': 'Other Dentist Clinic (isolation check)', 'address': 'Malolos, Bulacan',
+        'phone': '0917-555-0199', 'email': 'other@dev.local',
+        'operating_hours': 'Mon-Fri 9:00 AM - 5:00 PM', 'currency': 'PHP',
+        'owner_id': dentist2_id, 'is_active': True,
+        'created_at': now, 'updated_at': now, 'seed_tag': SEED_TAG,
+    }).inserted_id
+    db.patients.insert_one({
+        'clinic_id': other_clinic,
+        'personal_info': {'first_name': 'Isolated', 'last_name': 'Patient'},
+        'contact_info': {'cell_phone': '0917-555-0000'},
+        'is_active': True, 'created_by': dentist2_id,
+        'created_at': now, 'updated_at': now, 'seed_tag': SEED_TAG,
+    })
+    print(f'  created staff@dev.local + dentist2@dev.local (password: {DEV_PASSWORD})')
 
     # ── clinics ──
     clinics = [
@@ -216,7 +273,7 @@ def main():
     # tidy the convenience ref off patient docs
     db.patients.update_many({'seed_tag': SEED_TAG}, {'$unset': {'_clinic_id_ref': ''}})
 
-    print('Done. Demo data seeded successfully.')
+    print('Done. Dev data seeded successfully.')
     return 0
 
 

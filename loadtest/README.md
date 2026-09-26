@@ -9,9 +9,9 @@ Starter vs free-tier cold start — see TODO Phase 6).
 **NEVER run load against the Render production deploy (`dental_portal_prod` = real
 patient data).** It will stress real PHI and pollute metrics/logs.
 
-Target one of:
-- **Local** — `python app.py` → `http://127.0.0.1:5000` (recommended; default).
-- **AWS showcase** env (`dental_portal_showcase`, demo data only).
+Target **local only** — `python app.py` → `http://127.0.0.1:5000` (the default).
+Seed it first with `python scripts/seed_dev.py`. There is no staging host (the
+AWS showcase env was torn down 2026-08-01).
 
 The runners refuse to start if `BASE_URL` looks like the prod host.
 
@@ -25,7 +25,7 @@ The runners refuse to start if `BASE_URL` looks like the prod host.
 > measure **app + DB logic latency under serialized load** — useful to spot slow
 > endpoints, but they do NOT characterize production concurrency. True
 > worker-count / cold-start tuning must run against a **Linux gunicorn** target
-> (a non-prod staging/showcase box) — never prod.
+> (a non-prod Linux staging box, e.g. the repo's Dockerfile) — never prod.
 
 ## Install Vegeta
 - Windows: `scoop install vegeta`, or download the release `.zip` from

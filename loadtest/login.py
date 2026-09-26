@@ -25,7 +25,7 @@ EMAIL = os.environ.get("EMAIL", "admin@dental.com")
 PASSWORD = os.environ.get("PASSWORD", "admin123")
 
 if "onrender.com" in BASE_URL or "dental_portal_prod" in BASE_URL:
-    sys.exit(f"REFUSING: BASE_URL ({BASE_URL}) looks like production. Use local or AWS showcase.")
+    sys.exit(f"REFUSING: BASE_URL ({BASE_URL}) looks like production. Use local (http://127.0.0.1:5000).")
 
 jar = http.cookiejar.CookieJar()
 opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
