@@ -19,18 +19,17 @@ def get(appt_id):
         return None
 
 
-def find_in_range(clinic_ids, clinic_filter, start, end):
-    """Active appointments for the calendar, sorted by (date, time).
+def find_in_range(clinic_ids, start, end):
+    """Active appointments in `clinic_ids` for the calendar, sorted by (date, time).
 
-    Scoped to `clinic_ids` (the owner's clinics); if `clinic_filter` is given it
-    narrows to that single clinic. `start`/`end` are 'YYYY-MM-DD' strings.
+    Callers narrow `clinic_ids` themselves (``utils.scoped_clinic_ids``) — this
+    never widens scope from request input. `start`/`end` are 'YYYY-MM-DD' strings.
     """
-    query = {'is_active': True}
-    if clinic_filter:
-        query['clinic_id'] = ObjectId(clinic_filter)
-    else:
-        query['clinic_id'] = {'$in': clinic_ids}
-    query['date'] = {'$gte': start, '$lte': end}
+    query = {
+        'is_active': True,
+        'clinic_id': {'$in': clinic_ids},
+        'date': {'$gte': start, '$lte': end},
+    }
     return list(mongo.db.appointments.find(query).sort([('date', 1), ('time', 1)]))
 
 

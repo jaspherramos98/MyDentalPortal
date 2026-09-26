@@ -268,10 +268,10 @@ def test_appt_find_in_range_scopes_filters_and_sorts(db):
 
     # All owner clinics, sorted by (date, time):
     #   c = 07-01 08:00, a = 07-01 11:00, b = 07-02 09:00
-    rows = appt_repo.find_in_range([c1, c2], None, "2026-07-01", "2026-07-31")
+    rows = appt_repo.find_in_range([c1, c2], "2026-07-01", "2026-07-31")
     assert [r["tag"] for r in rows] == ["c", "a", "b"]
     # Narrow to a single clinic.
-    only_c1 = appt_repo.find_in_range([c1, c2], str(c1), "2026-07-01", "2026-07-31")
+    only_c1 = appt_repo.find_in_range([c1], "2026-07-01", "2026-07-31")
     assert {r["clinic_id"] for r in only_c1} == {c1}
 
 

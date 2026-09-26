@@ -8,7 +8,9 @@ from flask import (
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta
 
-from blueprints.utils import login_required, user_clinic_ids as _user_clinic_ids, audit
+from blueprints.utils import (
+    login_required, user_clinic_ids as _user_clinic_ids, scoped_clinic_ids, audit,
+)
 from blueprints.repositories import appointments as appt_repo
 from blueprints.repositories import clinics as clinic_repo
 from blueprints.repositories import patients as patient_repo
@@ -103,11 +105,10 @@ def appointments():
 @login_required
 def get_appointments():
     try:
-        clinic_ids = _user_clinic_ids()
-        if not clinic_ids:
+        if not _user_clinic_ids():
             return jsonify({'success': False, 'error': 'No clinics found'}), 403
+        clinic_ids = scoped_clinic_ids(request.args.get('clinic_id'))
 
-        clinic_filter = request.args.get('clinic_id')
         start = request.args.get('start_date')
         end = request.args.get('end_date')
 
@@ -117,7 +118,7 @@ def get_appointments():
             we = ws + timedelta(days=6)
             start, end = ws.strftime('%Y-%m-%d'), we.strftime('%Y-%m-%d')
 
-        appts = appt_repo.find_in_range(clinic_ids, clinic_filter, start, end)
+        appts = appt_repo.find_in_range(clinic_ids, start, end)
         out = []
         for a in appts:
             out.append({
@@ -136,7 +137,7 @@ def get_appointments():
         return jsonify({'success': True, 'appointments': out, 'total': len(out)})
     except Exception as e:
         print(f"Get appointments error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Could not load appointments.'}), 500
 
 
 # ── API: create ──────────────────────────────────────────────────────────

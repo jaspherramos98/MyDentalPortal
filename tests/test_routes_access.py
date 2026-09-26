@@ -30,7 +30,7 @@ PAGES = [
     ("/dashboard",                                    ["login", 200,        200,    200,        200]),
     ("/patients",                                     ["login", 200,        200,    200,        200]),
     ("/patients/create",                              ["login", "new",      200,    200,        200]),
-    ("/patients/{patient_a}",                         ["login", "patients", 200,    "patients", "patients"]),
+    ("/patients/{patient_a}",                         ["login", "patients", 200,    200,        "patients"]),
     ("/patients/{patient_a}/edit",                    ["login", "patients", 200,    200,        "patients"]),
     ("/patients/{patient_a}/pdf",                     ["login", "patients", 200,    200,        "patients"]),
     ("/chart/patient/{patient_a}",                    ["login", "patients", 200,    200,        "patients"]),
@@ -117,31 +117,90 @@ def test_dentist_sees_own_patient_in_list_and_dashboard(real_client, as_user, wo
     assert MARKER_A in _body(real_client.get("/dashboard"))
 
 
-# ── Known bugs (Phase 1). These describe the CORRECT behaviour. ─────────────
+# ── Staff reach their dentist's patients (fixed Phase 1, 2026-09-26) ────────
 
-STAFF_PATIENT_BUG = (
-    "Phase 1: list_patients / patient_detail / dashboard use owner-only clinic "
-    "queries instead of the membership seam, so linked staff can't see patients"
-)
-
-
-@pytest.mark.xfail(strict=True, reason=STAFF_PATIENT_BUG)
 def test_staff_sees_dentists_patient_in_list(real_client, as_user, world):
     as_user("staff")
     assert MARKER_A in _body(real_client.get("/patients"))
 
 
-@pytest.mark.xfail(strict=True, reason=STAFF_PATIENT_BUG)
 def test_staff_can_open_dentists_patient(real_client, as_user, world):
     as_user("staff")
     res = real_client.get(f"/patients/{world.patient_a}")
     assert res.status_code == 200 and MARKER_A in _body(res)
 
 
-@pytest.mark.xfail(strict=True, reason=STAFF_PATIENT_BUG)
 def test_staff_dashboard_shows_dentists_patients(real_client, as_user, world):
     as_user("staff")
     assert MARKER_A in _body(real_client.get("/dashboard"))
+
+
+# ── Query-string clinic filters can only NARROW (fixed Phase 1, 2026-09-26) ──
+# Before: ?clinic_id=<any clinic> replaced the user's clinic list, so any
+# logged-in user could list another clinic's patients / calendar.
+
+def test_patient_list_ignores_foreign_clinic_filter(real_client, as_user, world):
+    as_user("outsider")
+    res = real_client.get(f"/patients?clinic_id={world.clinic_a}")
+    assert res.status_code == 200 and MARKER_A not in _body(res)
+
+
+def test_patient_list_honours_own_clinic_filter(real_client, as_user, world):
+    as_user("staff")
+    assert MARKER_A in _body(real_client.get(f"/patients?clinic_id={world.clinic_a}"))
+
+
+def test_patient_list_malformed_clinic_filter_is_empty_not_error(real_client, as_user, world):
+    as_user("dentist")
+    res = real_client.get("/patients?clinic_id=not-an-id")
+    assert res.status_code == 200 and MARKER_A not in _body(res)
+
+
+def _calendar(real_client, clinic_id):
+    res = real_client.get(f"/appointments/api?clinic_id={clinic_id}"
+                          "&start_date=2099-01-01&end_date=2099-01-31")
+    return res.get_json()
+
+
+def test_calendar_api_ignores_foreign_clinic_filter(real_client, as_user, world):
+    as_user("outsider")
+    body = _calendar(real_client, world.clinic_a)
+    assert MARKER_A not in str(body)
+
+
+def test_calendar_api_honours_own_clinic_filter(real_client, as_user, world):
+    as_user("staff")
+    assert MARKER_A in str(_calendar(real_client, world.clinic_a))
+
+
+def test_calendar_api_malformed_clinic_filter_is_empty(real_client, as_user, world):
+    as_user("dentist")
+    body = _calendar(real_client, "not-an-id")
+    assert body["success"] is True and MARKER_A not in str(body)
+
+
+# ── No PHI in logs or user-facing error text (fixed Phase 1, 2026-09-26) ─────
+
+@pytest.mark.parametrize("path", ["/patients/{patient_a}", "/patients/{patient_a}/edit",
+                                  "/chart/patient/{patient_a}", "/patients"])
+def test_viewing_patient_pages_logs_no_patient_data(real_client, as_user, world, capsys, path):
+    as_user("dentist")
+    real_client.get(_fill(path, world))
+    out = capsys.readouterr()
+    assert MARKER_A not in out.out and MARKER_A not in out.err
+
+
+def test_patient_detail_error_does_not_show_internals(real_client, as_user, world, monkeypatch):
+    from blueprints.routes import patients as patients_routes
+
+    def boom(*_a, **_k):
+        raise RuntimeError("internal-detail-xyz")
+    monkeypatch.setattr(patients_routes, "render_template", boom)
+    as_user("dentist")
+    real_client.get(f"/patients/{world.patient_a}")
+    with real_client.session_transaction() as sess:
+        flashes = str(sess.get("_flashes", []))
+    assert "internal-detail-xyz" not in flashes
 
 
 # ── Cross-cutting response behaviour ─────────────────────────────────────────
@@ -172,6 +231,27 @@ def test_service_worker_scope_header(real_client):
 
 def test_static_urls_are_cache_busted(real_client):
     assert "main.css?v=" in _body(real_client.get("/login"))
+
+
+def test_health_failure_does_not_leak_driver_error(real_client, monkeypatch):
+    from extensions import mongo
+
+    def boom(*_a, **_k):
+        raise RuntimeError("cluster0-shard-00.secret-host.mongodb.net refused")
+    monkeypatch.setattr(mongo.db, "command", boom)
+    res = real_client.get("/health")
+    assert res.status_code == 500 and "secret-host" not in _body(res)
+
+
+def test_calendar_api_error_does_not_leak_internals(real_client, as_user, world, monkeypatch):
+    from blueprints.repositories import appointments as appt_repo
+
+    def boom(*_a, **_k):
+        raise RuntimeError("internal-detail-xyz")
+    monkeypatch.setattr(appt_repo, "find_in_range", boom)
+    as_user("dentist")
+    res = real_client.get("/appointments/api")
+    assert res.status_code == 500 and "internal-detail-xyz" not in _body(res)
 
 
 def test_health_reports_database(real_client):
