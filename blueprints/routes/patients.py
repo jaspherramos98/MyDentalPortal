@@ -14,7 +14,7 @@ import traceback
 from extensions import mongo
 from blueprints.utils import (
     login_required, user_clinic_ids as _get_user_clinic_ids, verify_patient_access,
-    role_required, ROLE_DENTIST, audit, wants_json_submit,
+    role_required, ROLE_DENTIST, audit, wants_json_submit, scoped_clinic_ids,
 )
 from blueprints.repositories import patients as patient_repo
 from blueprints.repositories import clinics as clinic_repo
@@ -54,10 +54,8 @@ _ensure_nested = patient_repo.ensure_nested
 @login_required
 def list_patients():
     try:
-        user_clinics = list(
-            mongo.db.clinics.find({'owner_id': session['user_id'], 'is_active': True})
-        )
-        clinic_ids = [c['_id'] for c in user_clinics]
+        # Clinics the user may work in (owned + via staff membership).
+        user_clinics = clinic_repo.accessible_active(session['user_id'])
 
         search_query = request.args.get('search', '')
         clinic_filter = request.args.get('clinic_id', '')
@@ -74,11 +72,9 @@ def list_patients():
         if sort_by not in sort_options:
             sort_by = 'name_asc'
 
-        query = {'is_active': True}
-        if clinic_filter:
-            query['clinic_id'] = ObjectId(clinic_filter)
-        else:
-            query['clinic_id'] = {'$in': clinic_ids}
+        # ?clinic_id may only narrow the user's own clinics (see scoped_clinic_ids).
+        query = {'is_active': True,
+                 'clinic_id': {'$in': scoped_clinic_ids(clinic_filter)}}
 
         if search_query:
             # Escape so the user's text is matched literally — never interpreted
@@ -306,7 +302,7 @@ def create_patient():
         except Exception as e:
             print(f"[ERROR] Create patient: {e}")
             traceback.print_exc()
-            flash(f'Error creating patient record: {e}', 'error')
+            flash('Could not save the patient record. Please try again.', 'error')
             return render_template('patients/create.html',
                                    clinics=user_clinics, form_data=f)
 
@@ -319,25 +315,10 @@ def create_patient():
 @login_required
 def patient_detail(patient_id):
     try:
-        print(f"[DEBUG] Loading patient: {patient_id}")
-
-        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
-        if not patient:
-            print(f"[ERROR] Patient not found: {patient_id}")
-            flash('Patient not found', 'error')
-            return redirect(url_for('patients.list_patients'))
-
-        print(f"[DEBUG] Patient found: {patient.get('personal_info', {}).get('first_name', '?')}")
-        print(f"[DEBUG] Patient clinic_id: {patient.get('clinic_id')} (type: {type(patient.get('clinic_id'))})")
-
-        # Look up clinic — try owner_id match first, fall back to just _id
-        clinic = mongo.db.clinics.find_one({
-            '_id': patient['clinic_id'],
-            'owner_id': session['user_id'],
-        })
-        if not clinic:
-            # Owner mismatch or missing clinic — deny access (don't leak existence).
-            print(f"[ERROR] Access denied for patient {patient_id} (not owner)")
+        # Access via the membership seam: clinic owner OR linked staff.
+        # Missing and forbidden look the same (don't leak existence).
+        patient, clinic = verify_patient_access(patient_id)
+        if not patient or not clinic:
             flash('Patient not found', 'error')
             return redirect(url_for('patients.list_patients'))
 
@@ -366,7 +347,6 @@ def patient_detail(patient_id):
             .sort('created_at', -1)
         )
 
-        print(f"[DEBUG] Rendering patient detail OK")
         return render_template(
             'patients/detail.html',
             patient=patient,
@@ -380,7 +360,7 @@ def patient_detail(patient_id):
     except Exception as e:
         print(f"[ERROR] Patient detail failed: {e}")
         traceback.print_exc()
-        flash(f'Error loading patient details: {e}', 'error')
+        flash('Could not load this patient. Please try again.', 'error')
         return redirect(url_for('patients.list_patients'))
 
 
@@ -522,7 +502,7 @@ def edit_patient(patient_id):
     except Exception as e:
         print(f"[ERROR] Edit patient: {e}")
         traceback.print_exc()
-        flash(f'Error editing patient: {e}', 'error')
+        flash('Could not save the changes. Please try again.', 'error')
         return redirect(url_for('patients.list_patients'))
 
 
@@ -531,14 +511,10 @@ def edit_patient(patient_id):
 @role_required(ROLE_DENTIST)  # deleting a patient record is dentist/admin only
 def delete_patient(patient_id):
     try:
-        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
-        # Only the owner of the patient's clinic may delete the record.
-        clinic = None
-        if patient:
-            clinic = mongo.db.clinics.find_one({
-                '_id': patient['clinic_id'],
-                'owner_id': session['user_id'],
-            })
+        patient = patient_repo.get(patient_id)
+        # Only the OWNER of the patient's clinic may delete the record — not
+        # linked staff (they use the deletion-request workflow instead).
+        clinic = clinic_repo.get_owned(patient['clinic_id'], session['user_id']) if patient else None
         if patient and clinic:
             mongo.db.patients.update_one(
                 {'_id': ObjectId(patient_id)},
@@ -551,5 +527,5 @@ def delete_patient(patient_id):
     except Exception as e:
         print(f"[ERROR] Delete patient: {e}")
         traceback.print_exc()
-        flash(f'Error deleting patient: {e}', 'error')
+        flash('Could not delete the patient record. Please try again.', 'error')
     return redirect(url_for('patients.list_patients'))

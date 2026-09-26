@@ -106,7 +106,8 @@ def dashboard():
     try:
         user_id = session['user_id']
 
-        user_clinics = clinic_repo.owned_active_by_name(user_id)
+        # Clinics the user may work in (owned + via staff membership).
+        user_clinics = clinic_repo.accessible_active(user_id)
         clinic_ids = [c['_id'] for c in user_clinics]
 
         recent_patients = []

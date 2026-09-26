@@ -8,6 +8,9 @@
 import time
 from functools import wraps
 
+from bson.errors import InvalidId
+from bson.objectid import ObjectId
+
 from flask import (
     session, redirect, url_for, current_app, abort, request, jsonify, flash,
 )
@@ -87,6 +90,23 @@ def user_clinic_ids():
     member of. The multi-staff listing seam.
     """
     return _clinic_repo.accessible_ids(session['user_id'])
+
+
+def scoped_clinic_ids(requested=None):
+    """Clinic ids a listing may show, optionally narrowed by a requested clinic.
+
+    Never trust a ``clinic_id`` from the query string on its own: it may only
+    NARROW the user's accessible clinics. A foreign or malformed id yields []
+    (fail closed) rather than the clinic the caller asked for.
+    """
+    accessible = user_clinic_ids()
+    if not requested:
+        return accessible
+    try:
+        wanted = ObjectId(requested)
+    except (InvalidId, TypeError):
+        return []
+    return [wanted] if wanted in accessible else []
 
 
 def verify_patient_access(patient_id):

@@ -257,7 +257,10 @@ def _register_core_routes(app):
             mongo.db.command('ping')
             return jsonify({"status": "healthy", "database": "connected"}), 200
         except Exception as e:
-            return jsonify({"status": "unhealthy", "error": str(e)}), 500
+            # Public endpoint: never echo the driver error (it can name cluster
+            # hosts). Render only needs the status code; details go to the log.
+            print(f"[ERROR] Health check: {type(e).__name__}")
+            return jsonify({"status": "unhealthy", "database": "unavailable"}), 500
 
 
     # ---------------------------------------------------------------------------

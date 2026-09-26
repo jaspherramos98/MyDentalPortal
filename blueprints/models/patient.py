@@ -15,7 +15,10 @@ from bson import ObjectId
 # The nested sections the detail/list templates expect. Declared so a write can
 # never produce a doc missing them (or with a non-dict in their place).
 class PatientDoc(BaseModel):
-    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+    # hide_input_in_errors: a ValidationError's text is printed to the server
+    # log, and by default it echoes the submitted values — i.e. patient data.
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True,
+                              hide_input_in_errors=True)
 
     clinic_id: ObjectId
     is_active: bool = True

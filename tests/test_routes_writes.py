@@ -208,6 +208,16 @@ def test_non_owner_cannot_delete_patient(real_client, as_user, world, db, who):
     assert _patient(db, world.patient_a)["is_active"] is True
 
 
+def test_patient_validation_errors_do_not_echo_submitted_values(db):
+    """pydantic errors end up in logs via print/traceback; they must not carry PHI."""
+    from pydantic import ValidationError
+    from blueprints.models.patient import validate_patient
+    with pytest.raises(ValidationError) as exc:
+        validate_patient({"clinic_id": "Alicemarker-not-an-id",
+                          "personal_info": {"first_name": "Alicemarker"}})
+    assert "Alicemarker" not in str(exc.value)
+
+
 # ── Treatments + pricing ─────────────────────────────────────────────────────
 
 def _treatment_form(**extra):
