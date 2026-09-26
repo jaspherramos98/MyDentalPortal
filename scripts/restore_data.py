@@ -15,7 +15,7 @@ those collections restores patient photos / documents / prescriptions too.
 
 Usage:
     # Restore into a throwaway DB for a drill (target db is in the URI path):
-    python scripts/restore_data.py backups/dental_portal_showcase-XXES.zip \
+    python scripts/restore_data.py backups/dental_portal_prod-XXES.zip \
         --uri "mongodb+srv://.../dental_portal_restore_test?..." --drop --yes
 
     # Genuine production recovery (be sure!):

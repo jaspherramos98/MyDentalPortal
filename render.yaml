@@ -4,8 +4,8 @@
 services:
   - type: web
     name: dental-portal
-    env: python
-    runtime: python-3.11.9
+    runtime: python
+    # Python version: .python-version (the single source of truth).
     buildCommand: pip install -r requirements.txt
     # Tuned for Render's 512 MB instance:
     #  --threads gives concurrency so one slow photo request doesn't freeze the

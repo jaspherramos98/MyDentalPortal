@@ -2,8 +2,7 @@ r"""Quick MongoDB connectivity check.
 
 Reads the connection string from the MONGO_URI environment variable, connects,
 pings the server, and prints the databases/collections it can see. It never
-prints the password. Use it to prove a connection works (local, Atlas, or from
-the deployed AWS server) before wiring it into the app.
+prints the password. Use it to prove a connection works (local or Atlas) before wiring it into the app.
 
 Usage (PowerShell):
     $env:MONGO_URI = "mongodb+srv://user:pass@cluster.xxxx.mongodb.net/dental_portal?retryWrites=true&w=majority"

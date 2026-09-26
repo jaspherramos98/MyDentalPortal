@@ -10,7 +10,7 @@ DURATION="${DURATION:-30s}"
 
 case "$BASE_URL" in
   *dental_portal_prod*|*onrender.com*)
-    echo "REFUSING: BASE_URL ($BASE_URL) looks like production. Use local or the AWS showcase env." >&2
+    echo "REFUSING: BASE_URL ($BASE_URL) looks like production. Use local (http://127.0.0.1:5000)." >&2
     exit 1 ;;
 esac
 
