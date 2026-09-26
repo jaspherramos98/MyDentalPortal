@@ -57,8 +57,13 @@
             </a>
         </div>
 
-        <form method="POST" action="{{ url_for('patients.create_patient') }}" class="needs-validation" novalidate>
+        <form method="POST" action="{{ url_for('patients.create_patient') }}" class="needs-validation" novalidate
+              data-resilient-submit
+              data-keepalive-url="{{ url_for('main.keepalive') }}"
+              data-login-url="{{ url_for('auth.login') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {# One id per fill of this form: makes a retried create idempotent. #}
+            <input type="hidden" name="submission_id" value="{{ form_data.get('submission_id', '') }}">
             
             <!-- Personal Information Section -->
             <div class="form-section">
@@ -586,6 +591,7 @@
     </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/resilient-submit.js') }}"></script>
 <script>
 // Enhanced form validation and age-based guardian requirements
 // Enhanced Dental Patient Form Validation and Interactive Features
@@ -878,6 +884,9 @@
         setupFormValidation: function() {
             const forms = document.getElementsByClassName('needs-validation');
             Array.from(forms).forEach(form => {
+                // Attach up front so keepalive + the unsaved-changes guard run
+                // while the form is being filled, not just at submit.
+                const resilient = ResilientSubmit.attach(form);
                 form.addEventListener('submit', function(event) {
                     let formValid = true;
                     
@@ -912,6 +921,14 @@
                     const errorContainer = document.getElementById('validation-errors');
                     if (errorContainer) errorContainer.innerHTML = '';
                     form.classList.add('was-validated');
+
+                    // Send it ourselves so a dropped connection or expired
+                    // session never loses the typed form (resilient-submit.js).
+                    // Falls through to the native submit on very old browsers.
+                    if (resilient) {
+                        event.preventDefault();
+                        resilient.submit();
+                    }
                 }, false);
             });
         },

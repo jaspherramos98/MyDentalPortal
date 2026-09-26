@@ -3,8 +3,9 @@
 
 from flask import (
     Blueprint, render_template, session,
-    redirect, url_for, request, flash,
+    redirect, url_for, request, flash, jsonify,
 )
+from flask_wtf.csrf import generate_csrf
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 
@@ -32,6 +33,20 @@ def privacy():
     """Public privacy notice (RA 10173 right-to-be-informed). Static content;
     clinic-specific details (DPO name/contact) are placeholders to fill in."""
     return render_template('privacy.html')
+
+
+@main_bp.route('/session/keepalive')
+@login_required
+def keepalive():
+    """Called by resilient-submit.js while someone is actively typing a long form.
+
+    Reaching this route refreshes the idle-timeout stamp (before_request), so a
+    user who is typing isn't logged out mid-form; the idle timeout still fires
+    for an unattended screen because the client only pings on real input. It also
+    hands back a fresh CSRF token (the form's token expires after an hour) and
+    reopens a warm connection before the save. No PHI in or out.
+    """
+    return jsonify({'ok': True, 'csrf_token': generate_csrf()})
 
 
 @main_bp.route('/activity')

@@ -5,9 +5,12 @@
 # single source of truth — important for security, since access-control logic
 # must behave identically everywhere.
 
+import time
 from functools import wraps
 
-from flask import session, redirect, url_for, current_app, abort
+from flask import (
+    session, redirect, url_for, current_app, abort, request, jsonify, flash,
+)
 
 from blueprints.repositories import patients as _patient_repo
 from blueprints.repositories import clinics as _clinic_repo
@@ -21,11 +24,57 @@ ROLE_DENTIST = 'dentist'
 ROLE_STAFF = 'staff'
 
 
+# Header sent by static/js/resilient-submit.js. It asks for JSON outcomes
+# instead of redirects: with fetch(), "the response was a redirect" can't tell
+# a successful save apart from a bounce to /login (idle timeout) or back to the
+# form (expired CSRF). Treating every redirect as success loses the typed form.
+RESILIENT_SUBMIT_HEADER = 'X-Resilient-Submit'
+
+
+def wants_json_submit():
+    """True when the request came from the resilient-submit client."""
+    return request.headers.get(RESILIENT_SUBMIT_HEADER) == '1'
+
+
+def session_expired_response():
+    """401 JSON for a resilient-submit request that has no live session."""
+    return jsonify({'ok': False, 'error': 'session_expired'}), 401
+
+
+def enforce_idle_timeout():
+    """before_request hook: log a user out after IDLE_TIMEOUT_SECONDS of inactivity.
+
+    Each request refreshes the activity stamp; once the gap exceeds the timeout
+    the session is cleared and the user is bounced to login. PHI shouldn't stay
+    open on an unattended machine. Static assets don't reset the timer. A
+    resilient-submit request gets a 401 JSON instead of the redirect, so the
+    open form keeps what was typed.
+    """
+    timeout = current_app.config.get('IDLE_TIMEOUT_SECONDS') or 0
+    if 'user_id' not in session or timeout <= 0:
+        return None
+    if request.endpoint == 'static':
+        return None
+    now = int(time.time())
+    last = session.get('last_activity')
+    if last is not None and now - last > timeout:
+        session.clear()
+        if wants_json_submit():
+            return session_expired_response()
+        flash('You were signed out due to inactivity.', 'info')
+        return redirect(url_for('auth.login'))
+    session.permanent = True
+    session['last_activity'] = now
+    return None
+
+
 def login_required(f):
     """Redirect to login if there is no authenticated session."""
     @wraps(f)
     def decorated(*args, **kwargs):
         if 'user_id' not in session:
+            if wants_json_submit():
+                return session_expired_response()
             return redirect(url_for('auth.login'))
         return f(*args, **kwargs)
     return decorated

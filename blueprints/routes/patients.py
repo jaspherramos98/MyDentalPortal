@@ -6,6 +6,7 @@ from flask import (
     redirect, url_for, flash, jsonify, send_file,
 )
 from bson.objectid import ObjectId
+from pymongo.errors import DuplicateKeyError
 from datetime import datetime
 import re
 import traceback
@@ -13,13 +14,35 @@ import traceback
 from extensions import mongo
 from blueprints.utils import (
     login_required, user_clinic_ids as _get_user_clinic_ids, verify_patient_access,
-    role_required, ROLE_DENTIST, audit,
+    role_required, ROLE_DENTIST, audit, wants_json_submit,
 )
 from blueprints.repositories import patients as patient_repo
 from blueprints.repositories import clinics as clinic_repo
 from werkzeug.utils import secure_filename
 
 patients_bp = Blueprint('patients', __name__)
+
+# Client-generated id for one fill of the create form (32 hex chars, see
+# static/js/resilient-submit.js). Anything else is ignored.
+_SUBMISSION_ID_RE = re.compile(r'[0-9a-f]{32}')
+
+
+def _submission_id(form):
+    value = (form.get('submission_id') or '').strip().lower()
+    return value if _SUBMISSION_ID_RE.fullmatch(value) else None
+
+
+def _saved_response(patient_id):
+    """Success outcome of a patient create/edit.
+
+    Plain form posts get the usual redirect. The resilient-submit client gets an
+    explicit JSON success instead, because to fetch() a redirect is ambiguous
+    (login bounce and CSRF bounce redirect too).
+    """
+    url = url_for('patients.patient_detail', patient_id=str(patient_id))
+    if wants_json_submit():
+        return jsonify({'ok': True, 'redirect': url})
+    return redirect(url)
 
 # _ensure_nested moved to the patients repository (blueprints/repositories/patients.py).
 # Kept as a module-level alias for backward compatibility with existing call sites.
@@ -119,6 +142,14 @@ def create_patient():
 
     if request.method == 'POST':
         f = request.form
+        # A retry of a submission that already went through (its response was
+        # lost on the way back) returns the existing patient — never a duplicate.
+        submission_id = _submission_id(f)
+        if submission_id:
+            existing = patient_repo.find_by_submission(submission_id, session['user_id'])
+            if existing:
+                flash('Patient created successfully!', 'success')
+                return _saved_response(existing['_id'])
         try:
             # NOTE: keys here are read from the create form's actual field names
             # (left side of f.get) and written to the canonical schema the detail
@@ -257,11 +288,20 @@ def create_patient():
                 return render_template('patients/create.html',
                                        clinics=user_clinics, form_data=f)
 
-            inserted_id = patient_repo.create(patient_data)
+            if submission_id:
+                patient_data['submission_id'] = submission_id
+            try:
+                inserted_id = patient_repo.create(patient_data)
+            except DuplicateKeyError:
+                # Two copies of the same submission raced; the other one won.
+                existing = patient_repo.find_by_submission(submission_id, session['user_id'])
+                if not existing:
+                    raise
+                flash('Patient created successfully!', 'success')
+                return _saved_response(existing['_id'])
             audit('create', 'patient', inserted_id, clinic=sel_clinic)
             flash('Patient created successfully!', 'success')
-            return redirect(url_for('patients.patient_detail',
-                                    patient_id=str(inserted_id)))
+            return _saved_response(inserted_id)
 
         except Exception as e:
             print(f"[ERROR] Create patient: {e}")
@@ -475,7 +515,7 @@ def edit_patient(patient_id):
             patient_repo.update_set(patient_id, update_data)
             audit('update', 'patient', patient_id, clinic=clinic)
             flash('Patient updated successfully!', 'success')
-            return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+            return _saved_response(patient_id)
 
         return render_template('patients/edit.html',
                                patient=patient, clinics=user_clinics, clinic=clinic)
