@@ -3,7 +3,6 @@
 # All route logic lives in app/routes/*.py
 
 import os
-import time
 
 from flask import Flask, url_for, session, request, redirect, flash
 from flask_wtf.csrf import CSRFProtect, CSRFError
@@ -12,6 +11,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from extensions import mongo, limiter
+from blueprints.utils import enforce_idle_timeout, wants_json_submit
 from config import get_config
 from observability import init_sentry
 
@@ -137,25 +137,26 @@ def datefmt(value, fmt='%B %d, %Y'):
         return value  # unparseable string — show it raw rather than crash
     return str(value)
 
-@app.before_request
-def enforce_idle_timeout():
-    """Log a logged-in user out after a period of inactivity. Each request
-    refreshes the activity stamp; once the gap exceeds IDLE_TIMEOUT_SECONDS the
-    session is cleared and the user is bounced to login. PHI shouldn't stay open
-    on an unattended machine. Skips static assets so they don't reset the timer."""
-    timeout = app.config.get('IDLE_TIMEOUT_SECONDS') or 0
-    if 'user_id' not in session or timeout <= 0:
+@app.url_defaults
+def _static_cache_bust(endpoint, values):
+    """Append ?v=<file mtime> to url_for('static', ...) URLs.
+
+    sw.js serves /static/* cache-first, so without a changing URL an installed
+    PWA keeps running the OLD copy of a JS/CSS file after a deploy — a shipped
+    fix would never reach the device. The query string is part of the cache key,
+    so a new deploy (new mtime) means a fresh fetch.
+    """
+    if endpoint != 'static' or 'v' in values or 'filename' not in values:
         return
-    if request.endpoint == 'static':
-        return
-    now = int(time.time())
-    last = session.get('last_activity')
-    if last is not None and now - last > timeout:
-        session.clear()
-        flash('You were signed out due to inactivity.', 'info')
-        return redirect(url_for('auth.login'))
-    session.permanent = True
-    session['last_activity'] = now
+    try:
+        values['v'] = int(os.stat(os.path.join(app.static_folder, values['filename'])).st_mtime)
+    except OSError:
+        pass  # missing file: leave the URL alone, the request will 404 normally
+
+
+# Idle logout (PHI on an unattended screen). Lives in blueprints/utils so the
+# hermetic tests can exercise it without importing this module.
+app.before_request(enforce_idle_timeout)
 
 
 @app.after_request
@@ -234,6 +235,10 @@ def internal_error(error):
 def handle_csrf_error(error):
     """Invalid/missing CSRF token — JSON for fetch calls, redirect for form posts."""
     from flask import request, jsonify, flash
+    if wants_json_submit():
+        # Resilient form submit: it refreshes the token and retries, keeping
+        # the typed form (a redirect here would throw it away).
+        return jsonify({'ok': False, 'error': 'csrf'}), 400
     if request.is_json:
         return jsonify({'success': False, 'error': 'CSRF token missing or invalid'}), 400
     flash('Your session expired or the form was invalid. Please try again.', 'error')
@@ -292,6 +297,13 @@ def init_database():
         mongo.db.users.create_index("license_number")
         mongo.db.clinics.create_index("owner_id")
         mongo.db.patients.create_index("clinic_id")
+        # Idempotent create: a retried POST carries the same submission_id, and
+        # the unique index makes a concurrent duplicate insert fail instead of
+        # creating the patient twice. Partial = legacy docs without it are fine.
+        mongo.db.patients.create_index(
+            "submission_id", unique=True,
+            partialFilterExpression={"submission_id": {"$type": "string"}},
+        )
         mongo.db.dental_charts.create_index("patient_id")
         mongo.db.treatment_records.create_index("patient_id")
         mongo.db.prescriptions.create_index("patient_id")

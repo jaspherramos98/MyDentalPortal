@@ -12,7 +12,13 @@ services:
     #    whole site (sync workers block); 2 workers x 4 threads = 8 concurrent.
     #  --timeout 120 (default is 30) so large photo/GridFS transfers aren't killed.
     #  --max-requests recycles workers periodically to bound memory growth.
-    startCommand: gunicorn app:app --workers 2 --threads 4 --timeout 120 --max-requests 400 --max-requests-jitter 50
+    #  --keep-alive 75 (default 2s): behind Render's proxy, a 2s idle timeout
+    #    lets gunicorn close an upstream connection just as the proxy reuses it;
+    #    a GET gets retried, a POST is dropped with nothing logged (Incident
+    #    2026-09-26). gthread parks idle keep-alive sockets, so no thread cost.
+    #  ⚠️ If the Render dashboard has its own Start Command, it OVERRIDES this —
+    #    keep the two identical.
+    startCommand: gunicorn app:app --workers 2 --threads 4 --timeout 120 --max-requests 400 --max-requests-jitter 50 --keep-alive 75
     envVars:
       - key: FLASK_ENV
         value: production

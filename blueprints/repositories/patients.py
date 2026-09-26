@@ -86,6 +86,20 @@ def create(data):
     return mongo.db.patients.insert_one(doc).inserted_id
 
 
+def find_by_submission(submission_id, created_by):
+    """The patient a given create-form submission already produced, or None.
+
+    Makes patient create idempotent: resilient-submit.js retries a POST whose
+    response was lost, and the retry must return the existing record instead of
+    inserting a duplicate. Scoped to the creator so an id can't reach another
+    user's patient.
+    """
+    return mongo.db.patients.find_one(
+        {'submission_id': submission_id, 'created_by': created_by},
+        {'_id': 1},
+    )
+
+
 def update_set(patient_id, fields):
     """Apply a targeted ``$set`` (dot-notation keys) to one patient."""
     return mongo.db.patients.update_one(
