@@ -2,18 +2,20 @@
 # Clinic management routes. Clinic management is OWNER-only (clinic_repo.*_owned);
 # linked staff work in a dentist's clinics but never manage them.
 
+import logging
+
 from flask import (
     Blueprint, render_template, request, session,
     redirect, url_for, flash,
 )
 from datetime import datetime
-import traceback
 
 from blueprints.utils import login_required, role_required, ROLE_DENTIST, audit
 from blueprints.repositories import clinics as clinic_repo
 from blueprints.repositories import patients as patient_repo
 
 clinics_bp = Blueprint('clinics', __name__)
+log = logging.getLogger(__name__)
 
 # The currencies the clinic forms offer. Anything else falls back to the default.
 CURRENCIES = ('PHP', 'USD')
@@ -44,9 +46,8 @@ def list_clinics():
             clinic['patient_count'] = counts.get(clinic['_id'], 0)
         return render_template('clinics/list.html', clinics=clinics,
                                search_query=search_query)
-    except Exception as e:
-        print(f"[ERROR] Clinics list: {e}")
-        traceback.print_exc()
+    except Exception:
+        log.exception("Clinics list failed")
         flash('Error loading clinics', 'error')
         return render_template('clinics/list.html', clinics=[], search_query='')
 
@@ -68,9 +69,8 @@ def create_clinic():
             audit('create', 'clinic', clinic_id, dentist_id=session['user_id'])
             flash(f'Clinic "{fields["name"]}" created successfully!', 'success')
             return redirect(url_for('clinics.list_clinics'))
-        except Exception as e:
-            print(f"[ERROR] Create clinic: {e}")
-            traceback.print_exc()
+        except Exception:
+            log.exception("Create clinic failed")
             flash('Error creating clinic', 'error')
 
     return render_template('clinics/create.html')
@@ -96,9 +96,8 @@ def edit_clinic(clinic_id):
             return redirect(url_for('clinics.list_clinics'))
 
         return render_template('clinics/edit.html', clinic=clinic)
-    except Exception as e:
-        print(f"[ERROR] Edit clinic: {e}")
-        traceback.print_exc()
+    except Exception:
+        log.exception("Edit clinic failed")
         flash('Error editing clinic', 'error')
         return redirect(url_for('clinics.list_clinics'))
 
@@ -114,8 +113,7 @@ def delete_clinic(clinic_id):
             flash('Clinic deleted successfully', 'success')
         else:
             flash('Clinic not found', 'error')
-    except Exception as e:
-        print(f"[ERROR] Delete clinic: {e}")
-        traceback.print_exc()
+    except Exception:
+        log.exception("Delete clinic failed")
         flash('Error deleting clinic', 'error')
     return redirect(url_for('clinics.list_clinics'))

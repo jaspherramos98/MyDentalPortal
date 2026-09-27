@@ -1,6 +1,8 @@
 # File: MyDentalPortal/app/routes/auth.py
 # Authentication routes — login, register, logout
 
+import logging
+
 from flask import (
     Blueprint, request, jsonify, session,
     render_template, redirect, url_for, flash,
@@ -16,6 +18,7 @@ from blueprints.repositories import access_codes as code_repo
 from blueprints.repositories import memberships as membership_repo
 
 auth_bp = Blueprint('auth', __name__)
+log = logging.getLogger(__name__)
 
 
 def _audit_auth(action, user=None):
@@ -28,7 +31,7 @@ def _audit_auth(action, user=None):
             actor_user_id=uid, actor_role=(user or {}).get('role'),
         )
     except Exception as e:  # noqa: BLE001
-        print(f"[ERROR] auth audit failed: {e}")
+        log.exception("Auth audit failed")
 
 # Pre-computed hash so failed logins stay roughly constant-time: we always run a
 # password check even when the email doesn't exist, so a missing account can't be
@@ -104,8 +107,8 @@ def login():
 
             _audit_auth('login_failed', user)  # user is None for an unknown email
             flash('Invalid email or password', 'error')
-        except Exception as e:
-            print(f"Login error: {e}")
+        except Exception:
+            log.exception("Login handler error")
             flash('Login failed. Please try again.', 'error')
 
         return render_template('auth/login.html')
@@ -172,8 +175,8 @@ def register():
                   'account before you can log in.', 'success')
             return redirect(url_for('auth.login'))
 
-        except Exception as e:
-            print(f"Registration error: {e}")
+        except Exception:
+            log.exception("Registration failed")
             flash('Registration failed. Please try again.', 'error')
             return render_template('auth/register.html')
 
@@ -251,13 +254,13 @@ def join():
                                   actor_user_id=user_id, actor_role='staff',
                                   dentist_id=dentist_id)
             except Exception as e:  # noqa: BLE001
-                print(f"[ERROR] join audit failed: {e}")
+                log.exception("Join audit failed")
 
             flash('Account created. You can now log in.', 'success')
             return redirect(url_for('auth.login'))
 
-        except Exception as e:
-            print(f"Staff join error: {e}")
+        except Exception:
+            log.exception("Staff join failed")
             flash('Registration failed. Please try again.', 'error')
             return render_template('auth/join.html')
 
@@ -276,7 +279,7 @@ def logout():
             audit_repo.record('logout', 'auth', entity_id=uid, actor_user_id=uid,
                               actor_role=session.get('user_role'))
         except Exception as e:  # noqa: BLE001
-            print(f"[ERROR] auth audit failed: {e}")
+            log.exception("Auth audit failed")
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('auth.login'))

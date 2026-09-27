@@ -6,6 +6,7 @@
 # Index creation + the default-admin seed live in ``init_database()``, which
 # only ``app.py`` runs at startup.
 
+import logging
 import os
 from datetime import datetime
 
@@ -21,6 +22,9 @@ from werkzeug.security import generate_password_hash
 from extensions import mongo, limiter
 from blueprints.utils import enforce_idle_timeout, wants_json_submit, is_admin
 from config import get_config
+from observability import configure_logging
+
+log = logging.getLogger(__name__)
 
 
 def create_app(config_class=None, overrides=None, init_mongo=True):
@@ -31,6 +35,7 @@ def create_app(config_class=None, overrides=None, init_mongo=True):
     init_mongo:   False leaves the shared ``mongo`` singleton alone, so tests can
                   point it at mongomock without a real client being created.
     """
+    configure_logging()
     app = Flask(__name__)
 
     config_class = config_class or get_config()
@@ -256,10 +261,10 @@ def _register_core_routes(app):
         try:
             mongo.db.command('ping')
             return jsonify({"status": "healthy", "database": "connected"}), 200
-        except Exception as e:
+        except Exception:
             # Public endpoint: never echo the driver error (it can name cluster
             # hosts). Render only needs the status code; details go to the log.
-            print(f"[ERROR] Health check: {type(e).__name__}")
+            log.exception("Health check failed")
             return jsonify({"status": "unhealthy", "database": "unavailable"}), 500
 
 
@@ -330,6 +335,6 @@ def init_database():
                 "updated_at": datetime.utcnow(),
                 "is_active": True,
             })
-            print(">>> Default admin created  |  admin@dental.com / admin123")
-    except Exception as e:
-        print(f"Database init error: {e}")
+            log.warning("Default admin account created (admin@dental.com) — change its password")
+    except Exception:
+        log.exception("Database init failed")

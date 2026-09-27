@@ -71,12 +71,6 @@ class ProductionConfig(Config):
                 'environment variable before running in production.'
             )
 
-        import logging
-        import sys
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setLevel(logging.INFO)
-        app.logger.addHandler(handler)
-
 
 # Map env name -> config class
 config = {
