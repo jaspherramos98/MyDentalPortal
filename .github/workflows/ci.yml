@@ -38,7 +38,7 @@ jobs:
 
       - name: Lint (unused imports/names, undefined names)
         # pyflakes: no config, no style opinions — only real mistakes.
-        run: python -m pyflakes blueprints scripts tests factory.py app.py observability.py config.py extensions.py
+        run: python -m pyflakes blueprints scripts tests e2e factory.py app.py observability.py config.py extensions.py
 
       - name: Run tests
         run: pytest
