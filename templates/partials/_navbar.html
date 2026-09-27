@@ -1,8 +1,10 @@
 {# Shared top navbar — included by base.html AND the standalone appointments.html
    (was a hand-kept copy until 2026-09-26). Optional context:
      nav_class  — extra class on <nav> (appointments.html passes 'app-navbar' for its sticky layout)
-     active_nav — 'appointments' marks that link active #}
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary{{ ' ' ~ nav_class if nav_class }}">
+     active_nav — 'appointments' marks that link active
+   navbar-expand-xl (not lg): the admin bar (Manage + Add New) doesn't fit between
+   992-1199px, so iPad-landscape widths get the hamburger (e2e overflow check). #}
+<nav class="navbar navbar-expand-xl navbar-dark bg-primary{{ ' ' ~ nav_class if nav_class }}">
     <div class="container-fluid">
         <a class="navbar-brand" href="{{ url_for('main.dashboard') }}">
             <i class="fas fa-tooth"></i> Dental Portal
