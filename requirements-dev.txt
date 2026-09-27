@@ -1,9 +1,9 @@
 # Dev/test-only dependencies (NOT installed in production).
 #   pip install -r requirements-dev.txt
 -r requirements.txt
-pytest==8.3.3
-mongomock==4.1.2
+pytest==9.0.3
+# 4.3.0: works with pymongo 4.18's GridFS and no longer needs pkg_resources,
+# so the old setuptools<81 pin is gone.
+mongomock==4.3.0
 # Lint gate in CI: flags unused imports/variables and undefined names. No deps.
 pyflakes==4.0.0
-# mongomock 4.1.2 still imports pkg_resources, removed in setuptools 81+.
-setuptools<81

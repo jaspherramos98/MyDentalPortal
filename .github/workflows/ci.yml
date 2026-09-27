@@ -31,8 +31,7 @@ jobs:
           cache-dependency-path: requirements-dev.txt
 
       - name: Install dependencies
-        # requirements-dev.txt pulls in requirements.txt (-r) + pytest/mongomock
-        # and pins setuptools<81 (mongomock 4.1.2 still imports pkg_resources).
+        # requirements-dev.txt pulls in requirements.txt (-r) + pytest/mongomock.
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
