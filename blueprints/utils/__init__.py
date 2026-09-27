@@ -5,6 +5,7 @@
 # single source of truth — important for security, since access-control logic
 # must behave identically everywhere.
 
+import logging
 import time
 from functools import wraps
 
@@ -19,6 +20,8 @@ from blueprints.repositories import patients as _patient_repo
 from blueprints.repositories import clinics as _clinic_repo
 from blueprints.repositories import audit_log as _audit_repo
 
+
+log = logging.getLogger(__name__)
 
 # Role vocabulary. App Admin is a global superset; Dentist owns clinics; Staff
 # (assistant/receptionist) is the constrained role multi-staff will introduce.
@@ -188,4 +191,4 @@ def audit(action, entity_type, entity_id=None, clinic=None, dentist_id=None):
             clinic_id=clinic_id, dentist_id=dentist_id,
         )
     except Exception as e:  # noqa: BLE001 - audit must never break the request
-        print(f"[ERROR] audit log write failed: {e}")
+        log.exception("Audit log write failed")

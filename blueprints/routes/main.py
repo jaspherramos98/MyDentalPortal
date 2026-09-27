@@ -1,6 +1,8 @@
 # File: MyDentalPortal/app/routes/main.py
 # Dashboard and landing page routes
 
+import logging
+
 from flask import (
     Blueprint, render_template, session,
     redirect, url_for, request, flash, jsonify,
@@ -17,6 +19,7 @@ from blueprints.repositories import appointments as appt_repo
 from blueprints.repositories import audit_log as audit_repo
 
 main_bp = Blueprint('main', __name__)
+log = logging.getLogger(__name__)
 
 AUDIT_PAGE_SIZE = 50
 
@@ -165,8 +168,8 @@ def dashboard():
             stats=stats,
         )
 
-    except Exception as e:
-        print(f"Dashboard error: {e}")
+    except Exception:
+        log.exception("Dashboard failed")
         empty = {
             'total_clinics': 0, 'total_patients': 0,
             'patients_this_month': 0, 'appointments_this_week': 0,

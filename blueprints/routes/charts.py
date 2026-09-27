@@ -2,6 +2,8 @@
 # Dental chart routes — FDI numbering, cross layout
 # *** THIS MODULE IS CRITICAL — DO NOT MODIFY CHART LOGIC ***
 
+import logging
+
 from flask import (
     Blueprint, render_template, request, jsonify,
     session, redirect, url_for, flash, send_file,
@@ -9,12 +11,12 @@ from flask import (
 from werkzeug.utils import secure_filename
 from bson.objectid import ObjectId
 from datetime import datetime
-import traceback
 
 from blueprints.utils import login_required, verify_patient_access, audit
 from blueprints.repositories import charts as charts_repo
 
 charts_bp = Blueprint('charts', __name__)
+log = logging.getLogger(__name__)
 
 
 def create_default_dental_chart(patient_id):
@@ -120,9 +122,8 @@ def view_chart(patient_id):
             chart_data=chart_data_json,
             clinic=clinic,
         )
-    except Exception as e:
-        print(f"[ERROR] Dental chart: {e}")
-        traceback.print_exc()
+    except Exception:
+        log.exception("Dental chart failed")
         flash('Error loading dental chart', 'error')
         return redirect(url_for('patients.list_patients'))
 
@@ -155,9 +156,8 @@ def chart_pdf(patient_id):
                          as_attachment=True, download_name=fname + '.pdf')
         resp.headers['X-Content-Type-Options'] = 'nosniff'
         return resp
-    except Exception as e:
-        print(f"[ERROR] Chart PDF: {e}")
-        traceback.print_exc()
+    except Exception:
+        log.exception("Chart PDF failed")
         flash('Could not generate the dental chart PDF.', 'error')
         return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
@@ -184,7 +184,6 @@ def update_chart(patient_id):
         audit('update', 'chart', patient_id, clinic=clinic)
         return jsonify({'success': True, 'message': 'Chart updated successfully'})
 
-    except Exception as e:
-        print(f"[ERROR] Chart update: {e}")
-        traceback.print_exc()
+    except Exception:
+        log.exception("Chart update failed")
         return jsonify({'success': False, 'error': 'Failed to update chart'}), 500

@@ -1,6 +1,8 @@
 # File: MyDentalPortal/blueprints/routes/patients.py
 # Patient management routes — matches PDA paper form fields exactly
 
+import logging
+
 from flask import (
     Blueprint, render_template, request, session,
     redirect, url_for, flash, jsonify, send_file,
@@ -9,7 +11,6 @@ from bson.objectid import ObjectId
 from pymongo.errors import DuplicateKeyError
 from datetime import datetime
 import re
-import traceback
 
 from blueprints.utils import (
     login_required, user_clinic_ids as _get_user_clinic_ids, verify_patient_access,
@@ -24,6 +25,7 @@ from blueprints.repositories import uploads as uploads_repo
 from werkzeug.utils import secure_filename
 
 patients_bp = Blueprint('patients', __name__)
+log = logging.getLogger(__name__)
 
 # Client-generated id for one fill of the create form (32 hex chars, see
 # static/js/resilient-submit.js). Anything else is ignored.
@@ -86,9 +88,8 @@ def list_patients():
             search_query=search_query,
             sort_by=sort_by,
         )
-    except Exception as e:
-        print(f"[ERROR] Patients list: {e}")
-        traceback.print_exc()
+    except Exception:
+        log.exception("Patients list failed")
         flash('Error loading patients', 'error')
         return render_template(
             'patients/list.html',
@@ -272,9 +273,8 @@ def create_patient():
             flash('Patient created successfully!', 'success')
             return _saved_response(inserted_id)
 
-        except Exception as e:
-            print(f"[ERROR] Create patient: {e}")
-            traceback.print_exc()
+        except Exception:
+            log.exception("Create patient failed")
             flash('Could not save the patient record. Please try again.', 'error')
             return render_template('patients/create.html',
                                    clinics=user_clinics, form_data=f)
@@ -314,9 +314,8 @@ def patient_detail(patient_id):
             prescriptions=prescriptions,
             patient_files=patient_files,
         )
-    except Exception as e:
-        print(f"[ERROR] Patient detail failed: {e}")
-        traceback.print_exc()
+    except Exception:
+        log.exception("Patient detail failed")
         flash('Could not load this patient. Please try again.', 'error')
         return redirect(url_for('patients.list_patients'))
 
@@ -346,9 +345,8 @@ def patient_pdf(patient_id):
                          as_attachment=True, download_name=fname + '.pdf')
         resp.headers['X-Content-Type-Options'] = 'nosniff'
         return resp
-    except Exception as e:
-        print(f"[ERROR] Patient PDF: {e}")
-        traceback.print_exc()
+    except Exception:
+        log.exception("Patient PDF failed")
         flash('Could not generate the PDF.', 'error')
         return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
@@ -453,9 +451,8 @@ def edit_patient(patient_id):
 
         return render_template('patients/edit.html',
                                patient=patient, clinics=user_clinics, clinic=clinic)
-    except Exception as e:
-        print(f"[ERROR] Edit patient: {e}")
-        traceback.print_exc()
+    except Exception:
+        log.exception("Edit patient failed")
         flash('Could not save the changes. Please try again.', 'error')
         return redirect(url_for('patients.list_patients'))
 
@@ -475,8 +472,7 @@ def delete_patient(patient_id):
             flash('Patient record deleted', 'success')
         else:
             flash('Patient not found', 'error')
-    except Exception as e:
-        print(f"[ERROR] Delete patient: {e}")
-        traceback.print_exc()
+    except Exception:
+        log.exception("Delete patient failed")
         flash('Could not delete the patient record. Please try again.', 'error')
     return redirect(url_for('patients.list_patients'))

@@ -1,6 +1,8 @@
 # File: MyDentalPortal/blueprints/routes/admin.py
 # Admin-only screens. Currently: review + approve/reject new registrations.
 
+import logging
+
 from flask import (
     Blueprint, render_template, redirect, url_for,
     session, flash, abort, request,
@@ -16,6 +18,7 @@ from blueprints.repositories import memberships as membership_repo
 from blueprints.repositories import audit_log as audit_repo
 
 admin_bp = Blueprint('admin', __name__)
+log = logging.getLogger(__name__)
 
 
 def _audit_admin(action, entity_type, entity_id):
@@ -24,7 +27,7 @@ def _audit_admin(action, entity_type, entity_id):
         audit_repo.record(action, entity_type, entity_id,
                           actor_user_id=session.get('user_id'), actor_role='admin')
     except Exception as e:  # noqa: BLE001
-        print(f"[ERROR] admin audit failed: {e}")
+        log.exception("Admin audit failed")
 
 
 @admin_bp.route('/admin/registrations')

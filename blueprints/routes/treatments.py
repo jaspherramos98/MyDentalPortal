@@ -1,13 +1,14 @@
 # File: MyDentalPortal/app/routes/treatments.py
 # Treatment record routes — scalable design for future additions
 
+import logging
+
 from flask import (
     Blueprint, render_template, request, jsonify,
     session, redirect, url_for, flash,
 )
 from bson.objectid import ObjectId
 from datetime import datetime
-import traceback
 
 from blueprints.utils import (
     login_required, verify_patient_access as _verify_patient_access,
@@ -18,6 +19,7 @@ from blueprints.repositories import treatments as treatment_repo
 from blueprints.repositories import patients as patient_repo
 
 treatments_bp = Blueprint('treatments', __name__)
+log = logging.getLogger(__name__)
 
 
 def _is_price_confirmer():
@@ -78,9 +80,8 @@ def add_treatment(patient_id):
             flash('Treatment record added successfully!', 'success')
             return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
-        except Exception as e:
-            print(f"[ERROR] Add treatment: {e}")
-            traceback.print_exc()
+        except Exception:
+            log.exception("Add treatment failed")
             flash('Error adding treatment record', 'error')
 
     return render_template(
@@ -156,9 +157,8 @@ def edit_treatment(treatment_id):
             'treatments/edit.html',
             treatment=treatment, patient=patient, clinic=clinic,
         )
-    except Exception as e:
-        print(f"[ERROR] Edit treatment: {e}")
-        traceback.print_exc()
+    except Exception:
+        log.exception("Edit treatment failed")
         flash('Error editing treatment', 'error')
         return redirect(url_for('patients.list_patients'))
 
@@ -184,9 +184,8 @@ def mark_paid(treatment_id):
                 return redirect(url_for('patients.patient_detail',
                                         patient_id=str(treatment['patient_id'])))
         flash('Access denied or treatment not found', 'error')
-    except Exception as e:
-        print(f"[ERROR] Mark paid: {e}")
-        traceback.print_exc()
+    except Exception:
+        log.exception("Mark paid failed")
         flash('Error updating payment', 'error')
     return redirect(url_for('patients.list_patients'))
 
@@ -206,8 +205,8 @@ def delete_treatment(treatment_id):
                 return redirect(url_for('patients.patient_detail',
                                         patient_id=str(treatment['patient_id'])))
         flash('Access denied or treatment not found', 'error')
-    except Exception as e:
-        print(f"Delete treatment error: {e}")
+    except Exception:
+        log.exception("Delete treatment failed")
         flash('Error deleting treatment', 'error')
     return redirect(url_for('patients.list_patients'))
 

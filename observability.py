@@ -1,5 +1,12 @@
 # File: MyDentalPortal/observability.py
-# Error tracking (Sentry) — prod-only, PHI-safe.
+# Logging + error tracking (Sentry) — PHI-safe by construction.
+#
+# ONE rule for everything that leaves the request: exception TYPES and stack
+# frames are fine, exception MESSAGES are not. Messages routinely carry data —
+# a DuplicateKeyError names the duplicate email, a ValueError can echo a form
+# value — so both the log formatter and the Sentry scrubber redact them.
+# Log calls themselves use constant messages; interpolate ids only, never
+# names, contact details, notes or form values.
 #
 # This app stores patient health data (PHI). Sentry is configured to capture
 # unhandled exceptions for off-box debugging WITHOUT ever shipping patient data
@@ -14,7 +21,84 @@
 #     (query strings can contain patient-name searches; cookies carry the
 #     session). The URL *path* is kept (ObjectId ids aid debugging, not PHI).
 
+import logging
 import os
+import sys
+import traceback
+
+REDACTED = '[message redacted]'
+
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+
+def _exception_chain(exc):
+    """The exception and its causes/contexts, oldest first (like a traceback)."""
+    chain, seen = [], set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        chain.append(exc)
+        exc = exc.__cause__ or (None if exc.__suppress_context__ else exc.__context__)
+    return list(reversed(chain))
+
+
+def redacted_traceback(exc):
+    """A full traceback (files, lines, code) with every exception message removed."""
+    parts = []
+    chain = _exception_chain(exc)
+    for i, e in enumerate(chain):
+        if i:
+            parts.append(
+                '\nThe above exception was the direct cause of the following exception:\n\n'
+                if e.__cause__ is chain[i - 1] else
+                '\nDuring handling of the above exception, another exception occurred:\n\n'
+            )
+        parts.append('Traceback (most recent call last):\n')
+        parts.extend(traceback.format_tb(e.__traceback__))
+        parts.append(f'{type(e).__module__}.{type(e).__qualname__}: {REDACTED}\n')
+    return ''.join(parts).rstrip('\n')
+
+
+class PhiSafeFormatter(logging.Formatter):
+    """Formatter that keeps tracebacks but never prints exception messages."""
+
+    def format(self, record):
+        # logging caches the formatted traceback on the record (exc_text). If any
+        # other handler formatted it first, that cached text is UNREDACTED — so
+        # always re-render through formatException, then restore the cache.
+        cached = record.exc_text
+        record.exc_text = None
+        try:
+            return super().format(record)
+        finally:
+            record.exc_text = cached
+
+    def formatException(self, ei):
+        return redacted_traceback(ei[1]) if ei and ei[1] is not None else ''
+
+
+class _StdoutHandler(logging.StreamHandler):
+    """StreamHandler bound to the *current* sys.stdout (Render reads stdout;
+    resolving it per record also keeps pytest's output capture working)."""
+
+    def emit(self, record):
+        self.stream = sys.stdout
+        super().emit(record)
+
+
+_LOG_FORMAT = '%(asctime)s %(levelname)s %(name)s: %(message)s'
+
+
+def configure_logging(level=logging.INFO):
+    """Route the app's logs to stdout through the PHI-safe formatter. Idempotent."""
+    root = logging.getLogger()
+    if not any(isinstance(h, _StdoutHandler) for h in root.handlers):
+        handler = _StdoutHandler()
+        handler.setFormatter(PhiSafeFormatter(_LOG_FORMAT))
+        root.addHandler(handler)
+    root.setLevel(level)
+
+
+# ── Sentry ───────────────────────────────────────────────────────────────────
 
 
 # Keys whose values could carry PHI or auth material — scrubbed from every event.
@@ -51,6 +135,10 @@ def _scrub_phi(event, hint):
         if isinstance(env, dict):
             for key in _SENSITIVE_ENV:
                 env.pop(key, None)
+    # Exception messages can carry PHI (see module header) — keep type + frames.
+    for exc in (event.get('exception') or {}).get('values') or []:
+        if exc.get('value'):
+            exc['value'] = REDACTED
     # Never attach a user identity (we don't set one, but be defensive).
     event.pop('user', None)
     return event
@@ -69,6 +157,7 @@ def init_sentry():
     # Imported lazily so the package is only needed where Sentry is actually
     # enabled (and import errors don't take the app down on hosts without it).
     import sentry_sdk
+    from sentry_sdk.integrations.logging import LoggingIntegration
 
     sentry_sdk.init(
         dsn=dsn,
@@ -78,6 +167,9 @@ def init_sentry():
         include_local_variables=False,
         max_request_body_size='never',
         before_send=_scrub_phi,
+        # Logged (handled) errors stay on-box: log records become breadcrumbs
+        # only, never Sentry events — only unhandled exceptions are reported.
+        integrations=[LoggingIntegration(level=logging.INFO, event_level=None)],
         # Errors only — no performance tracing (keeps us in the free tier and
         # avoids per-request overhead). Raise later if perf insight is needed.
         traces_sample_rate=0.0,

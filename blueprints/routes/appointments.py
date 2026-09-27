@@ -1,6 +1,8 @@
 # File: MyDentalPortal/app/routes/appointments.py
 # Appointment management routes — calendar + CRUD API
 
+import logging
+
 from flask import (
     Blueprint, render_template, request, jsonify,
     session, redirect, url_for, flash,
@@ -16,6 +18,7 @@ from blueprints.repositories import clinics as clinic_repo
 from blueprints.repositories import patients as patient_repo
 
 appointments_bp = Blueprint('appointments', __name__)
+log = logging.getLogger(__name__)
 
 # Server-side allowlists — never trust client-supplied enums.
 ALLOWED_TYPES = {
@@ -94,8 +97,8 @@ def appointments():
             clinics=user_clinics,
             patients=formatted,
         )
-    except Exception as e:
-        print(f"Appointments page error: {e}")
+    except Exception:
+        log.exception("Appointments page failed")
         flash('Error loading appointments page', 'error')
         return redirect(url_for('main.dashboard'))
 
@@ -135,8 +138,8 @@ def get_appointments():
                 'notes': a.get('notes', ''),
             })
         return jsonify({'success': True, 'appointments': out, 'total': len(out)})
-    except Exception as e:
-        print(f"Get appointments error: {e}")
+    except Exception:
+        log.exception("Get appointments failed")
         return jsonify({'success': False, 'error': 'Could not load appointments.'}), 500
 
 
@@ -202,8 +205,8 @@ def create_appointment():
             'appointment_id': appt_id,
             'message': f'Appointment scheduled at {clinic["name"]}',
         })
-    except Exception as e:
-        print(f"Create appointment error: {e}")
+    except Exception:
+        log.exception("Create appointment failed")
         return jsonify({'success': False, 'error': 'Failed to create appointment'}), 500
 
 
@@ -257,8 +260,8 @@ def update_appointment(appt_id):
         action = 'cancel' if data.get('status') == 'cancelled' else 'update'
         audit(action, 'appointment', appt_id, clinic=clinic)
         return jsonify({'success': True, 'message': 'Updated'})
-    except Exception as e:
-        print(f"Update appointment error: {e}")
+    except Exception:
+        log.exception("Update appointment failed")
         return jsonify({'success': False, 'error': 'Update failed'}), 500
 
 
@@ -278,6 +281,6 @@ def delete_appointment(appt_id):
         appt_repo.soft_delete(appt_id)
         audit('delete', 'appointment', appt_id, clinic=clinic)
         return jsonify({'success': True, 'message': 'Deleted'})
-    except Exception as e:
-        print(f"Delete appointment error: {e}")
+    except Exception:
+        log.exception("Delete appointment failed")
         return jsonify({'success': False, 'error': 'Delete failed'}), 500
