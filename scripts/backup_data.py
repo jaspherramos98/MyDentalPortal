@@ -43,24 +43,22 @@ from werkzeug.utils import secure_filename
 BACKUP_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'backups')
 
 
-def main():
-    uri = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('MONGO_URI')
-    if not uri:
-        print('ERROR: pass a MongoDB URI as the first argument or set MONGO_URI.')
-        return 2
+def backup(uri, root=BACKUP_ROOT):
+    """Back up the URI's database to ``<root>/<db>-<utc stamp>.zip``; returns the zip path.
 
+    Read-only against the database. Raises on any failure.
+    """
     client = MongoClient(uri, serverSelectionTimeoutMS=15000)
     db = client.get_default_database()
     if db is None:
-        print('ERROR: the URI has no default database (no /dbname in the path).')
-        return 2
+        raise ValueError('the URI has no default database (no /dbname in the path)')
 
     # ping first so we fail fast with a clear message
     client.admin.command('ping')
 
     stamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
     name = f'{db.name}-{stamp}'
-    out_dir = os.path.join(BACKUP_ROOT, name)
+    out_dir = os.path.join(root, name)
     files_dir = os.path.join(out_dir, 'files')
     os.makedirs(files_dir, exist_ok=True)
 
@@ -98,11 +96,24 @@ def main():
         fh.write(json_util.dumps(manifest, indent=2))
 
     # ── zip it up ──
-    zip_base = os.path.join(BACKUP_ROOT, name)
+    zip_base = os.path.join(root, name)
     archive = shutil.make_archive(zip_base, 'zip', out_dir)
     # remove the unzipped folder, keep only the .zip
     shutil.rmtree(out_dir, ignore_errors=True)
+    client.close()
+    return archive
 
+
+def main():
+    uri = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('MONGO_URI')
+    if not uri:
+        print('ERROR: pass a MongoDB URI as the first argument or set MONGO_URI.')
+        return 2
+    try:
+        archive = backup(uri)
+    except ValueError as exc:
+        print(f'ERROR: {exc}.')
+        return 2
     size_mb = os.path.getsize(archive) / (1024 * 1024)
     print(f'\nDone. Backup written to:\n  {archive}  ({size_mb:.2f} MB)')
     print('Keep this somewhere safe and OFF the free tier. It contains PHI.')
