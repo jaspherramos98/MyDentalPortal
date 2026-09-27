@@ -6,6 +6,7 @@
 # must behave identically everywhere.
 
 import logging
+import re
 import time
 from functools import wraps
 
@@ -40,6 +41,25 @@ RESILIENT_SUBMIT_HEADER = 'X-Resilient-Submit'
 def wants_json_submit():
     """True when the request came from the resilient-submit client."""
     return request.headers.get(RESILIENT_SUBMIT_HEADER) == '1'
+
+
+_SUBMISSION_ID_RE = re.compile(r'[0-9a-f]{32}')
+
+
+def submission_id(form):
+    """The client-generated id for one fill of a create form (32 hex chars,
+    see resilient-submit.js), or None. Anything else is ignored."""
+    value = (form.get('submission_id') or '').strip().lower()
+    return value if _SUBMISSION_ID_RE.fullmatch(value) else None
+
+
+def submit_success(url):
+    """Success outcome of a form save: a redirect for plain posts, explicit JSON
+    for the resilient-submit client (to fetch(), a redirect is ambiguous — the
+    login and CSRF bounces redirect too)."""
+    if wants_json_submit():
+        return jsonify({'ok': True, 'redirect': url})
+    return redirect(url)
 
 
 def session_expired_response():

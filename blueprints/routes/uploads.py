@@ -24,11 +24,12 @@ from PIL import Image
 
 from blueprints.utils import (
     login_required, verify_patient_access as _verify_patient_access,
-    role_required, ROLE_DENTIST, audit,
+    role_required, ROLE_DENTIST, audit, submission_id as _submission_id, submit_success,
 )
 from blueprints.utils.images import shrink_image, PHOTO_MAX_SIDE, DOCUMENT_MAX_SIDE
 from blueprints.repositories import uploads as uploads_repo
 from blueprints.repositories import patients as patient_repo
+from blueprints.repositories import submissions as submissions_repo
 from blueprints.clock import utcnow
 
 uploads_bp = Blueprint('uploads', __name__)
@@ -144,7 +145,7 @@ def set_photo(patient_id):
     })
     audit('update', 'photo', patient_id, clinic=clinic)
     flash('Patient photo updated.', 'success')
-    return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+    return submit_success(url_for('patients.patient_detail', patient_id=patient_id))
 
 
 @uploads_bp.route('/patients/<patient_id>/photo')
@@ -206,6 +207,13 @@ def add_prescription(patient_id):
         flash('Add a description or an image for the prescription.', 'error')
         return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
+    detail_url = url_for('patients.patient_detail', patient_id=patient_id)
+    sid = _submission_id(request.form)
+    # Retry of a save that already went through: don't store the image again.
+    if submissions_repo.find('prescriptions', sid, session['user_id']):
+        flash('Prescription saved.', 'success')
+        return submit_success(detail_url)
+
     doc = {
         'patient_id': ObjectId(patient_id),
         'clinic_id': clinic['_id'],
@@ -227,10 +235,17 @@ def add_prescription(patient_id):
         doc['image_file_id'] = _store(data, upload.filename, ext)
         doc['image_name'] = secure_filename(upload.filename)
 
-    pres_id = uploads_repo.insert_prescription(doc)
-    audit('create', 'prescription', pres_id, clinic=clinic)
+    if sid:
+        doc['submission_id'] = sid
+    pres_id, created = submissions_repo.create_once(
+        'prescriptions', sid, session['user_id'], lambda: uploads_repo.insert_prescription(doc),
+    )
+    if created:
+        audit('create', 'prescription', pres_id, clinic=clinic)
+    else:
+        uploads_repo.delete_blob(doc['image_file_id'])   # lost a race: drop our copy
     flash('Prescription saved.', 'success')
-    return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+    return submit_success(detail_url)
 
 
 @uploads_bp.route('/prescriptions/<prescription_id>/image')
@@ -288,6 +303,13 @@ def add_file(patient_id):
         flash('Choose a file to upload.', 'error')
         return redirect(url_for('patients.patient_detail', patient_id=patient_id))
 
+    detail_url = url_for('patients.patient_detail', patient_id=patient_id)
+    sid = _submission_id(request.form)
+    # Retry of an upload that already went through: don't store the file again.
+    if submissions_repo.find('patient_files', sid, session['user_id']):
+        flash('File uploaded.', 'success')
+        return submit_success(detail_url)
+
     ext = _ext(upload.filename)
     data = upload.read()
     ok, err = _validate(data, ext, FILE_EXTS)
@@ -300,7 +322,7 @@ def add_file(patient_id):
 
     display_name = (request.form.get('display_name') or '').strip() or upload.filename
 
-    file_doc_id = uploads_repo.insert_file({
+    file_doc = {
         'patient_id': ObjectId(patient_id),
         'clinic_id': clinic['_id'],
         'file_id': _store(data, upload.filename, ext),
@@ -310,10 +332,19 @@ def add_file(patient_id):
         'content_type': CONTENT_TYPES.get(ext, 'application/octet-stream'),
         'created_by': session['user_id'],
         'created_at': utcnow(),
-    })
+    }
+    if sid:
+        file_doc['submission_id'] = sid
+    file_doc_id, created = submissions_repo.create_once(
+        'patient_files', sid, session['user_id'], lambda: uploads_repo.insert_file(file_doc),
+    )
+    if not created:
+        uploads_repo.delete_blob(file_doc['file_id'])     # lost a race: drop our copy
+        flash('File uploaded.', 'success')
+        return submit_success(detail_url)
     audit('create', 'file', file_doc_id, clinic=clinic)
     flash('File uploaded.', 'success')
-    return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+    return submit_success(detail_url)
 
 
 @uploads_bp.route('/files/<file_doc_id>/download')

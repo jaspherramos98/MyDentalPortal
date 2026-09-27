@@ -9,9 +9,13 @@ from flask import (
     redirect, url_for, flash,
 )
 
-from blueprints.utils import login_required, role_required, ROLE_DENTIST, audit
+from blueprints.utils import (
+    login_required, role_required, ROLE_DENTIST, audit,
+    submission_id as _submission_id, submit_success,
+)
 from blueprints.repositories import clinics as clinic_repo
 from blueprints.repositories import patients as patient_repo
+from blueprints.repositories import submissions as submissions_repo
 from blueprints.clock import utcnow
 
 clinics_bp = Blueprint('clinics', __name__)
@@ -62,13 +66,18 @@ def create_clinic():
             return render_template('clinics/create.html')
         try:
             now = utcnow()
-            clinic_id = clinic_repo.insert(dict(
-                fields, owner_id=session['user_id'], is_active=True,
-                created_at=now, updated_at=now,
-            ))
-            audit('create', 'clinic', clinic_id, dentist_id=session['user_id'])
+            sid = _submission_id(request.form)
+            doc = dict(fields, owner_id=session['user_id'], created_by=session['user_id'],
+                       is_active=True, created_at=now, updated_at=now)
+            if sid:
+                doc['submission_id'] = sid
+            clinic_id, created = submissions_repo.create_once(
+                'clinics', sid, session['user_id'], lambda: clinic_repo.insert(doc),
+            )
+            if created:
+                audit('create', 'clinic', clinic_id, dentist_id=session['user_id'])
             flash(f'Clinic "{fields["name"]}" created successfully!', 'success')
-            return redirect(url_for('clinics.list_clinics'))
+            return submit_success(url_for('clinics.list_clinics'))
         except Exception:
             log.exception("Create clinic failed")
             flash('Error creating clinic', 'error')
@@ -93,7 +102,7 @@ def edit_clinic(clinic_id):
             clinic_repo.update_owned(clinic['_id'], session['user_id'], fields)
             audit('update', 'clinic', clinic['_id'], clinic=clinic)
             flash('Clinic updated successfully!', 'success')
-            return redirect(url_for('clinics.list_clinics'))
+            return submit_success(url_for('clinics.list_clinics'))
 
         return render_template('clinics/edit.html', clinic=clinic)
     except Exception:

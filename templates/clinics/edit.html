@@ -11,7 +11,8 @@
     </div>
     <div class="card shadow-sm">
         <div class="card-body">
-            <form method="POST" action="{{ url_for('clinics.edit_clinic', clinic_id=clinic._id) }}">
+            <form method="POST" action="{{ url_for('clinics.edit_clinic', clinic_id=clinic._id) }}"
+                  data-resilient-submit="auto">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="mb-3">
                     <label for="name" class="form-label">Clinic Name *</label>
