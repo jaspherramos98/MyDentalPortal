@@ -1,0 +1,21 @@
+{# Shared <head> essentials — included by base.html AND the standalone
+   appointments.html (was a hand-kept copy until 2026-09-26). Page-specific CSS
+   (base.html's main.css, appointments.html's own <style>) stays in each page. #}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+
+<!-- PWA: installable, online-first -->
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0d6efd">
+<link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='icons/favicon-32x32.png') }}">
+<link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='icons/favicon-16x16.png') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+<script src="{{ url_for('static', filename='js/pwa-register.js') }}"></script>
+
+<!-- Attach the CSRF token to every state-changing fetch(); in <head> so it's in
+     place before any later script fires a request. -->
+<script src="{{ url_for('static', filename='js/csrf-fetch.js') }}"></script>
+
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
