@@ -8,13 +8,13 @@
 #                 Use for patient/appointment listing scope (the access seam).
 
 import re
-from datetime import datetime
 
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
 
 from extensions import mongo
 from blueprints.repositories import memberships as _membership_repo
+from blueprints.clock import utcnow
 
 
 def owned_by(owner_id, active_only=True):
@@ -116,7 +116,7 @@ def update_owned(clinic_id, owner_id, fields):
         return False
     result = mongo.db.clinics.update_one(
         {'_id': oid, 'owner_id': owner_id},
-        {'$set': dict(fields, updated_at=datetime.utcnow())},
+        {'$set': dict(fields, updated_at=utcnow())},
     )
     return result.matched_count == 1
 

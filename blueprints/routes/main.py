@@ -17,6 +17,7 @@ from blueprints.repositories import clinics as clinic_repo
 from blueprints.repositories import patients as patient_repo
 from blueprints.repositories import appointments as appt_repo
 from blueprints.repositories import audit_log as audit_repo
+from blueprints.clock import utcnow
 
 main_bp = Blueprint('main', __name__)
 log = logging.getLogger(__name__)
@@ -139,7 +140,7 @@ def dashboard():
                 clinic_ids, today_str, end_date, limit=10,
             )
 
-            now = datetime.utcnow()
+            now = utcnow()
             month_start = datetime(now.year, now.month, 1)
             stats['patients_this_month'] = patient_repo.count_active_in_clinics(
                 clinic_ids, created_since=month_start,
@@ -205,7 +206,7 @@ def settings():
                 user_repo.update_set(user['_id'], {
                     'name': name,
                     'specialty': specialty,
-                    'updated_at': datetime.utcnow(),
+                    'updated_at': utcnow(),
                 })
                 session['user_name'] = name
                 flash('Profile updated successfully', 'success')
@@ -225,7 +226,7 @@ def settings():
             else:
                 user_repo.update_set(user['_id'], {
                     'password': generate_password_hash(new),
-                    'updated_at': datetime.utcnow(),
+                    'updated_at': utcnow(),
                 })
                 flash('Password changed successfully', 'success')
             return redirect(url_for('main.settings'))

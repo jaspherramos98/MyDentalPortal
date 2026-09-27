@@ -3,12 +3,12 @@
 # Access control (does this owner own the clinic?) stays in the route via
 # clinics_repo; this module only holds the raw appointment queries.
 
-from datetime import datetime
 
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
 
 from extensions import mongo
+from blueprints.clock import utcnow
 
 
 def get(appt_id):
@@ -104,7 +104,7 @@ def soft_delete(appt_id):
     """Soft-delete: mark inactive + stamp deleted_at (keeps the record)."""
     return mongo.db.appointments.update_one(
         {'_id': ObjectId(appt_id)},
-        {'$set': {'is_active': False, 'deleted_at': datetime.utcnow()}},
+        {'$set': {'is_active': False, 'deleted_at': utcnow()}},
     )
 
 

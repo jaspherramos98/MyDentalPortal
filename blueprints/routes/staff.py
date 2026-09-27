@@ -6,7 +6,7 @@
 # flow). This blueprint is the dentist's side of onboarding.
 
 from flask import (
-    Blueprint, render_template, request, session, redirect, url_for, flash,
+    Blueprint, render_template, session, redirect, url_for, flash,
 )
 
 from blueprints.utils import role_required, ROLE_DENTIST, audit

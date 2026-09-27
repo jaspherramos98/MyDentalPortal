@@ -8,11 +8,11 @@ from flask import (
     Blueprint, render_template, request, session,
     redirect, url_for, flash,
 )
-from datetime import datetime
 
 from blueprints.utils import login_required, role_required, ROLE_DENTIST, audit
 from blueprints.repositories import clinics as clinic_repo
 from blueprints.repositories import patients as patient_repo
+from blueprints.clock import utcnow
 
 clinics_bp = Blueprint('clinics', __name__)
 log = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ def create_clinic():
             flash('Clinic name is required', 'error')
             return render_template('clinics/create.html')
         try:
-            now = datetime.utcnow()
+            now = utcnow()
             clinic_id = clinic_repo.insert(dict(
                 fields, owner_id=session['user_id'], is_active=True,
                 created_at=now, updated_at=now,

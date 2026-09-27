@@ -9,11 +9,10 @@ from flask import (
 )
 from bson.objectid import ObjectId
 from pymongo.errors import DuplicateKeyError
-from datetime import datetime
 import re
 
 from blueprints.utils import (
-    login_required, user_clinic_ids as _get_user_clinic_ids, verify_patient_access,
+    login_required, verify_patient_access,
     role_required, ROLE_DENTIST, audit, wants_json_submit, scoped_clinic_ids,
 )
 from blueprints.repositories import patients as patient_repo
@@ -22,6 +21,7 @@ from blueprints.repositories import charts as chart_repo
 from blueprints.repositories import treatments as treatment_repo
 from blueprints.repositories import appointments as appt_repo
 from blueprints.repositories import uploads as uploads_repo
+from blueprints.clock import utcnow
 from werkzeug.utils import secure_filename
 
 patients_bp = Blueprint('patients', __name__)
@@ -212,13 +212,13 @@ def create_patient():
                 # basis at the time the record was created.
                 'privacy_consent': {
                     'given': f.get('privacy_consent') == 'yes',
-                    'at': datetime.utcnow(),
+                    'at': utcnow(),
                     'version': '1.0',
                     'by_user_id': session['user_id'],
                 },
                 'created_by': session['user_id'],
-                'created_at': datetime.utcnow(),
-                'updated_at': datetime.utcnow(),
+                'created_at': utcnow(),
+                'updated_at': utcnow(),
                 'is_active': True,
             }
 
@@ -442,7 +442,7 @@ def edit_patient(patient_id):
                 'medical_history.conditions.thyroid_problem': 'condition_thyroid_problem' in f,
                 'medical_history.conditions.bleeding_problems': 'condition_bleeding_problems' in f,
                 'medical_history.conditions.other': (f.get('condition_other') or '').strip(),
-                'updated_at': datetime.utcnow(),
+                'updated_at': utcnow(),
             }
             patient_repo.update_set(patient_id, update_data)
             audit('update', 'patient', patient_id, clinic=clinic)

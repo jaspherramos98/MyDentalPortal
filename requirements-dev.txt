@@ -5,3 +5,5 @@ pytest==9.0.3
 # 4.3.0: works with pymongo 4.18's GridFS and no longer needs pkg_resources,
 # so the old setuptools<81 pin is gone.
 mongomock==4.3.0
+# Lint gate in CI: flags unused imports/variables and undefined names. No deps.
+pyflakes==4.0.0

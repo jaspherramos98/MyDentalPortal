@@ -190,5 +190,5 @@ def audit(action, entity_type, entity_id=None, clinic=None, dentist_id=None):
             actor_role=session.get('user_role', ROLE_DENTIST),
             clinic_id=clinic_id, dentist_id=dentist_id,
         )
-    except Exception as e:  # noqa: BLE001 - audit must never break the request
+    except Exception:  # noqa: BLE001 - audit must never break the request
         log.exception("Audit log write failed")

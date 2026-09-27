@@ -21,6 +21,7 @@ from werkzeug.security import generate_password_hash
 
 from extensions import mongo, limiter
 from blueprints.utils import enforce_idle_timeout, wants_json_submit, is_admin
+from blueprints.clock import utcnow
 from config import get_config
 from observability import configure_logging
 
@@ -115,7 +116,7 @@ def _register_template_helpers(app):
 
         return dict(
             safe_url_for=safe_url_for,
-            current_year=datetime.utcnow().year,
+            current_year=utcnow().year,
             is_admin=is_admin(),
             today=_today,
             min_birth_date='1900-01-01',
@@ -331,8 +332,8 @@ def init_database():
                 "specialty": "General Dentistry",
                 "role": "admin",
                 "status": "approved",
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow(),
+                "created_at": utcnow(),
+                "updated_at": utcnow(),
                 "is_active": True,
             })
             log.warning("Default admin account created (admin@dental.com) — change its password")
