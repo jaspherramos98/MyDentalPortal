@@ -4,21 +4,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
+    {% include 'partials/_head_common.html' %}
     <title>{% block title %}Dental Portal{% endblock %}</title>
-
-    <!-- PWA: installable, online-first -->
-    <link rel="manifest" href="/manifest.webmanifest">
-    <meta name="theme-color" content="#0d6efd">
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='icons/favicon-32x32.png') }}">
-    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='icons/favicon-16x16.png') }}">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
-
-    <!-- Attach the CSRF token to every same-origin fetch() that changes state.
-         Runs in <head> so it's in place before any later script fires a request. -->
-    <script src="{{ url_for('static', filename='js/csrf-fetch.js') }}"></script>
     
     <!-- Resilient form submit (retry, session recovery, idempotent creates).
          Loaded SYNCHRONOUSLY in <head>, NOT defer: page scripts (e.g.
@@ -27,10 +14,6 @@
          bug in #42). It only registers listeners at load, so early is safe. -->
     <script src="{{ url_for('static', filename='js/resilient-submit.js') }}"></script>
 
-    <!-- Bootstrap CSS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <!-- Custom CSS -->
     <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
     
@@ -38,144 +21,7 @@
 </head>
 <body data-keepalive-url="{{ url_for('main.keepalive') }}" data-login-url="{{ url_for('auth.login') }}">
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('main.dashboard') }}">
-                <i class="fas fa-tooth"></i> Dental Portal
-            </a>
-            
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            
-            <div class="collapse navbar-collapse" id="navbarNav">
-                {% if session.user_id %}
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.dashboard') }}">
-                            <i class="fas fa-tachometer-alt"></i> Dashboard
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('appointments.appointments') }}">
-                            <i class="fas fa-calendar"></i> Appointments
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('patients.list_patients') }}">
-                            <i class="fas fa-users"></i> Patients
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('clinics.list_clinics') }}">
-                            <i class="fas fa-clinic-medical"></i> Clinics
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('reports.reports') }}">
-                            <i class="fas fa-chart-line"></i> Performance
-                        </a>
-                    </li>
-                    {% if session.user_role != 'staff' %}
-                    <!-- Management & oversight tools, grouped to keep the bar uncluttered -->
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-toolbox"></i> Manage
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('staff.list_staff') }}">
-                                    <i class="fas fa-user-nurse"></i> Staff
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('treatments.pending_prices') }}">
-                                    <i class="fas fa-money-check-dollar"></i> Pending Prices
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('deletions.queue') }}">
-                                    <i class="fas fa-trash-can-arrow-up"></i> Deletion Requests
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('main.activity') }}">
-                                    <i class="fas fa-clock-rotate-left"></i> Activity Log
-                                </a>
-                            </li>
-                            {% if is_admin %}
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('admin.registrations') }}">
-                                    <i class="fas fa-user-shield"></i> Approvals
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('admin.panel') }}">
-                                    <i class="fas fa-users-gear"></i> Admin Panel
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('admin.users') }}">
-                                    <i class="fas fa-users-cog"></i> Users
-                                </a>
-                            </li>
-                            {% endif %}
-                        </ul>
-                    </li>
-                    {% endif %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-plus"></i> Add New
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('patients.create_patient') }}">
-                                    <i class="fas fa-user-plus"></i> New Patient
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('clinics.create_clinic') }}">
-                                    <i class="fas fa-clinic-medical"></i> New Clinic
-                                </a>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('appointments.appointments') }}">
-                                    <i class="fas fa-calendar-plus"></i> New Appointment
-                                </a>
-                            </li>
-                        </ul>
-                    </li>
-                </ul>
-                
-                <ul class="navbar-nav">
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user"></i> {{ session.user_name or 'User' }}
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('main.settings') }}">
-                                    <i class="fas fa-user-cog"></i> Account
-                                </a>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <form method="POST" action="{{ url_for('auth.logout') }}">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button type="submit" class="dropdown-item">
-                                        <i class="fas fa-sign-out-alt"></i> Logout
-                                    </button>
-                                </form>
-                            </li>
-                        </ul>
-                    </li>
-                </ul>
-                {% endif %}
-            </div>
-        </div>
-    </nav>
+    {% include 'partials/_navbar.html' %}
 
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -211,7 +57,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
 
     <!-- PWA: register the (online-first) service worker -->
-    <script src="{{ url_for('static', filename='js/pwa-register.js') }}"></script>
 
     {% block extra_js %}{% endblock %}
 
