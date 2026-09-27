@@ -132,6 +132,27 @@ def test_dentist_edits_own_clinic(real_client, as_user, world, db):
     assert db.clinics.find_one({"_id": world.clinic_a})["name"] == "Hijacked"
 
 
+def test_rejected_clinic_delete_is_not_audited(real_client, as_user, world, db):
+    # A refused attempt must not appear as a delete in the owner's activity log.
+    as_user("outsider")
+    real_client.post(f"/clinics/{world.clinic_a}/delete")
+    assert db.audit_log.count_documents({"entity_type": "clinic", "action": "delete"}) == 0
+
+
+def test_clinic_currency_is_whitelisted(real_client, as_user, world, db):
+    as_user("dentist")
+    real_client.post("/clinics/create", data={"name": "Clinic Delta", "currency": "BTC"})
+    assert db.clinics.find_one({"name": "Clinic Delta"})["currency"] == "PHP"
+    real_client.post(f"/clinics/{world.clinic_a}/edit", data={"name": "Clinic Alpha", "currency": "USD"})
+    assert db.clinics.find_one({"_id": world.clinic_a})["currency"] == "USD"
+
+
+def test_clinic_edit_rejects_empty_name(real_client, as_user, world, db):
+    as_user("dentist")
+    real_client.post(f"/clinics/{world.clinic_a}/edit", data={"name": "  "})
+    assert db.clinics.find_one({"_id": world.clinic_a})["name"] == "Clinic Alpha"
+
+
 def test_dentist_soft_deletes_own_clinic(real_client, as_user, world, db):
     as_user("dentist")
     real_client.post(f"/clinics/{world.clinic_a}/delete")

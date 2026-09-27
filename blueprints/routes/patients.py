@@ -11,13 +11,16 @@ from datetime import datetime
 import re
 import traceback
 
-from extensions import mongo
 from blueprints.utils import (
     login_required, user_clinic_ids as _get_user_clinic_ids, verify_patient_access,
     role_required, ROLE_DENTIST, audit, wants_json_submit, scoped_clinic_ids,
 )
 from blueprints.repositories import patients as patient_repo
 from blueprints.repositories import clinics as clinic_repo
+from blueprints.repositories import charts as chart_repo
+from blueprints.repositories import treatments as treatment_repo
+from blueprints.repositories import appointments as appt_repo
+from blueprints.repositories import uploads as uploads_repo
 from werkzeug.utils import secure_filename
 
 patients_bp = Blueprint('patients', __name__)
@@ -44,10 +47,6 @@ def _saved_response(patient_id):
         return jsonify({'ok': True, 'redirect': url})
     return redirect(url)
 
-# _ensure_nested moved to the patients repository (blueprints/repositories/patients.py).
-# Kept as a module-level alias for backward compatibility with existing call sites.
-_ensure_nested = patient_repo.ensure_nested
-
 
 # ── LIST ─────────────────────────────────────────────────────────────────
 @patients_bp.route('/patients')
@@ -60,48 +59,22 @@ def list_patients():
         search_query = request.args.get('search', '')
         clinic_filter = request.args.get('clinic_id', '')
 
-        # Sort: default alphabetical (last name, then first name). Whitelist the
-        # option so user input can't drive an arbitrary Mongo sort.
-        sort_options = {
-            'name_asc': [('personal_info.last_name', 1), ('personal_info.first_name', 1)],
-            'name_desc': [('personal_info.last_name', -1), ('personal_info.first_name', -1)],
-            'newest': [('created_at', -1)],
-            'oldest': [('created_at', 1)],
-        }
-        sort_by = request.args.get('sort', 'name_asc')
-        if sort_by not in sort_options:
-            sort_by = 'name_asc'
-
-        # ?clinic_id may only narrow the user's own clinics (see scoped_clinic_ids).
-        query = {'is_active': True,
-                 'clinic_id': {'$in': scoped_clinic_ids(clinic_filter)}}
-
-        if search_query:
-            # Escape so the user's text is matched literally — never interpreted
-            # as a regex (prevents ReDoS / regex injection against the DB).
-            safe_q = re.escape(search_query)
-            query['$or'] = [
-                {'personal_info.first_name': {'$regex': safe_q, '$options': 'i'}},
-                {'personal_info.last_name': {'$regex': safe_q, '$options': 'i'}},
-                {'personal_info.nickname': {'$regex': safe_q, '$options': 'i'}},
-                {'contact_info.cell_phone': {'$regex': safe_q, '$options': 'i'}},
-            ]
+        # Whitelisted sort key (the repo falls back to the default for anything else).
+        sort_by = request.args.get('sort', patient_repo.DEFAULT_LIST_SORT)
+        if sort_by not in patient_repo.LIST_SORTS:
+            sort_by = patient_repo.DEFAULT_LIST_SORT
 
         page = max(1, request.args.get('page', 1, type=int))
         per_page = 20
-        total = mongo.db.patients.count_documents(query)
-        total_pages = max(1, (total + per_page - 1) // per_page)
-
-        patients = list(
-            mongo.db.patients.find(query)
-            .sort(sort_options[sort_by])
-            .skip((page - 1) * per_page)
-            .limit(per_page)
+        # ?clinic_id may only narrow the user's own clinics (see scoped_clinic_ids).
+        patients, total = patient_repo.search_active_page(
+            scoped_clinic_ids(clinic_filter), search_query, sort_by, page, per_page,
         )
+        total_pages = max(1, (total + per_page - 1) // per_page)
 
         # Ensure nested dicts for safe template access
         for p in patients:
-            _ensure_nested(p)
+            patient_repo.ensure_nested(p)
 
         return render_template(
             'patients/list.html',
@@ -323,29 +296,13 @@ def patient_detail(patient_id):
             return redirect(url_for('patients.list_patients'))
 
         # Ensure nested dicts
-        _ensure_nested(patient)
+        patient_repo.ensure_nested(patient)
 
-        dental_chart = mongo.db.dental_charts.find_one(
-            {'patient_id': ObjectId(patient_id)}
-        )
-        treatment_records = list(
-            mongo.db.treatment_records.find({'patient_id': ObjectId(patient_id)})
-            .sort('date', -1).limit(20)
-        )
-        patient_appointments = list(
-            mongo.db.appointments.find({
-                'patient_id': ObjectId(patient_id),
-                'is_active': True,
-            }).sort([('date', -1), ('time', -1)]).limit(10)
-        )
-        prescriptions = list(
-            mongo.db.prescriptions.find({'patient_id': ObjectId(patient_id)})
-            .sort('created_at', -1)
-        )
-        patient_files = list(
-            mongo.db.patient_files.find({'patient_id': ObjectId(patient_id)})
-            .sort('created_at', -1)
-        )
+        dental_chart = chart_repo.get_by_patient(patient_id)
+        treatment_records = treatment_repo.list_for_patient(patient_id, limit=20)
+        patient_appointments = appt_repo.active_for_patient(patient_id, limit=10)
+        prescriptions = uploads_repo.prescriptions_for_patient(patient_id)
+        patient_files = uploads_repo.files_for_patient(patient_id)
 
         return render_template(
             'patients/detail.html',
@@ -373,16 +330,13 @@ def patient_pdf(patient_id):
         flash('Patient not found', 'error')
         return redirect(url_for('patients.list_patients'))
     try:
-        _ensure_nested(patient)
+        patient_repo.ensure_nested(patient)
         from blueprints.utils.pdf import build_patient_pdf
         # Pull the patient photo (if any) so it can be embedded in the PDF.
         photo_bytes = None
         if patient.get('photo_file_id'):
-            try:
-                from gridfs import GridFS
-                photo_bytes = GridFS(mongo.db).get(patient['photo_file_id']).read()
-            except Exception:
-                photo_bytes = None
+            blob = uploads_repo.get_blob(patient['photo_file_id'])
+            photo_bytes = blob.read() if blob else None
         buf = build_patient_pdf(patient, clinic, photo_bytes=photo_bytes)
         pi = patient.get('personal_info', {})
         fname = secure_filename(
@@ -410,7 +364,7 @@ def edit_patient(patient_id):
             flash('Patient not found', 'error')
             return redirect(url_for('patients.list_patients'))
 
-        _ensure_nested(patient)
+        patient_repo.ensure_nested(patient)
         user_clinics = clinic_repo.accessible_active(session['user_id'])
 
         if request.method == 'POST':
@@ -516,10 +470,7 @@ def delete_patient(patient_id):
         # linked staff (they use the deletion-request workflow instead).
         clinic = clinic_repo.get_owned(patient['clinic_id'], session['user_id']) if patient else None
         if patient and clinic:
-            mongo.db.patients.update_one(
-                {'_id': ObjectId(patient_id)},
-                {'$set': {'is_active': False, 'updated_at': datetime.utcnow()}},
-            )
+            patient_repo.soft_delete(patient_id)
             audit('delete', 'patient', patient_id, clinic=clinic)
             flash('Patient record deleted', 'success')
         else:

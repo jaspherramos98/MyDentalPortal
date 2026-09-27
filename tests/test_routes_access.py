@@ -203,6 +203,33 @@ def test_patient_detail_error_does_not_show_internals(real_client, as_user, worl
     assert "internal-detail-xyz" not in flashes
 
 
+# ── Owner decisions (2026-09-26) ─────────────────────────────────────────────
+
+def test_admin_role_grants_no_patient_access(real_client, as_user, world):
+    """Admins manage accounts, not patient data: no patients on their dashboard or list."""
+    as_user("admin")
+    for path in ("/dashboard", "/patients", f"/patients/{world.patient_a}"):
+        body = _body(real_client.get(path, follow_redirects=True))
+        assert MARKER_A not in body and MARKER_B not in body
+
+
+def test_staff_see_dentists_clinic_performance(real_client, as_user, world, db):
+    """Staff get the performance view of their dentist's clinics (totals + the
+    clinic dropdown, which the template shows once there are 2+ clinics)."""
+    db.clinics.insert_one({"owner_id": world.dentist, "name": "Clinic Annex",
+                           "is_active": True, "currency": "PHP"})
+    as_user("staff")
+    body = _body(real_client.get("/reports"))
+    assert "1,500.00" in body                                  # treatment_a's charge
+    assert "Clinic Alpha" in body and "Clinic Annex" in body   # dropdown options
+    assert "Clinic Bravo" not in body
+
+
+def test_performance_view_is_read_only(real_client, as_user, world):
+    as_user("staff")
+    assert real_client.post("/reports").status_code == 405
+
+
 # ── Cross-cutting response behaviour ─────────────────────────────────────────
 
 def test_security_headers_on_every_response(real_client):
