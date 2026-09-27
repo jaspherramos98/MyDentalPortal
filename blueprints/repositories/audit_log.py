@@ -11,9 +11,9 @@
 # nested viewer (PR F) can group by dentist cheaply: staff see none, a dentist
 # sees their own clinics' activity, an admin sees all grouped by dentist.
 
-from datetime import datetime
 
 from extensions import mongo
+from blueprints.clock import utcnow
 
 
 def record(action, entity_type, entity_id=None, actor_user_id=None,
@@ -28,7 +28,7 @@ def record(action, entity_type, entity_id=None, actor_user_id=None,
         'entity_id': str(entity_id) if entity_id is not None else None,
         'clinic_id': clinic_id,
         'dentist_id': dentist_id,
-        'timestamp': datetime.utcnow(),
+        'timestamp': utcnow(),
     }).inserted_id
 
 

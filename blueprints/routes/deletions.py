@@ -4,7 +4,6 @@
 # (performs the delete) or rejects. Generic across patient/treatment/prescription/
 # file/photo. Everything is audited.
 
-from datetime import datetime
 
 from flask import (
     Blueprint, render_template, request, session, redirect, url_for, flash,
@@ -19,6 +18,7 @@ from blueprints.repositories import patients as patient_repo
 from blueprints.repositories import treatments as treatment_repo
 from blueprints.repositories import uploads as uploads_repo
 from blueprints.repositories import users as user_repo
+from blueprints.clock import utcnow
 
 deletions_bp = Blueprint('deletions', __name__)
 
@@ -53,7 +53,7 @@ def _resolve(entity_type, entity_id):
 def _perform_delete(entity_type, entity_id):
     """Actually delete the entity — mirrors the direct delete routes' behaviour."""
     if entity_type == 'patient':
-        patient_repo.update_set(entity_id, {'is_active': False, 'updated_at': datetime.utcnow()})
+        patient_repo.update_set(entity_id, {'is_active': False, 'updated_at': utcnow()})
     elif entity_type == 'photo':
         patient = patient_repo.get(entity_id)
         if patient:

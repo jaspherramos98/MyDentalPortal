@@ -6,12 +6,12 @@
 # entity_id). `dentist_id` is denormalised so the review queue scopes cheaply
 # (dentist sees their clinics' requests; admin sees all).
 
-from datetime import datetime
 
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
 
 from extensions import mongo
+from blueprints.clock import utcnow
 
 
 def has_pending(entity_type, entity_id):
@@ -36,7 +36,7 @@ def create(entity_type, entity_id, clinic_id, dentist_id, requested_by):
         'clinic_id': clinic_id,
         'dentist_id': dentist_id,
         'requested_by': requested_by,
-        'requested_at': datetime.utcnow(),
+        'requested_at': utcnow(),
         'status': 'pending',
         'resolved_by': None,
         'resolved_at': None,
@@ -77,5 +77,5 @@ def resolve(request_id, status, resolved_by):
     return mongo.db.deletion_requests.update_one(
         {'_id': oid, 'status': 'pending'},
         {'$set': {'status': status, 'resolved_by': resolved_by,
-                  'resolved_at': datetime.utcnow()}},
+                  'resolved_at': utcnow()}},
     )

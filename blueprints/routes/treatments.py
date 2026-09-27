@@ -8,7 +8,6 @@ from flask import (
     session, redirect, url_for, flash,
 )
 from bson.objectid import ObjectId
-from datetime import datetime
 
 from blueprints.utils import (
     login_required, verify_patient_access as _verify_patient_access,
@@ -17,6 +16,7 @@ from blueprints.utils import (
 )
 from blueprints.repositories import treatments as treatment_repo
 from blueprints.repositories import patients as patient_repo
+from blueprints.clock import utcnow
 
 treatments_bp = Blueprint('treatments', __name__)
 log = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ def add_treatment(patient_id):
             treatment = {
                 'patient_id': ObjectId(patient_id),
                 'clinic_id': clinic['_id'],
-                'date': f.get('date') or datetime.utcnow().strftime('%Y-%m-%d'),
+                'date': f.get('date') or utcnow().strftime('%Y-%m-%d'),
                 'tooth_numbers': [
                     t.strip() for t in (f.get('tooth_numbers') or '').split(',')
                     if t.strip()
@@ -61,8 +61,8 @@ def add_treatment(patient_id):
                 'notes': (f.get('notes') or '').strip(),
                 'next_appointment': f.get('next_appointment', ''),
                 'created_by': session['user_id'],
-                'created_at': datetime.utcnow(),
-                'updated_at': datetime.utcnow(),
+                'created_at': utcnow(),
+                'updated_at': utcnow(),
             }
 
             # Price-confirmation: a dentist/admin's price is confirmed immediately;
@@ -71,7 +71,7 @@ def add_treatment(patient_id):
             treatment['price_set_by'] = session['user_id']
             treatment['price_confirmed'] = confirmer
             treatment['price_confirmed_by'] = session['user_id'] if confirmer else None
-            treatment['price_confirmed_at'] = datetime.utcnow() if confirmer else None
+            treatment['price_confirmed_at'] = utcnow() if confirmer else None
 
             tid = treatment_repo.insert(treatment)
             audit('create', 'treatment', tid, clinic=clinic)
@@ -126,7 +126,7 @@ def edit_treatment(treatment_id):
                 'status': f.get('status', 'completed'),
                 'notes': (f.get('notes') or '').strip(),
                 'next_appointment': f.get('next_appointment', ''),
-                'updated_at': datetime.utcnow(),
+                'updated_at': utcnow(),
             }
 
             # Price-confirmation on edit: a dentist/admin save confirms the price;
@@ -137,7 +137,7 @@ def edit_treatment(treatment_id):
             if confirmer:
                 update['price_confirmed'] = True
                 update['price_confirmed_by'] = session['user_id']
-                update['price_confirmed_at'] = datetime.utcnow()
+                update['price_confirmed_at'] = utcnow()
             elif update['amount_charged'] != float(treatment.get('amount_charged') or 0):
                 update['price_confirmed'] = False
                 update['price_set_by'] = session['user_id']
@@ -177,7 +177,7 @@ def mark_paid(treatment_id):
                 treatment_repo.update_set(treatment_id, {
                     'amount_paid': charged,
                     'balance': 0.0,
-                    'updated_at': datetime.utcnow(),
+                    'updated_at': utcnow(),
                 })
                 audit('mark_paid', 'treatment', treatment_id, clinic=clinic)
                 flash('Treatment marked as fully paid.', 'success')
@@ -223,7 +223,7 @@ def confirm_price(treatment_id):
             treatment_repo.update_set(treatment_id, {
                 'price_confirmed': True,
                 'price_confirmed_by': session['user_id'],
-                'price_confirmed_at': datetime.utcnow(),
+                'price_confirmed_at': utcnow(),
             })
             audit('price_confirmed', 'treatment', treatment_id, clinic=clinic)
             flash('Price confirmed.', 'success')

@@ -23,7 +23,7 @@ devpass123 (separate dentist, separate clinic).
 import os
 import random
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from urllib.parse import urlsplit
 
@@ -119,7 +119,7 @@ def main():
             'password': generate_password_hash('admin123'),
             'license_number': 'ADMIN001', 'specialty': 'General Dentistry',
             'role': 'admin', 'status': 'approved',
-            'created_at': datetime.utcnow(), 'updated_at': datetime.utcnow(),
+            'created_at': datetime.now(timezone.utc).replace(tzinfo=None), 'updated_at': datetime.now(timezone.utc).replace(tzinfo=None),
             'is_active': True,
         }).inserted_id
         print('  created admin@dental.com / admin123')
@@ -134,7 +134,7 @@ def main():
         if deleted:
             print(f'  cleared {deleted} previous dev {coll}')
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
 
     # ── multi-role layout: staff linked to the admin + a separate dentist ──
     staff_id = _dev_user(db, 'Staff One', 'staff@dev.local', 'staff', now)

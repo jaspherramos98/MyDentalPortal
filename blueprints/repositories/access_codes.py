@@ -11,12 +11,13 @@
 
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
 
 from extensions import mongo
+from blueprints.clock import utcnow
 
 DEFAULT_TTL_DAYS = 7
 
@@ -33,13 +34,13 @@ def generate(dentist_id, created_by, ttl_days=DEFAULT_TTL_DAYS):
         'code_hash': _hash(code),
         'dentist_id': dentist_id,
         'role': 'staff',
-        'expires_at': datetime.utcnow() + timedelta(days=ttl_days),
+        'expires_at': utcnow() + timedelta(days=ttl_days),
         'used': False,
         'used_by': None,
         'used_at': None,
         'revoked': False,
         'created_by': created_by,
-        'created_at': datetime.utcnow(),
+        'created_at': utcnow(),
     })
     return code
 
@@ -53,9 +54,9 @@ def consume(code, used_by):
             'code_hash': _hash(code),
             'used': False,
             'revoked': {'$ne': True},
-            'expires_at': {'$gt': datetime.utcnow()},
+            'expires_at': {'$gt': utcnow()},
         },
-        {'$set': {'used': True, 'used_by': used_by, 'used_at': datetime.utcnow()}},
+        {'$set': {'used': True, 'used_by': used_by, 'used_at': utcnow()}},
         return_document=True,
     )
 
@@ -75,5 +76,5 @@ def revoke(code_id, dentist_id):
         return None
     return mongo.db.access_codes.update_one(
         {'_id': oid, 'dentist_id': dentist_id, 'used': False},
-        {'$set': {'revoked': True, 'revoked_at': datetime.utcnow()}},
+        {'$set': {'revoked': True, 'revoked_at': utcnow()}},
     )

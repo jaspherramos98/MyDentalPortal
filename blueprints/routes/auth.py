@@ -8,7 +8,6 @@ from flask import (
     render_template, redirect, url_for, flash,
 )
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
 import re
 
 from extensions import limiter
@@ -16,6 +15,7 @@ from blueprints.repositories import users as user_repo
 from blueprints.repositories import audit_log as audit_repo
 from blueprints.repositories import access_codes as code_repo
 from blueprints.repositories import memberships as membership_repo
+from blueprints.clock import utcnow
 
 auth_bp = Blueprint('auth', __name__)
 log = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ def _audit_auth(action, user=None):
             action, 'auth', entity_id=uid,
             actor_user_id=uid, actor_role=(user or {}).get('role'),
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         log.exception("Auth audit failed")
 
 # Pre-computed hash so failed logins stay roughly constant-time: we always run a
@@ -163,8 +163,8 @@ def register():
                 'specialty': specialty,
                 'role': 'dentist',           # future: admin, staff
                 'status': 'pending',         # must be approved by an admin
-                'created_at': datetime.utcnow(),
-                'updated_at': datetime.utcnow(),
+                'created_at': utcnow(),
+                'updated_at': utcnow(),
                 'is_active': True,
             }
             user_repo.create(user_data)
@@ -234,8 +234,8 @@ def join():
                 'password': generate_password_hash(password),
                 'role': 'staff',
                 'status': 'approved',     # the access code is the vetting
-                'created_at': datetime.utcnow(),
-                'updated_at': datetime.utcnow(),
+                'created_at': utcnow(),
+                'updated_at': utcnow(),
                 'is_active': True,
             })
 
@@ -253,7 +253,7 @@ def join():
                 audit_repo.record('join', 'membership', entity_id=str(membership_id),
                                   actor_user_id=user_id, actor_role='staff',
                                   dentist_id=dentist_id)
-            except Exception as e:  # noqa: BLE001
+            except Exception:  # noqa: BLE001
                 log.exception("Join audit failed")
 
             flash('Account created. You can now log in.', 'success')
@@ -278,7 +278,7 @@ def logout():
         try:
             audit_repo.record('logout', 'auth', entity_id=uid, actor_user_id=uid,
                               actor_role=session.get('user_role'))
-        except Exception as e:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             log.exception("Auth audit failed")
     session.clear()
     flash('You have been logged out.', 'info')

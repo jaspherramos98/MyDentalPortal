@@ -10,12 +10,12 @@ from flask import (
 from werkzeug.security import generate_password_hash
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
-from datetime import datetime
 
 from blueprints.utils import admin_required, ROLE_DENTIST, ROLE_STAFF, ROLE_ADMIN
 from blueprints.repositories import users as user_repo
 from blueprints.repositories import memberships as membership_repo
 from blueprints.repositories import audit_log as audit_repo
+from blueprints.clock import utcnow
 
 admin_bp = Blueprint('admin', __name__)
 log = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ def _audit_admin(action, entity_type, entity_id):
     try:
         audit_repo.record(action, entity_type, entity_id,
                           actor_user_id=session.get('user_id'), actor_role='admin')
-    except Exception as e:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         log.exception("Admin audit failed")
 
 
@@ -46,7 +46,7 @@ def approve(user_id):
         abort(404)
     user_repo.set_status_if_pending(
         oid, 'approved',
-        {'updated_at': datetime.utcnow(), 'approved_by': session['user_id']},
+        {'updated_at': utcnow(), 'approved_by': session['user_id']},
     )
     flash('Account approved — the user can now log in.', 'success')
     return redirect(url_for('admin.registrations'))
@@ -61,7 +61,7 @@ def reject(user_id):
         abort(404)
     user_repo.set_status_if_pending(
         oid, 'rejected',
-        {'updated_at': datetime.utcnow(), 'rejected_by': session['user_id']},
+        {'updated_at': utcnow(), 'rejected_by': session['user_id']},
     )
     flash('Registration rejected.', 'warning')
     return redirect(url_for('admin.registrations'))
@@ -91,7 +91,7 @@ def reset_password(user_id):
 
     result = user_repo.update_set(oid, {
         'password': generate_password_hash(new_password),
-        'updated_at': datetime.utcnow(),
+        'updated_at': utcnow(),
         'password_reset_by': session['user_id'],
     })
     if result.matched_count:
@@ -131,7 +131,7 @@ def set_active(user_id):
         return redirect(url_for('admin.panel'))
     active = request.form.get('active') == '1'
     result = user_repo.update_set(user_id, {
-        'is_active': active, 'updated_at': datetime.utcnow(),
+        'is_active': active, 'updated_at': utcnow(),
     })
     if result.matched_count:
         _audit_admin('activate' if active else 'deactivate', 'user', user_id)
@@ -154,7 +154,7 @@ def set_role(user_id):
         flash("You can't change your own admin role.", 'error')
         return redirect(url_for('admin.panel'))
     result = user_repo.update_set(user_id, {
-        'role': new_role, 'updated_at': datetime.utcnow(),
+        'role': new_role, 'updated_at': utcnow(),
     })
     if result.matched_count:
         _audit_admin('set_role', 'user', user_id)

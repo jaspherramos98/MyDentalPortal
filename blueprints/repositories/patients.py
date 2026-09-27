@@ -2,7 +2,6 @@
 # Patient reads + the patient-access seam. Thin wrapper over mongo.db.
 
 import re
-from datetime import datetime
 
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
@@ -10,6 +9,7 @@ from bson.errors import InvalidId
 from extensions import mongo
 from blueprints.models import validate_patient
 from blueprints.repositories import memberships as _membership_repo
+from blueprints.clock import utcnow
 
 
 # Every nested dict the detail/list templates may access — keep in sync with
@@ -187,7 +187,7 @@ def soft_delete(patient_id):
     """Mark a patient inactive (records are never hard-deleted here)."""
     mongo.db.patients.update_one(
         {'_id': ObjectId(patient_id)},
-        {'$set': {'is_active': False, 'updated_at': datetime.utcnow()}},
+        {'$set': {'is_active': False, 'updated_at': utcnow()}},
     )
 
 

@@ -22,6 +22,7 @@ from bson.objectid import ObjectId
 from flask import Flask, Blueprint
 
 from extensions import mongo
+from blueprints.clock import utcnow
 
 # Let the real gridfs package run against mongomock (patient photos/files).
 mongomock.gridfs.enable_gridfs_integration()
@@ -144,7 +145,6 @@ def seed_patient(db):
 # exactly what gunicorn serves. init_mongo=False keeps the shared ``mongo``
 # singleton pointed at the in-memory DB from the ``db`` fixture.
 
-from datetime import datetime
 from types import SimpleNamespace
 import time
 
@@ -187,7 +187,7 @@ def _user(db, name, email, role):
         "password": _password_hash("pw-" + role),
         "license_number": "LIC-" + name.replace(" ", ""),
         "status": "approved", "is_active": True,
-        "created_at": datetime.utcnow(),
+        "created_at": utcnow(),
     }).inserted_id
     return str(user_id)
 
@@ -205,7 +205,7 @@ def _patient(db, clinic_id, first, last):
         "personal_info": {"first_name": first, "last_name": last},
         "contact_info": {"cell_phone": "09170000000"},
         "is_active": True,
-        "created_at": datetime.utcnow(), "updated_at": datetime.utcnow(),
+        "created_at": utcnow(), "updated_at": utcnow(),
     }).inserted_id
 
 
@@ -235,7 +235,7 @@ def world(db):
 
     db.memberships.insert_one({
         "user_id": w.staff, "dentist_id": w.dentist, "role": "staff",
-        "is_active": True, "created_at": datetime.utcnow(),
+        "is_active": True, "created_at": utcnow(),
     })
     w.treatment_a = db.treatment_records.insert_one({
         "patient_id": w.patient_a, "clinic_id": w.clinic_a,
@@ -243,13 +243,13 @@ def world(db):
         "dentist": "Dentist A", "amount_charged": 1500.0, "amount_paid": 500.0,
         "balance": 1000.0, "currency": "PHP", "status": "completed",
         "price_confirmed": True, "created_by": w.dentist,
-        "created_at": datetime.utcnow(), "updated_at": datetime.utcnow(),
+        "created_at": utcnow(), "updated_at": utcnow(),
     }).inserted_id
     w.appointment_a = db.appointments.insert_one({
         "clinic_id": w.clinic_a, "patient_id": w.patient_a,
         "patient_name": "Alicemarker Alpha", "date": "2099-01-15", "time": "10:00",
         "duration": 30, "status": "scheduled", "is_active": True,
-        "created_by": w.dentist, "created_at": datetime.utcnow(),
+        "created_by": w.dentist, "created_at": utcnow(),
     }).inserted_id
     return w
 
