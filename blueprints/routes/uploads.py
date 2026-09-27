@@ -7,8 +7,9 @@
 #     clinic-ownership-checked download route.
 #   * Every upload is validated by BOTH extension allowlist AND magic-byte
 #     sniffing; raster images are additionally decode-verified with Pillow.
-#   * Validated images are then downscaled + stripped of metadata (incl. GPS)
-#     by utils.images.shrink_image before storage.
+#   * Validated profile photos + prescription images are then downscaled and
+#     stripped of metadata (incl. GPS) by utils.images.shrink_image. File
+#     attachments (X-rays!) are stored byte-for-byte as uploaded.
 #   * Downloads are forced as attachments with X-Content-Type-Options: nosniff
 #     so the browser will never execute an uploaded file as a script.
 
@@ -293,7 +294,9 @@ def add_file(patient_id):
     if not ok:
         flash(f'{err} Allowed types: {FILE_EXTS_LABEL}.', 'error')
         return redirect(url_for('patients.patient_detail', patient_id=patient_id))
-    data = shrink_image(data, ext, DOCUMENT_MAX_SIDE)   # non-images pass through
+    # Attachments are stored EXACTLY as uploaded — never resized or re-encoded.
+    # They include X-rays, where lossy compression or downscaling can erase the
+    # fine detail a diagnosis depends on.
 
     display_name = (request.form.get('display_name') or '').strip() or upload.filename
 

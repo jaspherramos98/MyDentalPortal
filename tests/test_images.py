@@ -113,17 +113,16 @@ def test_prescription_route_stores_document_size(real_client, as_user, world, db
     assert max(_open(_blob(db, rx["image_file_id"])).size) == DOCUMENT_MAX_SIDE
 
 
-def test_file_route_records_stored_size_and_leaves_pdfs_alone(real_client, as_user, world, db):
+def test_file_attachments_are_stored_byte_for_byte(real_client, as_user, world, db):
+    """Attachments include X-rays: never resized or re-encoded."""
     as_user("dentist")
-    _upload(real_client, f"/patients/{world.patient_a}/files/add", "file", _jpeg(), "xray.jpg")
+    xray = _jpeg(gps=True)
+    _upload(real_client, f"/patients/{world.patient_a}/files/add", "file", xray, "xray.jpg")
     pdf = b"%PDF-1.4\n" + b"x" * 500
     _upload(real_client, f"/patients/{world.patient_a}/files/add", "file", pdf, "report.pdf")
     image_doc = db.patient_files.find_one({"ext": "jpg"})
-    stored = _blob(db, image_doc["file_id"])
-    assert image_doc["size"] == len(stored)
-    assert max(_open(stored).size) == DOCUMENT_MAX_SIDE
-    pdf_doc = db.patient_files.find_one({"ext": "pdf"})
-    assert _blob(db, pdf_doc["file_id"]) == pdf
+    assert _blob(db, image_doc["file_id"]) == xray and image_doc["size"] == len(xray)
+    assert _blob(db, db.patient_files.find_one({"ext": "pdf"})["file_id"]) == pdf
 
 
 # ── one-off backfill (scripts/shrink_existing_images.py) ─────────────────────
@@ -166,7 +165,7 @@ def test_backfill_apply_repoints_deletes_old_and_is_idempotent(db):
 
     report = backfill.shrink_all(db, apply=True)
     assert report["profile photos"]["shrunk"] == 1
-    assert report["image attachments"]["shrunk"] == 1
+    assert "image attachments" not in report                          # X-rays never touched
     assert report["prescription images"] == {"seen": 1, "shrunk": 0, "skipped": 1,
                                              "before": 0, "after": 0}
 
@@ -174,8 +173,8 @@ def test_backfill_apply_repoints_deletes_old_and_is_idempotent(db):
     assert new_photo != old_photo
     assert max(_open(_blob(db, new_photo)).size) == PHOTO_MAX_SIDE
     assert db["fs.files"].find_one({"_id": old_photo}) is None        # old blob removed
-    file_doc = db.patient_files.find_one({"_id": fid})
-    assert file_doc["size"] == len(_blob(db, file_doc["file_id"]))
+    assert db.patient_files.find_one({"_id": fid})["file_id"] == old_file   # untouched
+    assert db["fs.files"].find_one({"_id": old_file}) is not None
     assert db["fs.files"].find_one({"_id": pdf_blob}) is not None      # pdf untouched
 
     again = backfill.shrink_all(db, apply=True)                        # idempotent

@@ -13,8 +13,10 @@ from PIL import Image, ImageOps
 
 log = logging.getLogger(__name__)
 
-# Longest side, in pixels. Photos show as a small avatar and at 1.2" in the
-# patient PDF; documents (prescriptions, photographed X-rays) must stay legible.
+# Longest side, in pixels. Photos show as a 110px avatar and at 1.2" in the
+# patient PDF; prescription images open full-size and must stay legible.
+# NEVER used for file attachments: those include X-rays, which are stored
+# exactly as uploaded (lossy re-encoding can erase diagnostic detail).
 PHOTO_MAX_SIDE = 800
 DOCUMENT_MAX_SIDE = 2000
 LOSSY_QUALITY = 82

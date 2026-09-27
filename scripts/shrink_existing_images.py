@@ -1,8 +1,9 @@
 r"""One-off backfill: shrink images uploaded before upload-time shrinking existed.
 
 Applies the SAME rules as new uploads (blueprints/utils/images.py): profile
-photos to 800px, prescription images + image attachments to 2000px, metadata
-(incl. GPS) dropped, format unchanged. Prints counts and sizes only.
+photos to 800px, prescription images to 2000px, metadata (incl. GPS) dropped,
+format unchanged. File attachments (X-rays) are never touched. Prints counts
+and sizes only.
 
 SAFETY
   * Dry run by default — reports projected savings, writes nothing.
@@ -40,8 +41,9 @@ IMAGE_EXTS = {'jpg', 'jpeg', 'png', 'webp'}
 TARGETS = [
     ('patients', 'photo_file_id', 'photo_ext', PHOTO_MAX_SIDE, 'profile photos'),
     ('prescriptions', 'image_file_id', 'image_name', DOCUMENT_MAX_SIDE, 'prescription images'),
-    ('patient_files', 'file_id', 'ext', DOCUMENT_MAX_SIDE, 'image attachments'),
 ]
+# patient_files is deliberately NOT a target: attachments include X-rays, which
+# must keep their original resolution and bytes.
 
 
 def _ext_of(value):
@@ -88,10 +90,8 @@ def shrink_all(db, apply=False):
             if not apply:
                 continue
             new_id = fs.put(new, filename=blob.filename, contentType=blob.content_type)
-            update = {'$set': {field: new_id}}
-            if coll == 'patient_files':
-                update['$set']['size'] = len(new)
-            result = db[coll].update_one({'_id': doc['_id'], field: old_id}, update)
+            result = db[coll].update_one({'_id': doc['_id'], field: old_id},
+                                         {'$set': {field: new_id}})
             if result.modified_count == 1:
                 fs.delete(old_id)
             else:
