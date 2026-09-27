@@ -22,6 +22,17 @@ treatments_bp = Blueprint('treatments', __name__)
 log = logging.getLogger(__name__)
 
 
+# Free-text "next visit" note the dentist writes on a treatment (e.g. "2 weeks —
+# crown fitting"). Separate from the Schedule-Next-Appointment button, which
+# creates a real calendar appointment.
+NEXT_VISIT_MAX_LEN = 200
+
+
+def _next_visit(form):
+    """The trimmed Next Visit note, capped at NEXT_VISIT_MAX_LEN characters."""
+    return (form.get('next_visit') or '').strip()[:NEXT_VISIT_MAX_LEN]
+
+
 def _is_price_confirmer():
     """Dentist/admin may set a confirmed price; staff can only propose one."""
     return is_admin() or session.get('user_role') != ROLE_STAFF
@@ -60,6 +71,7 @@ def add_treatment(patient_id):
                 'status': f.get('status', 'completed'),
                 'notes': (f.get('notes') or '').strip(),
                 'next_appointment': f.get('next_appointment', ''),
+                'next_visit': _next_visit(f),
                 'created_by': session['user_id'],
                 'created_at': utcnow(),
                 'updated_at': utcnow(),
@@ -126,6 +138,7 @@ def edit_treatment(treatment_id):
                 'status': f.get('status', 'completed'),
                 'notes': (f.get('notes') or '').strip(),
                 'next_appointment': f.get('next_appointment', ''),
+                'next_visit': _next_visit(f),
                 'updated_at': utcnow(),
             }
 

@@ -89,7 +89,10 @@ def shrink_all(db, apply=False):
             stats['after'] += len(new)
             if not apply:
                 continue
-            new_id = fs.put(new, filename=blob.filename, contentType=blob.content_type)
+            # GridOut.content_type is deprecated in pymongo 4.x — read the stored field.
+            content_type = (db['fs.files'].find_one({'_id': old_id}, {'contentType': 1})
+                            or {}).get('contentType')
+            new_id = fs.put(new, filename=blob.filename, contentType=content_type)
             result = db[coll].update_one({'_id': doc['_id'], field: old_id},
                                          {'$set': {field: new_id}})
             if result.modified_count == 1:
