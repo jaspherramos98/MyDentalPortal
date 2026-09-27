@@ -467,3 +467,49 @@ def test_upload_rejects_non_image_content(real_client, as_user, world, db):
                      data={"file": (io.BytesIO(b"MZ\x90\x00 not an image"), "evil.png")},
                      content_type="multipart/form-data")
     assert db.patient_files.count_documents({}) == 0
+
+
+# ── Treatment "Next Visit" note (2026-09-26) ─────────────────────────────────
+
+def test_next_visit_is_saved_trimmed_and_capped(real_client, as_user, world, db):
+    as_user("staff")
+    real_client.post(f"/patients/{world.patient_a}/treatments/add",
+                     data=_treatment_form(next_visit="  2 weeks — crown fitting  "))
+    assert db.treatment_records.find_one({"procedure": "Extraction"})["next_visit"] == \
+        "2 weeks — crown fitting"
+    as_user("dentist")
+    real_client.post(f"/treatments/{world.treatment_a}/edit",
+                     data=_treatment_form(next_visit="x" * 500))
+    assert len(db.treatment_records.find_one({"_id": world.treatment_a})["next_visit"]) == 200
+
+
+def test_next_visit_can_be_cleared_on_edit(real_client, as_user, world, db):
+    as_user("dentist")
+    real_client.post(f"/treatments/{world.treatment_a}/edit", data=_treatment_form(next_visit="Jan"))
+    real_client.post(f"/treatments/{world.treatment_a}/edit", data=_treatment_form(next_visit=""))
+    assert db.treatment_records.find_one({"_id": world.treatment_a})["next_visit"] == ""
+
+
+def test_next_visit_column_sits_between_status_and_actions(real_client, as_user, world, db):
+    db.treatment_records.update_one({"_id": world.treatment_a},
+                                    {"$set": {"next_visit": "3 months — cleaning"}})
+    as_user("dentist")
+    body = real_client.get(f"/patients/{world.patient_a}").get_data(as_text=True)
+    assert body.index(">Status</th>") < body.index(">Next Visit</th>") < body.index(">Actions</th>")
+    assert "3 months — cleaning" in body
+
+
+def test_next_visit_is_html_escaped(real_client, as_user, world, db):
+    db.treatment_records.update_one({"_id": world.treatment_a},
+                                    {"$set": {"next_visit": "<script>alert(1)</script>"}})
+    as_user("dentist")
+    body = real_client.get(f"/patients/{world.patient_a}").get_data(as_text=True)
+    assert "<script>alert(1)</script>" not in body
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in body
+
+
+def test_edit_form_prefills_next_visit(real_client, as_user, world, db):
+    db.treatment_records.update_one({"_id": world.treatment_a}, {"$set": {"next_visit": "Friday"}})
+    as_user("dentist")
+    body = real_client.get(f"/treatments/{world.treatment_a}/edit").get_data(as_text=True)
+    assert 'name="next_visit"' in body and 'value="Friday"' in body

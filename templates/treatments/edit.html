@@ -66,6 +66,13 @@
                     </div>
                 </div>
                 <div class="mb-3">
+                    <label for="next_visit" class="form-label">Next Visit</label>
+                    <input type="text" class="form-control" id="next_visit" name="next_visit"
+                           maxlength="200" placeholder="e.g. 2 weeks — crown fitting"
+                           value="{{ treatment.get('next_visit', '') }}">
+                    <div class="form-text">Shown in the patient's Treatment History. To book a calendar slot, use Schedule Next Appointment.</div>
+                </div>
+                <div class="mb-3">
                     <label for="notes" class="form-label">Notes</label>
                     <textarea class="form-control" id="notes" name="notes" rows="3">{{ treatment.notes }}</textarea>
                 </div>
