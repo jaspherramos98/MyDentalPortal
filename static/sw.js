@@ -3,7 +3,7 @@
 // PHI safety: navigations (HTML) and data/API responses are NEVER cached —
 // they always come from the network (single source of truth). Only same-origin
 // STATIC shell assets are cached, for instant load. Bump CACHE to invalidate.
-const CACHE = 'dp-shell-v2';
+const CACHE = 'dp-shell-v3';
 const SHELL = [
   '/static/css/main.css',
   '/static/offline.html',

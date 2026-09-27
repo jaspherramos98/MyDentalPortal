@@ -48,3 +48,13 @@ def test_init_database_creates_submission_id_index(real_app, db):
         init_database()
     index = db.patients.index_information()["submission_id_1"]
     assert index["unique"] is True
+
+
+def test_pwa_icons_are_real_pngs():
+    """Icons are served (and declared in the manifest) as image/png. JPEG bytes
+    under a .png name slipped in once (2026-09-26) — browsers can reject
+    install icons whose content doesn't match their declared type."""
+    import glob
+    for path in glob.glob("static/icons/*.png"):
+        with open(path, "rb") as fh:
+            assert fh.read(8) == b"\x89PNG\r\n\x1a\n", path
