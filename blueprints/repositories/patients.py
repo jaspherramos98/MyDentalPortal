@@ -1,6 +1,9 @@
 # File: MyDentalPortal/blueprints/repositories/patients.py
 # Patient reads + the patient-access seam. Thin wrapper over mongo.db.
 
+import re
+from datetime import datetime
+
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
 
@@ -143,3 +146,55 @@ def find_active_in_clinics(clinic_ids, created_since=None, fields=None):
     if created_since is not None:
         query['created_at'] = {'$gte': created_since}
     return list(mongo.db.patients.find(query, fields))
+
+
+# Whitelisted list orderings: user input picks a key, never a raw Mongo sort.
+LIST_SORTS = {
+    'name_asc': [('personal_info.last_name', 1), ('personal_info.first_name', 1)],
+    'name_desc': [('personal_info.last_name', -1), ('personal_info.first_name', -1)],
+    'newest': [('created_at', -1)],
+    'oldest': [('created_at', 1)],
+}
+DEFAULT_LIST_SORT = 'name_asc'
+
+
+def search_active_page(clinic_ids, search='', sort=DEFAULT_LIST_SORT, page=1, per_page=20):
+    """One page of active patients in ``clinic_ids``; returns (patients, total).
+
+    ``search`` is matched literally (re.escape: no ReDoS / regex injection)
+    against first/last name, nickname and cell phone. Unknown ``sort`` keys fall
+    back to the default. Scope is exactly ``clinic_ids``; callers narrow it.
+    """
+    query = {'is_active': True, 'clinic_id': {'$in': list(clinic_ids)}}
+    if search:
+        safe_q = re.escape(search)
+        query['$or'] = [
+            {field: {'$regex': safe_q, '$options': 'i'}}
+            for field in ('personal_info.first_name', 'personal_info.last_name',
+                          'personal_info.nickname', 'contact_info.cell_phone')
+        ]
+    total = mongo.db.patients.count_documents(query)
+    patients = list(
+        mongo.db.patients.find(query)
+        .sort(LIST_SORTS.get(sort, LIST_SORTS[DEFAULT_LIST_SORT]))
+        .skip((max(1, page) - 1) * per_page)
+        .limit(per_page)
+    )
+    return patients, total
+
+
+def soft_delete(patient_id):
+    """Mark a patient inactive (records are never hard-deleted here)."""
+    mongo.db.patients.update_one(
+        {'_id': ObjectId(patient_id)},
+        {'$set': {'is_active': False, 'updated_at': datetime.utcnow()}},
+    )
+
+
+def active_counts_by_clinic(clinic_ids):
+    """{clinic_id: active patient count} for ``clinic_ids``, in one query."""
+    rows = mongo.db.patients.aggregate([
+        {'$match': {'clinic_id': {'$in': list(clinic_ids)}, 'is_active': True}},
+        {'$group': {'_id': '$clinic_id', 'n': {'$sum': 1}}},
+    ])
+    return {row['_id']: row['n'] for row in rows}

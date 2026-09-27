@@ -85,3 +85,19 @@ def update_file_set(file_doc_id, fields):
 def delete_file(file_doc_id):
     """Hard-delete one patient-file metadata record."""
     return mongo.db.patient_files.delete_one({'_id': ObjectId(file_doc_id)})
+
+
+def prescriptions_for_patient(patient_id):
+    """A patient's prescriptions, newest first."""
+    return list(
+        mongo.db.prescriptions.find({'patient_id': ObjectId(patient_id)})
+        .sort('created_at', -1)
+    )
+
+
+def files_for_patient(patient_id):
+    """A patient's uploaded files, newest first."""
+    return list(
+        mongo.db.patient_files.find({'patient_id': ObjectId(patient_id)})
+        .sort('created_at', -1)
+    )

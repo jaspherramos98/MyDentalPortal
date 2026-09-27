@@ -474,17 +474,35 @@ def test_treatment_find_for_clinics_scopes_and_dates(db):
     assert all("secret" not in r for r in projected)
 
 
-# ── clinics: dashboard / reports helper ──────────────────────────────────────
-def test_clinics_owned_active_by_name(db):
+# ── clinics: owner management helpers ────────────────────────────────────────
+def test_clinics_search_owned(db):
     owner = str(ObjectId())
     db.clinics.insert_many([
-        {"_id": ObjectId(), "owner_id": owner, "is_active": True, "name": "Zeta"},
-        {"_id": ObjectId(), "owner_id": owner, "is_active": True, "name": "Alpha"},
+        {"_id": ObjectId(), "owner_id": owner, "is_active": True, "name": "Zeta", "address": "Obando"},
+        {"_id": ObjectId(), "owner_id": owner, "is_active": True, "name": "Alpha", "address": "Malolos"},
         {"_id": ObjectId(), "owner_id": owner, "is_active": False, "name": "Beta"},  # inactive
         {"_id": ObjectId(), "owner_id": str(ObjectId()), "is_active": True, "name": "Other"},
     ])
-    rows = clinic_repo.owned_active_by_name(owner)
-    assert [c["name"] for c in rows] == ["Alpha", "Zeta"]
+    assert [c["name"] for c in clinic_repo.search_owned(owner)] == ["Alpha", "Zeta"]
+    assert [c["name"] for c in clinic_repo.search_owned(owner, "obando")] == ["Zeta"]
+    assert clinic_repo.search_owned(owner, ".*") == []          # literal, not a regex
+
+
+def test_clinics_update_and_deactivate_are_owner_only(db):
+    owner, other = str(ObjectId()), str(ObjectId())
+    cid = clinic_repo.insert({"owner_id": owner, "is_active": True, "name": "Mine"})
+    assert clinic_repo.update_owned(cid, other, {"name": "Stolen"}) is False
+    assert clinic_repo.update_owned(str(cid), owner, {"name": "Renamed"}) is True
+    assert clinic_repo.deactivate_owned(cid, other) is False
+    assert clinic_repo.deactivate_owned(cid, owner) is True
+    doc = db.clinics.find_one({"_id": cid})
+    assert doc["name"] == "Renamed" and doc["is_active"] is False and "updated_at" in doc
+
+
+def test_clinics_malformed_ids_fail_closed(db):
+    owner = str(ObjectId())
+    assert clinic_repo.get_owned("not-an-id", owner) is None
+    assert clinic_repo.update_owned("not-an-id", owner, {"name": "x"}) is False
 
 
 # ── uploads: prescriptions + patient_files + GridFS ──────────────────────────
@@ -520,3 +538,68 @@ def test_uploads_gridfs_roundtrip(db):
     assert uploads_repo.get_blob(blob_id) is None
     # Best-effort delete tolerates a missing/None id without raising.
     uploads_repo.delete_blob(None)
+
+
+# ── Phase 3a helpers (patient detail / list) ─────────────────────────────────
+def _p(clinic_id, first, last, **extra):
+    doc = {"clinic_id": clinic_id, "is_active": True,
+           "personal_info": {"first_name": first, "last_name": last},
+           "contact_info": {"cell_phone": "0917"}, "created_at": datetime(2026, 1, 1)}
+    doc.update(extra)
+    return doc
+
+
+def test_patients_search_active_page_scope_search_sort_paging(db):
+    c1, c2 = ObjectId(), ObjectId()
+    db.patients.insert_many([
+        _p(c1, "Ana", "Cruz"), _p(c1, "Ben", "Abad"), _p(c1, "Cy", "Zamora"),
+        _p(c1, "Del", "Gone", is_active=False), _p(c2, "Eve", "Other"),
+    ])
+    rows, total = patient_repo.search_active_page([c1])
+    assert total == 3 and [r["personal_info"]["last_name"] for r in rows] == ["Abad", "Cruz", "Zamora"]
+    rows, _ = patient_repo.search_active_page([c1], sort="name_desc")
+    assert rows[0]["personal_info"]["last_name"] == "Zamora"
+    rows, _ = patient_repo.search_active_page([c1], sort="$where")   # unknown -> default
+    assert rows[0]["personal_info"]["last_name"] == "Abad"
+    rows, total = patient_repo.search_active_page([c1], search="ana")
+    assert total == 1 and rows[0]["personal_info"]["first_name"] == "Ana"
+    assert patient_repo.search_active_page([c1], search=".*")[1] == 0   # literal match
+    page2, total = patient_repo.search_active_page([c1], page=2, per_page=2)
+    assert total == 3 and len(page2) == 1
+    assert patient_repo.search_active_page([])[1] == 0                  # empty scope
+
+
+def test_patients_soft_delete_and_counts(db):
+    c1, c2 = ObjectId(), ObjectId()
+    keep = db.patients.insert_one(_p(c1, "A", "A")).inserted_id
+    gone = db.patients.insert_one(_p(c1, "B", "B")).inserted_id
+    db.patients.insert_one(_p(c2, "C", "C"))
+    patient_repo.soft_delete(str(gone))
+    assert db.patients.find_one({"_id": gone})["is_active"] is False
+    assert db.patients.find_one({"_id": keep})["is_active"] is True
+    assert patient_repo.active_counts_by_clinic([c1, c2]) == {c1: 1, c2: 1}
+    assert patient_repo.active_counts_by_clinic([]) == {}
+
+
+def test_patient_detail_lookups(db):
+    pid = ObjectId()
+    for d in ("2026-01-01", "2026-03-01", "2026-02-01"):
+        db.treatment_records.insert_one({"patient_id": pid, "date": d})
+    assert [t["date"] for t in treatment_repo.list_for_patient(pid)] == [
+        "2026-03-01", "2026-02-01", "2026-01-01"]
+    assert len(treatment_repo.list_for_patient(pid, limit=2)) == 2
+
+    db.appointments.insert_many([
+        {"patient_id": pid, "is_active": True, "date": "2026-05-01", "time": "09:00"},
+        {"patient_id": pid, "is_active": True, "date": "2026-05-01", "time": "15:00"},
+        {"patient_id": pid, "is_active": False, "date": "2026-06-01", "time": "09:00"},
+    ])
+    appts = appt_repo.active_for_patient(pid)
+    assert [a["time"] for a in appts] == ["15:00", "09:00"]
+
+    db.prescriptions.insert_many([{"patient_id": pid, "created_at": datetime(2026, 1, i)}
+                                  for i in (1, 3, 2)])
+    db.patient_files.insert_one({"patient_id": pid, "created_at": datetime(2026, 1, 1)})
+    db.patient_files.insert_one({"patient_id": ObjectId(), "created_at": datetime(2026, 1, 1)})
+    assert [p["created_at"].day for p in uploads_repo.prescriptions_for_patient(pid)] == [3, 2, 1]
+    assert len(uploads_repo.files_for_patient(pid)) == 1

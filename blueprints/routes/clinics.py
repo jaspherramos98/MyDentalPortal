@@ -1,50 +1,49 @@
-# File: MyDentalPortal/app/routes/clinics.py
-# Clinic management routes
+# File: MyDentalPortal/blueprints/routes/clinics.py
+# Clinic management routes. Clinic management is OWNER-only (clinic_repo.*_owned);
+# linked staff work in a dentist's clinics but never manage them.
 
 from flask import (
     Blueprint, render_template, request, session,
-    redirect, url_for, flash, jsonify,
+    redirect, url_for, flash,
 )
-from bson.objectid import ObjectId
 from datetime import datetime
-import re
 import traceback
 
-from extensions import mongo
 from blueprints.utils import login_required, role_required, ROLE_DENTIST, audit
+from blueprints.repositories import clinics as clinic_repo
+from blueprints.repositories import patients as patient_repo
 
 clinics_bp = Blueprint('clinics', __name__)
+
+# The currencies the clinic forms offer. Anything else falls back to the default.
+CURRENCIES = ('PHP', 'USD')
+DEFAULT_CURRENCY = 'PHP'
+
+
+def _clinic_fields(form):
+    """The editable clinic fields from a submitted form, trimmed + validated."""
+    currency = form.get('currency', DEFAULT_CURRENCY)
+    return {
+        'name': (form.get('name') or '').strip(),
+        'address': (form.get('address') or '').strip(),
+        'phone': (form.get('phone') or '').strip(),
+        'email': (form.get('email') or '').strip().lower(),
+        'operating_hours': (form.get('operating_hours') or '').strip(),
+        'currency': currency if currency in CURRENCIES else DEFAULT_CURRENCY,
+    }
 
 
 @clinics_bp.route('/clinics')
 @login_required
 def list_clinics():
+    search_query = request.args.get('search', '')
     try:
-        search_query = request.args.get('search', '')
-        query = {'owner_id': session['user_id'], 'is_active': True}
-
-        if search_query:
-            # Escape so the input is matched literally, never as a regex
-            # (prevents ReDoS / regex injection against the DB).
-            safe_q = re.escape(search_query)
-            query['$or'] = [
-                {'name': {'$regex': safe_q, '$options': 'i'}},
-                {'address': {'$regex': safe_q, '$options': 'i'}},
-            ]
-
-        clinics = list(mongo.db.clinics.find(query).sort('name', 1))
-
-        # Attach patient count per clinic
+        clinics = clinic_repo.search_owned(session['user_id'], search_query)
+        counts = patient_repo.active_counts_by_clinic([c['_id'] for c in clinics])
         for clinic in clinics:
-            clinic['patient_count'] = mongo.db.patients.count_documents({
-                'clinic_id': clinic['_id'], 'is_active': True,
-            })
-
-        return render_template(
-            'clinics/list.html',
-            clinics=clinics,
-            search_query=search_query,
-        )
+            clinic['patient_count'] = counts.get(clinic['_id'], 0)
+        return render_template('clinics/list.html', clinics=clinics,
+                               search_query=search_query)
     except Exception as e:
         print(f"[ERROR] Clinics list: {e}")
         traceback.print_exc()
@@ -56,33 +55,18 @@ def list_clinics():
 @role_required(ROLE_DENTIST)  # clinic management is dentist/admin only (staff can't)
 def create_clinic():
     if request.method == 'POST':
-        name = (request.form.get('name') or '').strip()
-        address = (request.form.get('address') or '').strip()
-        phone = (request.form.get('phone') or '').strip()
-        email = (request.form.get('email') or '').strip().lower()
-        operating_hours = (request.form.get('operating_hours') or '').strip()
-        currency = request.form.get('currency', 'PHP')
-
-        if not name:
+        fields = _clinic_fields(request.form)
+        if not fields['name']:
             flash('Clinic name is required', 'error')
             return render_template('clinics/create.html')
-
         try:
-            clinic_data = {
-                'name': name,
-                'address': address,
-                'phone': phone,
-                'email': email,
-                'operating_hours': operating_hours,
-                'currency': currency,
-                'owner_id': session['user_id'],
-                'is_active': True,
-                'created_at': datetime.utcnow(),
-                'updated_at': datetime.utcnow(),
-            }
-            result = mongo.db.clinics.insert_one(clinic_data)
-            audit('create', 'clinic', result.inserted_id, dentist_id=session['user_id'])
-            flash(f'Clinic "{name}" created successfully!', 'success')
+            now = datetime.utcnow()
+            clinic_id = clinic_repo.insert(dict(
+                fields, owner_id=session['user_id'], is_active=True,
+                created_at=now, updated_at=now,
+            ))
+            audit('create', 'clinic', clinic_id, dentist_id=session['user_id'])
+            flash(f'Clinic "{fields["name"]}" created successfully!', 'success')
             return redirect(url_for('clinics.list_clinics'))
         except Exception as e:
             print(f"[ERROR] Create clinic: {e}")
@@ -96,34 +80,25 @@ def create_clinic():
 @role_required(ROLE_DENTIST)  # clinic settings = dentist/admin only
 def edit_clinic(clinic_id):
     try:
-        clinic = mongo.db.clinics.find_one({
-            '_id': ObjectId(clinic_id),
-            'owner_id': session['user_id'],
-        })
+        clinic = clinic_repo.get_owned(clinic_id, session['user_id'])
         if not clinic:
             flash('Clinic not found', 'error')
             return redirect(url_for('clinics.list_clinics'))
 
         if request.method == 'POST':
-            mongo.db.clinics.update_one(
-                {'_id': ObjectId(clinic_id)},
-                {'$set': {
-                    'name': (request.form.get('name') or '').strip(),
-                    'address': (request.form.get('address') or '').strip(),
-                    'phone': (request.form.get('phone') or '').strip(),
-                    'email': (request.form.get('email') or '').strip().lower(),
-                    'operating_hours': (request.form.get('operating_hours') or '').strip(),
-                    'currency': request.form.get('currency', 'PHP'),
-                    'updated_at': datetime.utcnow(),
-                }},
-            )
-            audit('update', 'clinic', clinic_id, clinic=clinic)
+            fields = _clinic_fields(request.form)
+            if not fields['name']:
+                flash('Clinic name is required', 'error')
+                return render_template('clinics/edit.html', clinic=clinic)
+            clinic_repo.update_owned(clinic['_id'], session['user_id'], fields)
+            audit('update', 'clinic', clinic['_id'], clinic=clinic)
             flash('Clinic updated successfully!', 'success')
             return redirect(url_for('clinics.list_clinics'))
 
         return render_template('clinics/edit.html', clinic=clinic)
     except Exception as e:
-        print(f"Edit clinic error: {e}")
+        print(f"[ERROR] Edit clinic: {e}")
+        traceback.print_exc()
         flash('Error editing clinic', 'error')
         return redirect(url_for('clinics.list_clinics'))
 
@@ -132,13 +107,15 @@ def edit_clinic(clinic_id):
 @role_required(ROLE_DENTIST)  # clinic management is dentist/admin only
 def delete_clinic(clinic_id):
     try:
-        mongo.db.clinics.update_one(
-            {'_id': ObjectId(clinic_id), 'owner_id': session['user_id']},
-            {'$set': {'is_active': False, 'updated_at': datetime.utcnow()}},
-        )
-        audit('delete', 'clinic', clinic_id, dentist_id=session['user_id'])
-        flash('Clinic deleted successfully', 'success')
+        # Audit + success only when the caller really owned (and removed) it —
+        # a rejected attempt must not show up as a delete in the owner's log.
+        if clinic_repo.deactivate_owned(clinic_id, session['user_id']):
+            audit('delete', 'clinic', clinic_id, dentist_id=session['user_id'])
+            flash('Clinic deleted successfully', 'success')
+        else:
+            flash('Clinic not found', 'error')
     except Exception as e:
-        print(f"Delete clinic error: {e}")
+        print(f"[ERROR] Delete clinic: {e}")
+        traceback.print_exc()
         flash('Error deleting clinic', 'error')
     return redirect(url_for('clinics.list_clinics'))

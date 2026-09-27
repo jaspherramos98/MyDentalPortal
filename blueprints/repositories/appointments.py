@@ -106,3 +106,13 @@ def soft_delete(appt_id):
         {'_id': ObjectId(appt_id)},
         {'$set': {'is_active': False, 'deleted_at': datetime.utcnow()}},
     )
+
+
+def active_for_patient(patient_id, limit=10):
+    """A patient's active appointments, most recent first (detail page)."""
+    return list(
+        mongo.db.appointments
+        .find({'patient_id': ObjectId(patient_id), 'is_active': True})
+        .sort([('date', -1), ('time', -1)])
+        .limit(limit)
+    )

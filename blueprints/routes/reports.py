@@ -66,7 +66,9 @@ def _fmt(symbol, amount):
 @login_required
 def reports():
     all_clinic_ids = user_clinic_ids()
-    clinics = clinic_repo.owned_active_by_name(session['user_id'])
+    # Same scope as the totals: clinics the user may work in. Staff get the
+    # performance view of their dentist's clinics, read-only (GET-only page).
+    clinics = clinic_repo.accessible_active(session['user_id'])
 
     # ── clinic filter ──
     sel = request.args.get('clinic') or ''

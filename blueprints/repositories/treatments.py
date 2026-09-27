@@ -17,12 +17,13 @@ def get(treatment_id):
         return None
 
 
-def list_for_patient(patient_id):
-    """All treatments for a patient, newest first (by date)."""
+def list_for_patient(patient_id, limit=0):
+    """Treatments for a patient, newest first (by date). ``limit=0`` means all."""
     return list(
         mongo.db.treatment_records
         .find({'patient_id': ObjectId(patient_id)})
         .sort('date', -1)
+        .limit(limit)
     )
 
 
