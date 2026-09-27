@@ -31,3 +31,6 @@ TODO.md
 # Data backups (contain PHI — never commit)
 backups/
 *.backup.zip
+
+# E2E browser run log (local only)
+e2e/server.log

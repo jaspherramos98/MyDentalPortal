@@ -1,0 +1,5 @@
+# End-to-end browser tests (NOT installed in production or CI).
+#   pip install -r requirements-e2e.txt && python -m playwright install chromium
+#   pytest e2e
+-r requirements-dev.txt
+playwright==1.63.0

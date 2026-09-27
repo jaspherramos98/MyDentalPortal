@@ -145,8 +145,10 @@
             background: #555;
         }
 
-        /* Animation for flash messages */
-        .alert {
+        /* Animation for flash messages. Scoped to the fixed-position toasts:
+           on plain .alert it also slid in-page alerts (e.g. the dashboard
+           welcome) from off-screen, making the page scroll sideways for 0.3s. */
+        .flash-messages .alert {
             animation: slideInRight 0.3s ease-out;
         }
 
