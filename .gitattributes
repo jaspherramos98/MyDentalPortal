@@ -1,0 +1,2 @@
+# Test fixtures are byte-exact: never convert line endings.
+e2e/assets/** binary
