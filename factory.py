@@ -24,6 +24,7 @@ from blueprints.utils import enforce_idle_timeout, wants_json_submit, is_admin
 from blueprints.clock import utcnow
 from config import get_config
 from observability import configure_logging
+from blueprints.repositories import submissions as submissions_repo
 
 log = logging.getLogger(__name__)
 
@@ -297,13 +298,9 @@ def init_database():
         mongo.db.users.create_index("license_number")
         mongo.db.clinics.create_index("owner_id")
         mongo.db.patients.create_index("clinic_id")
-        # Idempotent create: a retried POST carries the same submission_id, and
-        # the unique index makes a concurrent duplicate insert fail instead of
-        # creating the patient twice. Partial = legacy docs without it are fine.
-        mongo.db.patients.create_index(
-            "submission_id", unique=True,
-            partialFilterExpression={"submission_id": {"$type": "string"}},
-        )
+        # Idempotent creates (resilient submit): unique submission_id per
+        # create collection, so a retried POST can't create a duplicate.
+        submissions_repo.ensure_indexes()
         mongo.db.dental_charts.create_index("patient_id")
         mongo.db.treatment_records.create_index("patient_id")
         mongo.db.prescriptions.create_index("patient_id")

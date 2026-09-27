@@ -5,15 +5,14 @@ import logging
 
 from flask import (
     Blueprint, render_template, request, session,
-    redirect, url_for, flash, jsonify, send_file,
+    redirect, url_for, flash, send_file,
 )
 from bson.objectid import ObjectId
-from pymongo.errors import DuplicateKeyError
-import re
 
 from blueprints.utils import (
     login_required, verify_patient_access,
-    role_required, ROLE_DENTIST, audit, wants_json_submit, scoped_clinic_ids,
+    role_required, ROLE_DENTIST, audit, scoped_clinic_ids, submission_id as _submission_id,
+    submit_success,
 )
 from blueprints.repositories import patients as patient_repo
 from blueprints.repositories import clinics as clinic_repo
@@ -21,34 +20,12 @@ from blueprints.repositories import charts as chart_repo
 from blueprints.repositories import treatments as treatment_repo
 from blueprints.repositories import appointments as appt_repo
 from blueprints.repositories import uploads as uploads_repo
+from blueprints.repositories import submissions as submissions_repo
 from blueprints.clock import utcnow
 from werkzeug.utils import secure_filename
 
 patients_bp = Blueprint('patients', __name__)
 log = logging.getLogger(__name__)
-
-# Client-generated id for one fill of the create form (32 hex chars, see
-# static/js/resilient-submit.js). Anything else is ignored.
-_SUBMISSION_ID_RE = re.compile(r'[0-9a-f]{32}')
-
-
-def _submission_id(form):
-    value = (form.get('submission_id') or '').strip().lower()
-    return value if _SUBMISSION_ID_RE.fullmatch(value) else None
-
-
-def _saved_response(patient_id):
-    """Success outcome of a patient create/edit.
-
-    Plain form posts get the usual redirect. The resilient-submit client gets an
-    explicit JSON success instead, because to fetch() a redirect is ambiguous
-    (login bounce and CSRF bounce redirect too).
-    """
-    url = url_for('patients.patient_detail', patient_id=str(patient_id))
-    if wants_json_submit():
-        return jsonify({'ok': True, 'redirect': url})
-    return redirect(url)
-
 
 # ── LIST ─────────────────────────────────────────────────────────────────
 @patients_bp.route('/patients')
@@ -112,14 +89,7 @@ def create_patient():
 
     if request.method == 'POST':
         f = request.form
-        # A retry of a submission that already went through (its response was
-        # lost on the way back) returns the existing patient — never a duplicate.
         submission_id = _submission_id(f)
-        if submission_id:
-            existing = patient_repo.find_by_submission(submission_id, session['user_id'])
-            if existing:
-                flash('Patient created successfully!', 'success')
-                return _saved_response(existing['_id'])
         try:
             # NOTE: keys here are read from the create form's actual field names
             # (left side of f.get) and written to the canonical schema the detail
@@ -260,18 +230,15 @@ def create_patient():
 
             if submission_id:
                 patient_data['submission_id'] = submission_id
-            try:
-                inserted_id = patient_repo.create(patient_data)
-            except DuplicateKeyError:
-                # Two copies of the same submission raced; the other one won.
-                existing = patient_repo.find_by_submission(submission_id, session['user_id'])
-                if not existing:
-                    raise
-                flash('Patient created successfully!', 'success')
-                return _saved_response(existing['_id'])
-            audit('create', 'patient', inserted_id, clinic=sel_clinic)
+            # A retry whose first attempt already saved returns that patient.
+            patient_id, created = submissions_repo.create_once(
+                'patients', submission_id, session['user_id'],
+                lambda: patient_repo.create(patient_data),
+            )
+            if created:
+                audit('create', 'patient', patient_id, clinic=sel_clinic)
             flash('Patient created successfully!', 'success')
-            return _saved_response(inserted_id)
+            return submit_success(url_for('patients.patient_detail', patient_id=str(patient_id)))
 
         except Exception:
             log.exception("Create patient failed")
@@ -447,7 +414,7 @@ def edit_patient(patient_id):
             patient_repo.update_set(patient_id, update_data)
             audit('update', 'patient', patient_id, clinic=clinic)
             flash('Patient updated successfully!', 'success')
-            return _saved_response(patient_id)
+            return submit_success(url_for('patients.patient_detail', patient_id=patient_id))
 
         return render_template('patients/edit.html',
                                patient=patient, clinics=user_clinics, clinic=clinic)

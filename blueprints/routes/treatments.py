@@ -13,9 +13,11 @@ from blueprints.utils import (
     login_required, verify_patient_access as _verify_patient_access,
     role_required, ROLE_DENTIST, ROLE_STAFF, is_admin,
     user_clinic_ids as _user_clinic_ids, audit,
+    submission_id as _submission_id, submit_success,
 )
 from blueprints.repositories import treatments as treatment_repo
 from blueprints.repositories import patients as patient_repo
+from blueprints.repositories import submissions as submissions_repo
 from blueprints.clock import utcnow
 
 treatments_bp = Blueprint('treatments', __name__)
@@ -85,12 +87,20 @@ def add_treatment(patient_id):
             treatment['price_confirmed_by'] = session['user_id'] if confirmer else None
             treatment['price_confirmed_at'] = utcnow() if confirmer else None
 
-            tid = treatment_repo.insert(treatment)
-            audit('create', 'treatment', tid, clinic=clinic)
-            if not confirmer:
-                audit('price_proposed', 'treatment', tid, clinic=clinic)
+            sid = _submission_id(f)
+            if sid:
+                treatment['submission_id'] = sid
+            # A retry whose first attempt already saved returns that treatment.
+            tid, created = submissions_repo.create_once(
+                'treatment_records', sid, session['user_id'],
+                lambda: treatment_repo.insert(treatment),
+            )
+            if created:
+                audit('create', 'treatment', tid, clinic=clinic)
+                if not confirmer:
+                    audit('price_proposed', 'treatment', tid, clinic=clinic)
             flash('Treatment record added successfully!', 'success')
-            return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+            return submit_success(url_for('patients.patient_detail', patient_id=patient_id))
 
         except Exception:
             log.exception("Add treatment failed")
@@ -163,8 +173,8 @@ def edit_treatment(treatment_id):
             if price_proposed:
                 audit('price_proposed', 'treatment', treatment_id, clinic=clinic)
             flash('Treatment updated successfully!', 'success')
-            return redirect(url_for('patients.patient_detail',
-                                    patient_id=str(treatment['patient_id'])))
+            return submit_success(url_for('patients.patient_detail',
+                                          patient_id=str(treatment['patient_id'])))
 
         return render_template(
             'treatments/edit.html',

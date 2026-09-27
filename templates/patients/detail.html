@@ -95,11 +95,12 @@
                              two-step "Choose File" + "Upload" flow. -->
                         <form method="POST"
                               action="{{ url_for('uploads.set_photo', patient_id=patient._id) }}"
-                              enctype="multipart/form-data" class="mt-2" data-no-guard>
+                              enctype="multipart/form-data" class="mt-2" data-no-guard
+                              data-resilient-submit="auto">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="file" name="photo" id="patientPhotoInput" accept="image/*"
                                    class="d-none"
-                                   onchange="if (this.files.length) { this.form.submit(); }">
+                                   onchange="if (this.files.length) { this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit(); }">
                             <div class="d-flex justify-content-center gap-2">
                                 <button type="button" class="btn btn-sm btn-outline-primary"
                                         onclick="document.getElementById('patientPhotoInput').click();">
@@ -660,8 +661,9 @@
                                 <h6 class="mb-3"><i class="fas fa-prescription"></i> Add Prescription</h6>
                                 <form method="POST"
                                       action="{{ url_for('uploads.add_prescription', patient_id=patient._id) }}"
-                                      enctype="multipart/form-data" class="mb-4">
+                                      enctype="multipart/form-data" class="mb-4" data-resilient-submit="auto">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="submission_id">
                                     <div class="mb-3">
                                         <label class="form-label" for="presc_description">Description</label>
                                         <textarea class="form-control" id="presc_description" name="description"
@@ -738,8 +740,9 @@
                                 <h6 class="mb-3"><i class="fas fa-folder-open"></i> Upload File</h6>
                                 <form method="POST"
                                       action="{{ url_for('uploads.add_file', patient_id=patient._id) }}"
-                                      enctype="multipart/form-data" class="mb-4">
+                                      enctype="multipart/form-data" class="mb-4" data-resilient-submit="auto">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="submission_id">
                                     <div class="row g-2 align-items-end">
                                         <div class="col-md-5">
                                             <label class="form-label" for="file_upload">File</label>

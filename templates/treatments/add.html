@@ -22,7 +22,9 @@
 
     <div class="card shadow-sm">
         <div class="card-body">
-            <form method="POST" action="{{ url_for('treatments.add_treatment', patient_id=patient._id) }}">
+            <form method="POST" action="{{ url_for('treatments.add_treatment', patient_id=patient._id) }}"
+                  data-resilient-submit="auto">
+                <input type="hidden" name="submission_id">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="row mb-3">
                     <div class="col-md-4">

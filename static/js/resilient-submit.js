@@ -1,30 +1,33 @@
-// Resilient submit for long patient forms (create / edit).
+// Resilient form submit — so a dropped connection or expired session never
+// loses what someone typed.
 //
-// Why: a long PHI form can sit open for minutes. By the time it's submitted
-// the connection may have been dropped somewhere between the device and the
-// app (proxy idle timeout, flaky mobile link, host restart). Browsers silently
+// Why: a form can sit open for minutes. By the time it's submitted the
+// connection may have been dropped somewhere between the device and the app
+// (proxy idle timeout, flaky mobile link, host restart). Browsers silently
 // retry a failed GET but NEVER a POST, so the user got Chrome's
-// ERR_CONNECTION_CLOSED page, the typed patient was gone, and the server logged
-// nothing (Incidents 2026-08-07 and 2026-09-26). Two other paths lost the form
-// the same way: the 30-min idle logout and the 1-hour CSRF token expiry, both
-// of which answered the POST with a redirect away from the form.
+// ERR_CONNECTION_CLOSED page, the typed data was gone, and the server logged
+// nothing (Incidents 2026-08-07 and 2026-09-26). The 30-min idle logout and the
+// 1-hour CSRF expiry lost forms the same way: both answered with a redirect.
 //
 // What this does:
 //   * sends the form via fetch and retries network failures with backoff
-//     (create is idempotent server-side via submission_id, edit is a $set);
+//     (creates are idempotent server-side via submission_id; edits are $sets);
 //   * asks the server for explicit JSON outcomes (X-Resilient-Submit header)
 //     instead of guessing success from "it redirected";
 //   * on an expired session/CSRF token: refreshes the token, or tells the user
-//     to sign in in another tab — the form is never navigated away from;
+//     to sign in in another tab — the page is never navigated away from;
 //   * while the user is typing, pings /session/keepalive (throttled) so they
 //     aren't idle-logged-out mid-form; no pings when nobody is typing;
-//   * warns before leaving the page with unsaved entries.
+//   * drives base.html's unsaved-changes guard (window.UnsavedGuard): a failed
+//     save re-arms the banner + leave-page warning.
 // Nothing is written to device storage: typed PHI lives only in the open page.
 //
-// Usage: <form data-resilient-submit data-keepalive-url="..." data-login-url="...">
-//   const rs = ResilientSubmit.attach(form);
-//   ... in the submit handler, once the form is valid:
-//   event.preventDefault(); rs.submit();
+// Usage (loaded once by base.html):
+//   * Simple forms: <form method="POST" data-resilient-submit="auto">. A create
+//     form also carries <input type="hidden" name="submission_id">.
+//   * Forms with their own JS validation: const rs = ResilientSubmit.attach(form);
+//     then in the submit handler, once valid: event.preventDefault(); rs.submit();
+// The route must answer a successful save with utils.submit_success(url).
 (function (window, document) {
     'use strict';
 
@@ -48,13 +51,19 @@
         return (res.headers.get('Content-Type') || '').indexOf('application/json') !== -1;
     }
 
+    // base.html's unsaved-changes guard; a no-op on pages without it.
+    function guard(method) {
+        const g = window.UnsavedGuard;
+        if (g && typeof g[method] === 'function') g[method]();
+    }
+
     function Controller(form) {
+        const body = document.body.dataset;
         this.form = form;
-        this.keepaliveUrl = form.dataset.keepaliveUrl || '';
-        this.loginUrl = form.dataset.loginUrl || '/login';
+        this.keepaliveUrl = form.dataset.keepaliveUrl || body.keepaliveUrl || '';
+        this.loginUrl = form.dataset.loginUrl || body.loginUrl || '/login';
         this.button = form.querySelector('button[type="submit"]');
         this.dirty = false;
-        this.leaving = false;
         this.inFlight = false;
         this.sessionExpired = false;
         this.lastPing = Date.now();
@@ -68,12 +77,6 @@
         // re-check the session and pick up a fresh CSRF token.
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible' && this.dirty) this.keepalive();
-        });
-        window.addEventListener('beforeunload', (event) => {
-            if (this.dirty && !this.leaving) {
-                event.preventDefault();
-                event.returnValue = '';
-            }
         });
     }
 
@@ -107,7 +110,7 @@
                                       RETRY_DELAYS_MS[tries]);
                     return;
                 }
-                this.finish();
+                this.fail();
                 this.showNetworkError();
             }
         );
@@ -115,26 +118,26 @@
 
     Controller.prototype.handleResponse = function (res, tries, csrfRefreshed) {
         if (!isJson(res)) {
-            // The server re-rendered the form (field validation, server error).
-            // Let the browser post it natively and show that page as usual.
+            // The server answered with a page (a validation error, a server
+            // error). Post natively so the browser shows that page as usual.
             this.nativeSubmit();
             return;
         }
         res.json().then((data) => {
             if (res.ok && data.ok && data.redirect) {
-                this.leaving = true;
+                guard('markSubmitting');            // intentional navigation
                 window.location.replace(data.redirect);
             } else if (data.error === 'csrf' && !csrfRefreshed) {
                 this.keepalive().then((ok) => {
                     if (ok) {
                         this.attempt(tries, true);
                     } else {
-                        this.finish();
+                        this.fail();
                         this.showSessionExpired();
                     }
                 });
             } else if (data.error === 'session_expired' || data.error === 'csrf') {
-                this.finish();
+                this.fail();
                 this.sessionExpired = true;
                 this.showSessionExpired();
             } else {
@@ -185,13 +188,15 @@
     };
 
     Controller.prototype.nativeSubmit = function () {
-        this.leaving = true;
+        guard('markSubmitting');
         this.form.submit();   // bypasses submit listeners, no recursion
     };
 
-    Controller.prototype.finish = function () {
+    // Nothing was saved: unlock the button and re-arm the unsaved-changes guard.
+    Controller.prototype.fail = function () {
         this.inFlight = false;
         this.setBusy(false);
+        guard('markDirty');
     };
 
     Controller.prototype.setBusy = function (busy) {
@@ -237,7 +242,7 @@
         strong.textContent = "Couldn't reach the server. ";
         this.showAlert([
             strong,
-            'Nothing was lost — everything you typed is still here. '
+            'Nothing was lost — everything you entered is still here. '
             + 'Check the internet connection, then press Save again.',
         ]);
     };
@@ -252,18 +257,38 @@
         link.textContent = 'Sign in again in a new tab';
         this.showAlert([
             strong,
-            'Everything you typed is still here — do not close or reload this page. ',
+            'Everything you entered is still here — do not close or reload this page. ',
             link,
             ', then come back to this tab and press Save again.',
         ]);
     };
 
-    window.ResilientSubmit = {
-        supported: supported,
-        attach: function (form) {
-            if (!form || !supported()) return null;
-            if (!form._resilientSubmit) form._resilientSubmit = new Controller(form);
-            return form._resilientSubmit;
-        },
-    };
+    function attach(form) {
+        if (!form || !supported()) return null;
+        if (!form._resilientSubmit) form._resilientSubmit = new Controller(form);
+        return form._resilientSubmit;
+    }
+
+    // Auto mode. A capture listener on the document runs BEFORE every form-level
+    // submit handler (base.html's loading spinner + guard, page validators), so
+    // the order is deterministic: invalid form -> step aside and let the page's
+    // validation show; valid form -> take over the submit and own the button
+    // + guard state.
+    document.addEventListener('submit', (event) => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement) || form.dataset.resilientSubmit !== 'auto') return;
+        if (typeof form.checkValidity === 'function' && !form.checkValidity()) return;
+        const controller = attach(form);
+        if (!controller) return;             // very old browser: native submit
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        controller.submit();
+    }, true);
+
+    // Auto forms get keepalive-on-typing from page load, not just at submit.
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('form[data-resilient-submit="auto"]').forEach(attach);
+    });
+
+    window.ResilientSubmit = { supported: supported, attach: attach };
 })(window, document);

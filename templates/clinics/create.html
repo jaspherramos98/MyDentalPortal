@@ -10,7 +10,9 @@
                 <h5><i class="fas fa-building"></i> Create New Clinic</h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('clinics.create_clinic') }}" class="needs-validation" novalidate>
+                <form method="POST" action="{{ url_for('clinics.create_clinic') }}" class="needs-validation" novalidate
+                      data-resilient-submit="auto">
+                    <input type="hidden" name="submission_id">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="row">
                         <div class="col-md-12 mb-3">
