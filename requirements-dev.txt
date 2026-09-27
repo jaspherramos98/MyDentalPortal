@@ -3,5 +3,7 @@
 -r requirements.txt
 pytest==8.3.3
 mongomock==4.1.2
+# Lint gate in CI: flags unused imports/variables and undefined names. No deps.
+pyflakes==4.0.0
 # mongomock 4.1.2 still imports pkg_resources, removed in setuptools 81+.
 setuptools<81

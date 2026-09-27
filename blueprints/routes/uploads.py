@@ -16,7 +16,6 @@ from flask import (
     Blueprint, request, session, redirect, url_for, flash, send_file, abort,
 )
 from bson.objectid import ObjectId
-from datetime import datetime
 from werkzeug.utils import secure_filename
 from PIL import Image
 
@@ -26,6 +25,7 @@ from blueprints.utils import (
 )
 from blueprints.repositories import uploads as uploads_repo
 from blueprints.repositories import patients as patient_repo
+from blueprints.clock import utcnow
 
 uploads_bp = Blueprint('uploads', __name__)
 
@@ -208,7 +208,7 @@ def add_prescription(patient_id):
         'image_file_id': None,
         'image_name': None,
         'created_by': session['user_id'],
-        'created_at': datetime.utcnow(),
+        'created_at': utcnow(),
     }
 
     if upload and upload.filename:
@@ -300,7 +300,7 @@ def add_file(patient_id):
         'size': len(data),
         'content_type': CONTENT_TYPES.get(ext, 'application/octet-stream'),
         'created_by': session['user_id'],
-        'created_at': datetime.utcnow(),
+        'created_at': utcnow(),
     })
     audit('create', 'file', file_doc_id, clinic=clinic)
     flash('File uploaded.', 'success')

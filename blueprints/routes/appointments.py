@@ -16,6 +16,7 @@ from blueprints.utils import (
 from blueprints.repositories import appointments as appt_repo
 from blueprints.repositories import clinics as clinic_repo
 from blueprints.repositories import patients as patient_repo
+from blueprints.clock import utcnow
 
 appointments_bp = Blueprint('appointments', __name__)
 log = logging.getLogger(__name__)
@@ -188,8 +189,8 @@ def create_appointment():
             'notes': (data.get('notes') or '').strip(),
             'status': 'scheduled',
             'created_by': session['user_id'],
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow(),
+            'created_at': utcnow(),
+            'updated_at': utcnow(),
             'is_active': True,
         }
         if data.get('patient_id'):
@@ -245,7 +246,7 @@ def update_appointment(appt_id):
         if 'priority' in data and data['priority'] not in ALLOWED_PRIORITIES:
             return jsonify({'success': False, 'error': 'Invalid priority'}), 400
 
-        update = {'updated_at': datetime.utcnow()}
+        update = {'updated_at': utcnow()}
         for field in ['patient_name', 'date', 'time', 'duration', 'type',
                        'priority', 'notes', 'status']:
             if field in data:

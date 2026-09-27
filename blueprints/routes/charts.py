@@ -10,10 +10,10 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 from bson.objectid import ObjectId
-from datetime import datetime
 
 from blueprints.utils import login_required, verify_patient_access, audit
 from blueprints.repositories import charts as charts_repo
+from blueprints.clock import utcnow
 
 charts_bp = Blueprint('charts', __name__)
 log = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ def create_default_dental_chart(patient_id):
 
     return {
         "patient_id": ObjectId(patient_id),
-        "chart_date": datetime.utcnow(),
+        "chart_date": utcnow(),
         "teeth_status": teeth_status,
         "periodontal_screening": {
             "gingivitis": False,
@@ -81,8 +81,8 @@ def create_default_dental_chart(patient_id):
             "others": {"taken": False, "type": "", "date": ""},
         },
         "created_by": session['user_id'],
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at": utcnow(),
+        "updated_at": utcnow(),
     }
 
 

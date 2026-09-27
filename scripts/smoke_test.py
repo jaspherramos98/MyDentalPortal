@@ -17,7 +17,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 BASE = os.environ.get("BASE_URL", "http://localhost:5000").rstrip("/")
 EMAIL = os.environ.get("EMAIL", "admin@dental.com")
@@ -100,7 +100,7 @@ else:
 # ── write path: chart save (SACRED) ──────────────────────────────────────
 if pid:
     code, body, _ = req("POST", f"/charts/update/{pid}",
-                        body={"teeth": {}, "smoke_marker": datetime.utcnow().isoformat()},
+                        body={"teeth": {}, "smoke_marker": datetime.now(timezone.utc).replace(tzinfo=None).isoformat()},
                         csrf=csrf)
     ok = code == 200 and '"success":true' in body.replace(" ", "")
     record("POST /charts/update/<id> (chart save)", ok, f"{code} {body[:80]}")

@@ -10,12 +10,12 @@
 # IDs are stored as strings to match the rest of the app (session['user_id'] and
 # clinics.owner_id are str(ObjectId), not ObjectId).
 
-from datetime import datetime
 
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
 
 from extensions import mongo
+from blueprints.clock import utcnow
 
 
 def dentist_ids_for(user_id):
@@ -44,7 +44,7 @@ def create(user_id, dentist_id, role='staff', created_by=None):
         'role': role,
         'is_active': True,
         'created_by': created_by,
-        'created_at': datetime.utcnow(),
+        'created_at': utcnow(),
     }).inserted_id
 
 
@@ -60,7 +60,7 @@ def deactivate(user_id, dentist_id):
     """Soft-revoke a staff link (keep the row for the audit trail)."""
     return mongo.db.memberships.update_one(
         {'user_id': user_id, 'dentist_id': dentist_id},
-        {'$set': {'is_active': False, 'revoked_at': datetime.utcnow()}},
+        {'$set': {'is_active': False, 'revoked_at': utcnow()}},
     )
 
 
@@ -80,5 +80,5 @@ def revoke_by_id(membership_id):
         return None
     return mongo.db.memberships.update_one(
         {'_id': oid},
-        {'$set': {'is_active': False, 'revoked_at': datetime.utcnow()}},
+        {'$set': {'is_active': False, 'revoked_at': utcnow()}},
     )

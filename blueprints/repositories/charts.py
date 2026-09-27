@@ -3,11 +3,11 @@
 # *logic* stay in blueprints/routes/charts.py (SACRED); this module just holds
 # the raw mongo.db reads/writes so the route doesn't query the driver directly.
 
-from datetime import datetime
 
 from bson.objectid import ObjectId
 
 from extensions import mongo
+from blueprints.clock import utcnow
 
 
 def get_by_patient(patient_id):
@@ -31,7 +31,7 @@ def upsert(patient_id, data, actor_id):
         {'patient_id': ObjectId(patient_id)},
         {'$set': {
             **data,
-            'updated_at': datetime.utcnow(),
+            'updated_at': utcnow(),
             'updated_by': actor_id,
         }},
         upsert=True,
