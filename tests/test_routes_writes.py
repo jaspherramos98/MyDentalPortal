@@ -443,7 +443,11 @@ def test_staff_uploads_and_reads_back_a_file(real_client, as_user, world, db):
     doc = db.patient_files.find_one({"patient_id": world.patient_a})
     assert doc is not None
     res = real_client.get(f"/files/{doc['_id']}/download")
-    assert res.status_code == 200 and res.data == PNG_1PX
+    # Images are re-encoded on upload (metadata stripped, see utils/images.py),
+    # so compare the decoded image, not the bytes.
+    assert res.status_code == 200
+    stored = Image.open(io.BytesIO(res.data))
+    assert stored.format == "PNG" and stored.size == Image.open(io.BytesIO(PNG_1PX)).size
 
 
 def test_outsider_cannot_download_clinic_a_file(real_client, as_user, world, db):
@@ -454,7 +458,7 @@ def test_outsider_cannot_download_clinic_a_file(real_client, as_user, world, db)
     doc = db.patient_files.find_one({})
     as_user("outsider")
     res = real_client.get(f"/files/{doc['_id']}/download")
-    assert res.status_code != 200 or res.data != PNG_1PX
+    assert res.status_code != 200      # denied (redirect), never the file
 
 
 def test_upload_rejects_non_image_content(real_client, as_user, world, db):

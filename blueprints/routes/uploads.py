@@ -7,6 +7,8 @@
 #     clinic-ownership-checked download route.
 #   * Every upload is validated by BOTH extension allowlist AND magic-byte
 #     sniffing; raster images are additionally decode-verified with Pillow.
+#   * Validated images are then downscaled + stripped of metadata (incl. GPS)
+#     by utils.images.shrink_image before storage.
 #   * Downloads are forced as attachments with X-Content-Type-Options: nosniff
 #     so the browser will never execute an uploaded file as a script.
 
@@ -23,6 +25,7 @@ from blueprints.utils import (
     login_required, verify_patient_access as _verify_patient_access,
     role_required, ROLE_DENTIST, audit,
 )
+from blueprints.utils.images import shrink_image, PHOTO_MAX_SIDE, DOCUMENT_MAX_SIDE
 from blueprints.repositories import uploads as uploads_repo
 from blueprints.repositories import patients as patient_repo
 from blueprints.clock import utcnow
@@ -128,6 +131,7 @@ def set_photo(patient_id):
     if not ok:
         flash(f'{err} Allowed image types: {IMAGE_EXTS_LABEL}.', 'error')
         return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+    data = shrink_image(data, ext, PHOTO_MAX_SIDE)
 
     # Replace any existing photo (delete the old GridFS blob first).
     uploads_repo.delete_blob(patient.get('photo_file_id'))
@@ -218,6 +222,7 @@ def add_prescription(patient_id):
         if not ok:
             flash(f'{err} Allowed image types: {IMAGE_EXTS_LABEL}.', 'error')
             return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+        data = shrink_image(data, ext, DOCUMENT_MAX_SIDE)
         doc['image_file_id'] = _store(data, upload.filename, ext)
         doc['image_name'] = secure_filename(upload.filename)
 
@@ -288,6 +293,7 @@ def add_file(patient_id):
     if not ok:
         flash(f'{err} Allowed types: {FILE_EXTS_LABEL}.', 'error')
         return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+    data = shrink_image(data, ext, DOCUMENT_MAX_SIDE)   # non-images pass through
 
     display_name = (request.form.get('display_name') or '').strip() or upload.filename
 
