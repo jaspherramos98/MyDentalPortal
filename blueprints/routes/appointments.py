@@ -97,6 +97,10 @@ def appointments():
             'appointments.html',
             clinics=user_clinics,
             patients=formatted,
+            clinics_json=[
+                {'id': str(c['_id']), 'name': c.get('name', ''), 'address': c.get('address') or ''}
+                for c in user_clinics
+            ],
         )
     except Exception:
         log.exception("Appointments page failed")

@@ -134,18 +134,5 @@
 
 {% include 'partials/_next_appointment_modal.html' %}
 
-<script>
-// Auto-calculate balance
-const charged = document.getElementById('amount_charged');
-const paid = document.getElementById('amount_paid');
-const balance = document.getElementById('balance_display');
-
-function updateBalance() {
-    const c = parseFloat(charged.value) || 0;
-    const p = parseFloat(paid.value) || 0;
-    balance.value = (c - p).toFixed(2);
-}
-charged.addEventListener('input', updateBalance);
-paid.addEventListener('input', updateBalance);
-</script>
+<script src="{{ url_for('static', filename='js/treatment-add.js') }}"></script>
 {% endblock %}
