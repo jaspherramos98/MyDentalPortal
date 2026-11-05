@@ -267,6 +267,16 @@ def patient_detail(patient_id):
 
         dental_chart = chart_repo.get_by_patient(patient_id)
         treatment_records = treatment_repo.list_for_patient(patient_id, limit=20)
+        # Arriving from a calendar banner / visit-history row (?visit=<appt id>):
+        # open the Treatment tab and highlight that visit's records, adding them
+        # if they're older than the 20 shown (only THIS patient's records).
+        highlight_visit = request.args.get('visit') or None
+        if highlight_visit:
+            shown = {t['_id'] for t in treatment_records}
+            linked = treatment_repo.by_appointment([highlight_visit]).get(highlight_visit, [])
+            treatment_records += [t for t in linked
+                                  if t['_id'] not in shown and t.get('patient_id') == patient['_id']]
+        active_tab = 'treatment' if request.args.get('tab') == 'treatment' else 'medical'
         patient_appointments = appt_repo.active_for_patient(patient_id, limit=10)
         prescriptions = uploads_repo.prescriptions_for_patient(patient_id)
         patient_files = uploads_repo.files_for_patient(patient_id)
@@ -280,6 +290,8 @@ def patient_detail(patient_id):
             appointments=patient_appointments,
             prescriptions=prescriptions,
             patient_files=patient_files,
+            highlight_visit=highlight_visit,
+            active_tab=active_tab,
         )
     except Exception:
         log.exception("Patient detail failed")

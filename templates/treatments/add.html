@@ -18,6 +18,13 @@
             &nbsp;|&nbsp;
             <strong>Clinic:</strong> {{ clinic.name }}
         </div>
+        {% if appointment %}
+        <div class="card-body py-2 bg-light" id="visit-link-banner">
+            <i class="fas fa-calendar-check text-success me-1"></i>
+            Completing the visit on <strong>{{ appointment.date | datefmt('%b %d, %Y') }}</strong>
+            at <strong>{{ appointment.time }}</strong>. Saving marks it completed on the calendar.
+        </div>
+        {% endif %}
     </div>
 
     <div class="card shadow-sm">
@@ -26,11 +33,14 @@
                   data-resilient-submit="auto">
                 <input type="hidden" name="submission_id">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if appointment %}
+                <input type="hidden" name="appointment_id" value="{{ appointment._id }}">
+                {% endif %}
                 <div class="row mb-3">
                     <div class="col-md-4">
                         <label for="date" class="form-label">Date *</label>
                         <input type="date" class="form-control" id="date" name="date"
-                               value="{{ today }}" max="{{ today }}" required>
+                               value="{{ appointment.date if appointment else today }}" max="{{ today }}" required>
                     </div>
                     <div class="col-md-4">
                         <label for="procedure" class="form-label">Procedure *</label>

@@ -21,7 +21,7 @@ from werkzeug.security import generate_password_hash
 
 from extensions import mongo, limiter
 from blueprints.utils import enforce_idle_timeout, wants_json_submit, is_admin
-from blueprints.clock import utcnow
+from blueprints.clock import utcnow, clinic_today
 from config import get_config
 from observability import configure_logging
 from blueprints.repositories import submissions as submissions_repo
@@ -109,11 +109,7 @@ def _register_template_helpers(app):
                 return '#'
 
         # "today" (in the clinic's timezone) for date-input min/max bounds.
-        try:
-            from zoneinfo import ZoneInfo
-            _today = datetime.now(ZoneInfo(app.config.get('TIMEZONE', 'Asia/Manila'))).strftime('%Y-%m-%d')
-        except Exception:
-            _today = datetime.now().strftime('%Y-%m-%d')
+        _today = clinic_today(app.config.get('TIMEZONE', 'Asia/Manila'))
 
         return dict(
             safe_url_for=safe_url_for,
@@ -303,6 +299,7 @@ def init_database():
         submissions_repo.ensure_indexes()
         mongo.db.dental_charts.create_index("patient_id")
         mongo.db.treatment_records.create_index("patient_id")
+        mongo.db.treatment_records.create_index("appointment_id", sparse=True)
         mongo.db.prescriptions.create_index("patient_id")
         mongo.db.patient_files.create_index("patient_id")
         mongo.db.appointments.create_index([("clinic_id", 1), ("date", 1)])

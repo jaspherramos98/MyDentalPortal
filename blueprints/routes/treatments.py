@@ -5,7 +5,7 @@ import logging
 
 from flask import (
     Blueprint, render_template, request, jsonify,
-    session, redirect, url_for, flash,
+    session, redirect, url_for, flash, current_app,
 )
 from bson.objectid import ObjectId
 
@@ -18,7 +18,8 @@ from blueprints.utils import (
 from blueprints.repositories import treatments as treatment_repo
 from blueprints.repositories import patients as patient_repo
 from blueprints.repositories import submissions as submissions_repo
-from blueprints.clock import utcnow
+from blueprints.repositories import appointments as appt_repo
+from blueprints.clock import utcnow, clinic_today
 
 treatments_bp = Blueprint('treatments', __name__)
 log = logging.getLogger(__name__)
@@ -35,6 +36,40 @@ def _next_visit(form):
     return (form.get('next_visit') or '').strip()[:NEXT_VISIT_MAX_LEN]
 
 
+def _linkable_appointment(appointment_id, patient, clinic):
+    """The appointment a new treatment may be attached to ("Complete visit"),
+    or None.
+
+    `appointment_id` comes from the query string / form, so trust nothing:
+    it must be an active appointment in THIS patient's clinic, still
+    scheduled (or already completed: a second procedure in the same visit),
+    not in the future, and either for this patient or a typed-in walk-in with
+    no patient linked yet.
+    """
+    if not appointment_id:
+        return None
+    appt = appt_repo.get(appointment_id)
+    if not appt or not appt.get('is_active') or appt.get('clinic_id') != clinic['_id']:
+        return None
+    if appt.get('status', 'scheduled') not in ('scheduled', 'completed'):
+        return None
+    if appt.get('date', '') > clinic_today(current_app.config.get('TIMEZONE', 'Asia/Manila')):
+        return None
+    if appt.get('patient_id') and appt['patient_id'] != patient['_id']:
+        return None
+    return appt
+
+
+def _complete_linked_visit(appt, patient, clinic):
+    """Mark the visit completed once a treatment is linked to it (idempotent:
+    a resilient-submit retry or a second procedure re-runs this harmlessly)."""
+    if appt.get('status') == 'completed' and appt.get('patient_id'):
+        return
+    appt_repo.mark_completed(appt['_id'],
+                             patient_id=None if appt.get('patient_id') else patient['_id'])
+    audit('complete', 'appointment', str(appt['_id']), clinic=clinic)
+
+
 def _is_price_confirmer():
     """Dentist/admin may set a confirmed price; staff can only propose one."""
     return is_admin() or session.get('user_role') != ROLE_STAFF
@@ -48,6 +83,9 @@ def add_treatment(patient_id):
     if not clinic:
         flash('Access denied or patient not found', 'error')
         return redirect(url_for('patients.list_patients'))
+
+    requested_appt = request.values.get('appointment_id')
+    appt = _linkable_appointment(requested_appt, patient, clinic)
 
     if request.method == 'POST':
         f = request.form
@@ -79,6 +117,9 @@ def add_treatment(patient_id):
                 'updated_at': utcnow(),
             }
 
+            if appt:
+                treatment['appointment_id'] = appt['_id']
+
             # Price-confirmation: a dentist/admin's price is confirmed immediately;
             # a staff member's price is PENDING until a dentist confirms it.
             confirmer = _is_price_confirmer()
@@ -99,17 +140,31 @@ def add_treatment(patient_id):
                 audit('create', 'treatment', tid, clinic=clinic)
                 if not confirmer:
                     audit('price_proposed', 'treatment', tid, clinic=clinic)
-            flash('Treatment record added successfully!', 'success')
+            if appt:
+                _complete_linked_visit(appt, patient, clinic)
+                flash('Treatment saved and visit marked completed.', 'success')
+                return submit_success(url_for('patients.patient_detail', patient_id=patient_id,
+                                              tab='treatment', visit=str(appt['_id']),
+                                              _anchor='treatment-history'))
+            if requested_appt:
+                # Saved, but the link was refused (stale/foreign appointment):
+                # keep the record rather than lose the clinician's entry.
+                flash('Treatment saved, but it could not be linked to that appointment.', 'warning')
+            else:
+                flash('Treatment record added successfully!', 'success')
             return submit_success(url_for('patients.patient_detail', patient_id=patient_id))
 
         except Exception:
             log.exception("Add treatment failed")
             flash('Error adding treatment record', 'error')
 
+    if requested_appt and not appt and request.method == 'GET':
+        flash("That appointment can't be completed here, so this treatment won't be linked to it.", 'warning')
     return render_template(
         'treatments/add.html',
         patient=patient,
         clinic=clinic,
+        appointment=appt,
     )
 
 

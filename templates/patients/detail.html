@@ -305,7 +305,7 @@
                     <div class="card-header">
                         <ul class="nav nav-tabs card-header-tabs" role="tablist">
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#medical-history" type="button" role="tab">
+                                <button class="nav-link{{ ' active' if active_tab == 'medical' }}" data-bs-toggle="tab" data-bs-target="#medical-history" type="button" role="tab">
                                     <i class="fas fa-user-md"></i> Medical History
                                 </button>
                             </li>
@@ -315,7 +315,7 @@
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#treatment-history" type="button" role="tab">
+                                <button class="nav-link{{ ' active' if active_tab == 'treatment' }}" data-bs-toggle="tab" data-bs-target="#treatment-history" type="button" role="tab">
                                     <i class="fas fa-procedures"></i> Treatment History
                                 </button>
                             </li>
@@ -339,7 +339,7 @@
                     <div class="card-body">
                         <div class="tab-content">
                             <!-- Medical History Tab -->
-                            <div class="tab-pane fade show active" id="medical-history" role="tabpanel">
+                            <div class="tab-pane fade{{ ' show active' if active_tab == 'medical' }}" id="medical-history" role="tabpanel">
                                 <div class="row">
                                     <!-- Physician Information -->
                                     <div class="col-md-6 mb-4">
@@ -530,12 +530,21 @@
                             </div>
 
                             <!-- Treatment History Tab -->
-                            <div class="tab-pane fade" id="treatment-history" role="tabpanel">
+                            <div class="tab-pane fade{{ ' show active' if active_tab == 'treatment' }}" id="treatment-history" role="tabpanel">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <h6><i class="fas fa-procedures"></i> Treatment History</h6>
+                                    {% if highlight_visit %}
+                                    {# Opened from a visit: a further procedure joins that visit
+                                       (the add route re-validates the appointment). #}
+                                    <a class="btn btn-outline-success btn-sm" id="add-treatment-to-visit"
+                                       href="{{ url_for('treatments.add_treatment', patient_id=patient._id, appointment_id=highlight_visit) }}">
+                                        <i class="fas fa-plus"></i> Add Treatment to this Visit
+                                    </a>
+                                    {% else %}
                                     <a class="btn btn-outline-success btn-sm" href="{{ url_for('treatments.add_treatment', patient_id=patient._id) }}">
                                         <i class="fas fa-plus"></i> Add Treatment
                                     </a>
+                                    {% endif %}
                                 </div>
 
                                 {% if treatment_records %}
@@ -565,7 +574,8 @@
                                         </thead>
                                         <tbody>
                                             {% for treatment in treatment_records %}
-                                            <tr>
+                                            {% set in_visit = highlight_visit and treatment.get('appointment_id')|string == highlight_visit %}
+                                            <tr{% if in_visit %} class="table-info visit-highlight"{% endif %}>
                                                 <td>{{ treatment.date | datefmt('%m/%d/%Y') }}</td>
                                                 <td>
                                                     {{ treatment.procedure }}
