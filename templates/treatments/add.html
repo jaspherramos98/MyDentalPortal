@@ -35,6 +35,21 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 {% if appointment %}
                 <input type="hidden" name="appointment_id" value="{{ appointment._id }}">
+                {% elif open_visits %}
+                <div class="alert alert-info py-2 mb-3" id="open-visit-picker">
+                    <label for="appointment_id" class="form-label fw-semibold mb-1">
+                        <i class="fas fa-calendar-check me-1"></i> Is this for a booked visit?
+                    </label>
+                    <select class="form-select form-select-sm" id="appointment_id" name="appointment_id">
+                        {% for v in open_visits %}
+                        <option value="{{ v._id }}"{{ ' selected' if loop.first }}>
+                            Yes — visit on {{ v.date | datefmt('%b %d, %Y') }} at {{ v.time }}{% if clinic_names.get(v.clinic_id|string) and v.clinic_id != clinic._id %} ({{ clinic_names[v.clinic_id|string] }}){% endif %}
+                        </option>
+                        {% endfor %}
+                        <option value="">No — not part of a booked visit</option>
+                    </select>
+                    <div class="form-text">Linking marks that visit completed on the calendar.</div>
+                </div>
                 {% endif %}
                 <div class="row mb-3">
                     <div class="col-md-4">
@@ -46,21 +61,9 @@
                         <label for="procedure" class="form-label">Procedure *</label>
                         <select class="form-select" id="procedure" name="procedure" required>
                             <option value="">Select procedure</option>
-                            <option value="Oral Prophylaxis">Oral Prophylaxis</option>
-                            <option value="OP + Fluoride Treatment">OP + Fluoride Treatment</option>
-                            <option value="Tooth Extraction">Tooth Extraction</option>
-                            <option value="Restoration (Filling)">Restoration (Filling)</option>
-                            <option value="Root Canal Treatment">Root Canal Treatment</option>
-                            <option value="Crown / Bridge">Crown / Bridge</option>
-                            <option value="Denture">Denture</option>
-                            <option value="Orthodontic Adjustment">Orthodontic Adjustment</option>
-                            <option value="Tooth Whitening">Tooth Whitening</option>
-                            <option value="Fluoride Treatment">Fluoride Treatment</option>
-                            <option value="Sealant">Sealant</option>
-                            <option value="Consultation">Consultation</option>
-                            <option value="X-ray">X-ray</option>
-                            <option value="Surgery">Surgery</option>
-                            <option value="Other">Other</option>
+                            {% for p in procedures %}
+                            <option value="{{ p }}">{{ p }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div class="col-md-4">

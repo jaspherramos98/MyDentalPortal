@@ -42,7 +42,6 @@ PAGES = [
     ("/appointments/api?start=2099-01-01&end=2099-02-01",
                                                       ["login", 403,        200,    200,        200]),
     ("/appointments/history",                         ["login", 200,        200,    200,        200]),
-    ("/appointments/{appointment_a}/complete",        ["login", "appts",    "appts", "appts",   "appts"]),
     ("/clinics",                                      ["login", 200,        200,    200,        200]),
     ("/clinics/create",                               ["login", 200,        200,    "dash",     200]),
     ("/clinics/{clinic_a}/edit",                      ["login", "clinics",  200,    "dash",     "clinics"]),

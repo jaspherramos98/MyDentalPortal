@@ -153,6 +153,11 @@ def is_admin():
     )
 
 
+def can_confirm_price():
+    """Dentist/admin set a confirmed treatment price; staff only propose one."""
+    return is_admin() or session.get('user_role') != ROLE_STAFF
+
+
 def admin_required(f):
     """Require an authenticated administrator; 403 otherwise."""
     @wraps(f)

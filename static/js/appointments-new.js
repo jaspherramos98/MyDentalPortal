@@ -12,7 +12,6 @@ function openNewAppointment() {
     document.getElementById('modalNotes').value = '';
     document.getElementById('appointmentForm').dataset.editingId = '';
     hideCancelButton();
-    hideVisitActions();
     if (currentClinic) {
         document.getElementById('modalClinicSelect').value = currentClinic;
     } else {

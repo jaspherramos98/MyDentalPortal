@@ -67,6 +67,30 @@ def by_appointment(appointment_ids):
     return grouped
 
 
+def unlinked_for_patient(patient_id, start, end):
+    """A patient's treatments NOT attached to any visit, dated start..end
+    ('YYYY-MM-DD', inclusive), oldest first — what a visit may claim."""
+    return list(
+        mongo.db.treatment_records
+        .find({'patient_id': ObjectId(patient_id), 'appointment_id': None,
+               'date': {'$gte': start, '$lte': end}})
+        .sort([('date', 1), ('created_at', 1)])
+    )
+
+
+def link_to_appointment(treatment_ids, appointment_id, patient_id):
+    """Attach still-unlinked treatments of this patient to a visit. The filter
+    re-checks both, so a stale or crafted id can't move another record.
+    Returns how many were linked."""
+    if not treatment_ids:
+        return 0
+    return mongo.db.treatment_records.update_many(
+        {'_id': {'$in': [ObjectId(t) for t in treatment_ids]},
+         'patient_id': ObjectId(patient_id), 'appointment_id': None},
+        {'$set': {'appointment_id': ObjectId(appointment_id)}},
+    ).modified_count
+
+
 def insert(doc):
     """Insert a treatment document; return the new _id (str)."""
     return str(mongo.db.treatment_records.insert_one(doc).inserted_id)

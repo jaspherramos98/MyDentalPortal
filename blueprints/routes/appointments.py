@@ -13,13 +13,15 @@ from datetime import datetime, timedelta
 
 from blueprints.utils import (
     login_required, user_clinic_ids as _user_clinic_ids, scoped_clinic_ids, audit,
+    verify_patient_access, submission_id, can_confirm_price,
 )
 from blueprints.repositories import appointments as appt_repo
 from blueprints.repositories import clinics as clinic_repo
 from blueprints.repositories import patients as patient_repo
 from blueprints.repositories import treatments as treatment_repo
+from blueprints.repositories import submissions as submissions_repo
 from blueprints.clock import utcnow, clinic_today
-from blueprints import visits
+from blueprints import treatment_records, visit_links, visits
 
 appointments_bp = Blueprint('appointments', __name__)
 log = logging.getLogger(__name__)
@@ -333,35 +335,146 @@ def _status_change_error(appt, new_status):
     return None
 
 
-# ── Complete visit -> Add Treatment linked to this appointment ───────────
-@appointments_bp.route('/appointments/<appt_id>/complete')
-@login_required
-def complete_visit(appt_id):
-    """Send the user to Add Treatment for the appointment's patient with the
-    appointment attached. Saving that treatment marks the visit completed
-    (treatments.add_treatment re-validates everything; this only routes).
-    A typed-in walk-in has no patient yet: the calendar passes ``?patient_id=``
-    picked from the clinic's patients."""
+# ── Record visit (the calendar's one-step dialog) ────────────────────────
+# Everything needed to finish a past/today visit without leaving the calendar:
+# pick the patient (typed-in walk-ins), claim records already entered for it,
+# and/or add what was done. Saving marks the visit completed.
+def _visit_context(appt_id, patient_id_arg):
+    """(appt, visit_clinic, patient, patient_clinic, error) for the visit
+    endpoints. `error` is a (message, status) pair; patient is None for a
+    walk-in whose patient hasn't been picked yet."""
     appt = appt_repo.get(appt_id)
-    clinic = None
-    if appt and appt.get('is_active'):
-        clinic = clinic_repo.get_accessible(appt['clinic_id'], session['user_id'])
-    if not clinic:
-        flash('Appointment not found', 'error')
-        return redirect(url_for('appointments.appointments'))
-    if appt.get('status', 'scheduled') not in ('scheduled', 'completed'):
-        flash('Only scheduled or completed visits can have treatments added.', 'warning')
-        return redirect(url_for('appointments.appointments'))
-    if appt['date'] > _today_str():
-        flash("A future appointment can't be completed yet.", 'warning')
-        return redirect(url_for('appointments.appointments'))
-
-    patient_id = appt.get('patient_id') or request.args.get('patient_id')
+    vclinic = visit_links.visit_clinic(appt, session['user_id'])
+    if not vclinic:
+        return None, None, None, None, ('Appointment not found.', 404)
+    if appt.get('patient_id') and patient_id_arg and str(patient_id_arg) != str(appt['patient_id']):
+        return appt, vclinic, None, None, ('This appointment is booked for a different patient.', 400)
+    patient_id = appt.get('patient_id') or patient_id_arg
     if not patient_id:
-        flash('Pick which registered patient this visit was for.', 'warning')
-        return redirect(url_for('appointments.appointments'))
-    return redirect(url_for('treatments.add_treatment', patient_id=str(patient_id),
-                            appointment_id=str(appt['_id'])))
+        return appt, vclinic, None, None, None
+    patient, pclinic = verify_patient_access(str(patient_id))
+    if not pclinic:
+        return appt, vclinic, None, None, ('Patient not found.', 404)
+    why = visit_links.refusal(appt, patient, session['user_id'], _today_str())
+    if why:
+        return appt, vclinic, patient, pclinic, (why, 400)
+    return appt, vclinic, patient, pclinic, None
+
+
+def _patient_name(patient):
+    info = patient.get('personal_info') or {}
+    return f"{info.get('first_name', '')} {info.get('last_name', '')}".strip()
+
+
+def _visit_json(visit, appt=None):
+    out = {'state': visit.state, 'status_label': visit.status_label,
+           'reasons': visit.reasons, 'procedures': visit.procedures}
+    if appt is not None:
+        out['url'] = _visit_url(appt)
+    return out
+
+
+@appointments_bp.route('/appointments/api/<appt_id>/visit', methods=['GET'])
+@login_required
+def visit_details(appt_id):
+    """What the Record-visit dialog shows. No amounts (calendar screen)."""
+    appt, vclinic, patient, pclinic, error = _visit_context(appt_id, request.args.get('patient_id'))
+    if error:
+        return jsonify({'success': False, 'error': error[0]}), error[1]
+    today = _today_str()
+    visit = _visits_for([appt], today)[str(appt['_id'])]
+    candidates = []
+    if patient:
+        candidates = [
+            {'id': str(t['_id']), 'date': t.get('date', ''), 'procedure': t.get('procedure', '')}
+            for t in visit_links.link_candidates(appt, patient['_id'], today)
+        ]
+    return jsonify({
+        'success': True,
+        'appointment': {
+            'id': str(appt['_id']), 'date': appt['date'], 'time': appt.get('time', ''),
+            'status': appt.get('status', 'scheduled'), 'clinic_name': vclinic.get('name', ''),
+            'patient_name': appt.get('patient_name', ''),
+            'has_patient': bool(appt.get('patient_id')),
+        },
+        'patient': {'id': str(patient['_id']), 'name': _patient_name(patient)} if patient else None,
+        'visit': _visit_json(visit),
+        'candidates': candidates,
+        'currency': (pclinic or vclinic).get('currency', 'PHP'),
+        'price_needs_confirmation': not can_confirm_price(),
+        'procedures': list(treatment_records.PROCEDURES),
+        'full_form_url': url_for('treatments.add_treatment', patient_id=str(patient['_id']),
+                                 appointment_id=str(appt['_id'])) if patient else None,
+    })
+
+
+@appointments_bp.route('/appointments/api/<appt_id>/visit', methods=['POST'])
+@login_required
+def record_visit(appt_id):
+    """Link chosen existing records and/or create one, then complete the visit.
+
+    JSON: {patient_id?, link: [treatment ids], treatment: {procedure,
+    tooth_numbers, amount_charged, amount_paid, notes} | null, submission_id?}
+    """
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'error': 'Invalid request.'}), 400
+    appt, vclinic, patient, pclinic, error = _visit_context(appt_id, data.get('patient_id'))
+    if error:
+        return jsonify({'success': False, 'error': error[0]}), error[1]
+    if not patient:
+        return jsonify({'success': False, 'error': 'Pick which patient this visit was for.'}), 400
+
+    today = _today_str()
+    link_ids = data.get('link') or []
+    entry = data.get('treatment')
+    if not isinstance(link_ids, list) or (entry is not None and not isinstance(entry, dict)):
+        return jsonify({'success': False, 'error': 'Invalid request.'}), 400
+    allowed = {str(t['_id']) for t in visit_links.link_candidates(appt, patient['_id'], today)}
+    link_ids = list(dict.fromkeys(str(t) for t in link_ids))
+    if any(t not in allowed for t in link_ids):
+        return jsonify({'success': False,
+                        'error': 'One of those records can no longer be linked. Reopen the visit.'}), 400
+
+    new_doc = None
+    if entry:
+        values = {k: entry.get(k) for k in
+                  ('procedure', 'tooth_numbers', 'amount_charged', 'amount_paid', 'notes')}
+        values['date'] = appt['date']   # the record is for the day of the visit
+        try:
+            new_doc = treatment_records.new_treatment(
+                values, patient['_id'], pclinic, session['user_id'],
+                session.get('user_name', ''), can_confirm_price(), today)
+        except treatment_records.TreatmentInputError as e:
+            return jsonify({'success': False, 'error': str(e)}), 400
+    if not link_ids and not new_doc:
+        return jsonify({'success': False,
+                        'error': 'Tick a record above or enter what was done.'}), 400
+
+    try:
+        if new_doc:
+            new_doc['appointment_id'] = appt['_id']
+            sid = submission_id(data)
+            if sid:
+                new_doc['submission_id'] = sid
+            tid, created = submissions_repo.create_once(
+                'treatment_records', sid, session['user_id'],
+                lambda: treatment_repo.insert(new_doc))
+            if created:
+                audit('create', 'treatment', tid, clinic=pclinic)
+                if not new_doc['price_confirmed']:
+                    audit('price_proposed', 'treatment', tid, clinic=pclinic)
+        if link_ids:
+            treatment_repo.link_to_appointment(link_ids, appt['_id'], patient['_id'])
+            for tid in link_ids:
+                audit('link_visit', 'treatment', tid, clinic=pclinic)
+        visit_links.complete(appt, patient, vclinic)
+        appt = appt_repo.get(appt_id)
+        visit = _visits_for([appt], today)[str(appt['_id'])]
+        return jsonify({'success': True, 'visit': _visit_json(visit, appt)})
+    except Exception:
+        log.exception("Record visit failed")
+        return jsonify({'success': False, 'error': 'Could not save the visit. Try again.'}), 500
 
 
 # ── Visit history (list view) ────────────────────────────────────────────

@@ -377,6 +377,10 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
 
+        .visit-modal-header { background: #198754; color: #fff; }
+        .visit-candidate { display: flex; gap: 10px; align-items: center; padding: 8px 10px;
+                           border: 1px solid #dee2e6; border-radius: 6px; margin-bottom: 6px; cursor: pointer; }
+        .visit-candidate:has(input:checked) { border-color: #198754; background: #f0faf4; }
         .appointment-modal .modal-header {
             background: linear-gradient(135deg, var(--primary-color), #0056b3);
             color: white;
@@ -522,6 +526,8 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                 align-items: center;
                 justify-content: center;
             }
+            /* ...but never over an open dialog (it covered the modal footer). */
+            body.modal-open .mobile-toggle { display: none !important; }
 
             /* Let the page scroll naturally instead of clipping at a fixed
                100vh-80px height (the nav is taller on mobile, so that math cut
@@ -816,27 +822,6 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <!-- Visit outcome (today's + past visits). Outside the form so
-                         picking a patient here doesn't count as an unsaved edit. -->
-                    <div class="visit-actions alert alert-light mb-3" id="visitActions" style="display:none;">
-                        <div class="fw-semibold mb-2">
-                            <i class="fas fa-clipboard-check"></i> Visit: <span id="visitStatusText"></span>
-                        </div>
-                        <div class="mb-2" id="visitPatientPicker" style="display:none;">
-                            <label class="form-label small mb-1" for="visitPatientSelect">
-                                This booking has no linked patient. Which patient was it?
-                            </label>
-                            <select class="form-select form-select-sm" id="visitPatientSelect"></select>
-                        </div>
-                        <div class="d-flex flex-wrap gap-2">
-                            <button type="button" class="btn btn-success btn-sm" id="completeVisitBtn">
-                                <i class="fas fa-check"></i> Complete visit
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" id="noShowBtn">
-                                <i class="fas fa-user-slash"></i> No-show
-                            </button>
-                        </div>
-                    </div>
                     <form id="appointmentForm">
                         <div class="row">
                             <div class="col-md-6 mb-3">
@@ -921,9 +906,88 @@ Description: Dental practice appointments calendar with drag-and-drop functional
         </div>
     </div>
 
+
+    <!-- Record visit: finish a today/past visit in one step (claim records already
+         entered for it and/or add what was done). Logic: static/js/appointments-visit.js -->
+    <div class="modal fade" id="visitModal" tabindex="-1" aria-labelledby="visitModalTitle">
+        <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+            <div class="modal-content">
+                <div class="modal-header visit-modal-header">
+                    <h5 class="modal-title" id="visitModalTitle">
+                        <i class="fas fa-clipboard-check"></i> Record visit
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <div class="fw-semibold fs-5" id="visitPatientLabel"></div>
+                        <div class="text-muted small" id="visitWhen"></div>
+                        <div class="small mt-1" id="visitStateText"></div>
+                    </div>
+                    <div class="text-muted" id="visitLoading"><i class="fas fa-spinner fa-spin"></i> Loading…</div>
+                    <div class="alert alert-danger d-none" id="visitError" role="alert"></div>
+
+                    <div class="mb-3 d-none" id="visitPickPatient">
+                        <label class="form-label fw-semibold" for="visitPatientSelect">
+                            Booked by name only. Which registered patient was it?
+                        </label>
+                        <select class="form-select" id="visitPatientSelect"></select>
+                    </div>
+
+                    <div class="mb-3 d-none" id="visitCandidates">
+                        <div class="fw-semibold mb-1">Already recorded — part of this visit?</div>
+                        <div id="visitCandidateList"></div>
+                    </div>
+
+                    <div class="d-none" id="visitEntry">
+                        <div class="fw-semibold mb-2" id="visitEntryTitle">What was done</div>
+                        <div class="row g-2">
+                            <div class="col-12 col-md-7">
+                                <label class="form-label small mb-1" for="visitProcedure">Procedure</label>
+                                <select class="form-select" id="visitProcedure"></select>
+                            </div>
+                            <div class="col-12 col-md-5">
+                                <label class="form-label small mb-1" for="visitTooth">Tooth number(s)</label>
+                                <input type="text" class="form-control" id="visitTooth" placeholder="e.g. 11, 12" maxlength="100">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-1" for="visitCharged">Charged (<span class="visit-currency"></span>)</label>
+                                <input type="number" class="form-control" id="visitCharged" min="0" step="0.01" inputmode="decimal" placeholder="0.00">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-1" for="visitPaid">Paid (<span class="visit-currency"></span>)</label>
+                                <input type="number" class="form-control" id="visitPaid" min="0" step="0.01" inputmode="decimal" placeholder="0.00">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small mb-1" for="visitNotes">Notes</label>
+                                <textarea class="form-control" id="visitNotes" rows="2" maxlength="2000"></textarea>
+                            </div>
+                        </div>
+                        <div class="form-text d-none" id="visitPriceNote">
+                            Your price shows as pending until a dentist confirms it.
+                        </div>
+                        <a class="small d-inline-block mt-2 d-none" id="visitFullFormLink" href="#">
+                            Need more fields? Open the full treatment form
+                        </a>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary me-auto" id="visitNoShowBtn">
+                        <i class="fas fa-user-slash"></i> No-show
+                    </button>
+                    <button type="button" class="btn btn-link" id="visitEditBtn">Edit booking</button>
+                    <button type="button" class="btn btn-success" id="visitSaveBtn" disabled>
+                        <i class="fas fa-check"></i> Complete visit
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script type="application/json" id="appointments-data">{{ {'clinics': clinics_json, 'patients': patients}|tojson }}</script>
     <script src="{{ url_for('static', filename='js/appointments-page.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/appointments-visit.js') }}"></script>
 
     <!-- Floating Add Appointment Button -->
     <button class="btn btn-primary shadow-lg"
