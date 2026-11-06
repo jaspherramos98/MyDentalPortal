@@ -3,7 +3,8 @@ import pytest
 
 from conftest import VIEWPORTS
 
-PAGES = ["/dashboard", "/patients", "/appointments", "/reports", "/clinics", "/settings"]
+PAGES = ["/dashboard", "/patients", "/appointments", "/appointments/history", "/reports", "/clinics",
+         "/settings"]
 
 # Which elements stick out past the viewport (so a failure says WHAT overflows).
 OFFENDERS = """() => {

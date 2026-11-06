@@ -33,6 +33,27 @@ def find_in_range(clinic_ids, start, end):
     return list(mongo.db.appointments.find(query).sort([('date', 1), ('time', 1)]))
 
 
+def find_history(clinic_ids, start, end, statuses=None, name_pattern=None):
+    """Active appointments in `clinic_ids` within ['YYYY-MM-DD' start, end] for
+    the visit-history list, newest first.
+
+    `statuses` optionally narrows to those status values; `name_pattern` is an
+    ALREADY-ESCAPED regex (callers ``re.escape`` user input) matched
+    case-insensitively against ``patient_name``. Callers bound the date range,
+    so the result size stays small at clinic volume.
+    """
+    query = {
+        'is_active': True,
+        'clinic_id': {'$in': clinic_ids},
+        'date': {'$gte': start, '$lte': end},
+    }
+    if statuses:
+        query['status'] = {'$in': list(statuses)}
+    if name_pattern:
+        query['patient_name'] = {'$regex': name_pattern, '$options': 'i'}
+    return list(mongo.db.appointments.find(query).sort([('date', -1), ('time', -1)]))
+
+
 def find_active_on_day(clinic_id, date, exclude_id=None):
     """Active, non-cancelled appointments in one clinic on one day.
 
@@ -98,6 +119,15 @@ def update_set(appt_id, fields):
         {'_id': ObjectId(appt_id)},
         {'$set': fields},
     )
+
+
+def mark_completed(appt_id, patient_id=None):
+    """Set an appointment ``completed`` (the visit happened). `patient_id` links
+    a typed-in walk-in to the registered patient it turned out to be."""
+    fields = {'status': 'completed', 'completed_at': utcnow(), 'updated_at': utcnow()}
+    if patient_id is not None:
+        fields['patient_id'] = patient_id if isinstance(patient_id, ObjectId) else ObjectId(patient_id)
+    return update_set(appt_id, fields)
 
 
 def soft_delete(appt_id):

@@ -3,7 +3,8 @@
 function openNewAppointment() {
     // Clear form
     document.getElementById('modalPatientName').value = '';
-    document.getElementById('modalAppointmentDate').value = new Date().toISOString().split('T')[0];
+    // Local date (toISOString is UTC: "yesterday" in Manila until 8 AM).
+    document.getElementById('modalAppointmentDate').value = formatDateForStorage(new Date());
     document.getElementById('modalAppointmentTime').value = '';
     document.getElementById('modalDuration').value = '30';
     document.getElementById('modalAppointmentType').value = 'checkup';
@@ -11,6 +12,7 @@ function openNewAppointment() {
     document.getElementById('modalNotes').value = '';
     document.getElementById('appointmentForm').dataset.editingId = '';
     hideCancelButton();
+    hideVisitActions();
     if (currentClinic) {
         document.getElementById('modalClinicSelect').value = currentClinic;
     } else {

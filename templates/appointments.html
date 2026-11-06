@@ -329,6 +329,34 @@ Description: Dental practice appointments calendar with drag-and-drop functional
             margin-top: 2px;
         }
 
+        /* Finished / past visits: one-line banner "Name | Procedure" + icon. */
+        .appointment-card.appointment-banner {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 6px;
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-left-width: 4px;
+        }
+        .appointment-banner .banner-text {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .appointment-banner .banner-icon { flex: none; font-size: 14px; }
+        .appointment-banner.visit-done { border-color: #198754; }
+        .appointment-banner.visit-done .banner-icon { color: #198754; }
+        .appointment-banner.visit-cancelled { border-color: #dc3545; opacity: 0.75; }
+        .appointment-banner.visit-cancelled .banner-icon { color: #dc3545; }
+        .appointment-banner.visit-attention { border-color: #fd7e14; }
+        .appointment-banner.visit-attention .banner-icon,
+        .legend .visit-attention-icon { color: #fd7e14; }
+        .visit-actions { border-left: 4px solid #fd7e14; }
+        .legend-item > i { margin-right: 8px; }
+
         .search-box {
             position: sticky;
             top: 0;
@@ -670,6 +698,9 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                         <button class="btn nav-btn" id="monthViewBtn" onclick="showMonthView()">
                             <i class="fas fa-calendar"></i> Month View
                         </button>
+                        <a class="btn nav-btn" id="listViewLink" href="{{ url_for('appointments.history') }}">
+                            <i class="fas fa-list"></i> List
+                        </a>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -758,6 +789,18 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                     <div class="legend-color" style="background: linear-gradient(135deg, #eceff1, #cfd8dc);"></div>
                     <span>Others</span>
                 </div>
+                <div class="legend-item">
+                    <i class="fas fa-circle-check text-success"></i>
+                    <span>Visit done</span>
+                </div>
+                <div class="legend-item">
+                    <i class="fas fa-circle-xmark text-danger"></i>
+                    <span>Cancelled / no-show</span>
+                </div>
+                <div class="legend-item">
+                    <i class="fas fa-circle-exclamation visit-attention-icon"></i>
+                    <span>Needs attention</span>
+                </div>
             </div>
         </div>
     </div>
@@ -773,6 +816,27 @@ Description: Dental practice appointments calendar with drag-and-drop functional
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <!-- Visit outcome (today's + past visits). Outside the form so
+                         picking a patient here doesn't count as an unsaved edit. -->
+                    <div class="visit-actions alert alert-light mb-3" id="visitActions" style="display:none;">
+                        <div class="fw-semibold mb-2">
+                            <i class="fas fa-clipboard-check"></i> Visit: <span id="visitStatusText"></span>
+                        </div>
+                        <div class="mb-2" id="visitPatientPicker" style="display:none;">
+                            <label class="form-label small mb-1" for="visitPatientSelect">
+                                This booking has no linked patient. Which patient was it?
+                            </label>
+                            <select class="form-select form-select-sm" id="visitPatientSelect"></select>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-success btn-sm" id="completeVisitBtn">
+                                <i class="fas fa-check"></i> Complete visit
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="noShowBtn">
+                                <i class="fas fa-user-slash"></i> No-show
+                            </button>
+                        </div>
+                    </div>
                     <form id="appointmentForm">
                         <div class="row">
                             <div class="col-md-6 mb-3">
