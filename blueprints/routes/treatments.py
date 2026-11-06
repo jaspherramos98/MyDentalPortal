@@ -7,72 +7,26 @@ from flask import (
     Blueprint, render_template, request, jsonify,
     session, redirect, url_for, flash, current_app,
 )
-from bson.objectid import ObjectId
 
 from blueprints.utils import (
     login_required, verify_patient_access as _verify_patient_access,
-    role_required, ROLE_DENTIST, ROLE_STAFF, is_admin,
+    role_required, ROLE_DENTIST, is_admin, can_confirm_price,
     user_clinic_ids as _user_clinic_ids, audit,
     submission_id as _submission_id, submit_success,
 )
 from blueprints.repositories import treatments as treatment_repo
 from blueprints.repositories import patients as patient_repo
 from blueprints.repositories import submissions as submissions_repo
-from blueprints.repositories import appointments as appt_repo
+from blueprints.repositories import clinics as clinic_repo
 from blueprints.clock import utcnow, clinic_today
+from blueprints import treatment_records, visit_links
 
 treatments_bp = Blueprint('treatments', __name__)
 log = logging.getLogger(__name__)
 
 
-# Free-text "next visit" note the dentist writes on a treatment (e.g. "2 weeks —
-# crown fitting"). Separate from the Schedule-Next-Appointment button, which
-# creates a real calendar appointment.
-NEXT_VISIT_MAX_LEN = 200
-
-
-def _next_visit(form):
-    """The trimmed Next Visit note, capped at NEXT_VISIT_MAX_LEN characters."""
-    return (form.get('next_visit') or '').strip()[:NEXT_VISIT_MAX_LEN]
-
-
-def _linkable_appointment(appointment_id, patient, clinic):
-    """The appointment a new treatment may be attached to ("Complete visit"),
-    or None.
-
-    `appointment_id` comes from the query string / form, so trust nothing:
-    it must be an active appointment in THIS patient's clinic, still
-    scheduled (or already completed: a second procedure in the same visit),
-    not in the future, and either for this patient or a typed-in walk-in with
-    no patient linked yet.
-    """
-    if not appointment_id:
-        return None
-    appt = appt_repo.get(appointment_id)
-    if not appt or not appt.get('is_active') or appt.get('clinic_id') != clinic['_id']:
-        return None
-    if appt.get('status', 'scheduled') not in ('scheduled', 'completed'):
-        return None
-    if appt.get('date', '') > clinic_today(current_app.config.get('TIMEZONE', 'Asia/Manila')):
-        return None
-    if appt.get('patient_id') and appt['patient_id'] != patient['_id']:
-        return None
-    return appt
-
-
-def _complete_linked_visit(appt, patient, clinic):
-    """Mark the visit completed once a treatment is linked to it (idempotent:
-    a resilient-submit retry or a second procedure re-runs this harmlessly)."""
-    if appt.get('status') == 'completed' and appt.get('patient_id'):
-        return
-    appt_repo.mark_completed(appt['_id'],
-                             patient_id=None if appt.get('patient_id') else patient['_id'])
-    audit('complete', 'appointment', str(appt['_id']), clinic=clinic)
-
-
-def _is_price_confirmer():
-    """Dentist/admin may set a confirmed price; staff can only propose one."""
-    return is_admin() or session.get('user_role') != ROLE_STAFF
+def _today():
+    return clinic_today(current_app.config.get('TIMEZONE', 'Asia/Manila'))
 
 
 # ── ADD TREATMENT ────────────────────────────────────────────────────────
@@ -84,51 +38,19 @@ def add_treatment(patient_id):
         flash('Access denied or patient not found', 'error')
         return redirect(url_for('patients.list_patients'))
 
+    today = _today()
     requested_appt = request.values.get('appointment_id')
-    appt = _linkable_appointment(requested_appt, patient, clinic)
+    appt = visit_links.linkable_appointment(requested_appt, patient, session['user_id'], today)
 
     if request.method == 'POST':
-        f = request.form
         try:
-            treatment = {
-                'patient_id': ObjectId(patient_id),
-                'clinic_id': clinic['_id'],
-                'date': f.get('date') or utcnow().strftime('%Y-%m-%d'),
-                'tooth_numbers': [
-                    t.strip() for t in (f.get('tooth_numbers') or '').split(',')
-                    if t.strip()
-                ],
-                'procedure': (f.get('procedure') or '').strip(),
-                'description': (f.get('description') or '').strip(),
-                'dentist': (f.get('dentist') or session.get('user_name', '')).strip(),
-                'amount_charged': float(f.get('amount_charged') or 0),
-                'amount_paid': float(f.get('amount_paid') or 0),
-                'balance': (
-                    float(f.get('amount_charged') or 0)
-                    - float(f.get('amount_paid') or 0)
-                ),
-                'currency': clinic.get('currency', 'PHP'),
-                'status': f.get('status', 'completed'),
-                'notes': (f.get('notes') or '').strip(),
-                'next_appointment': f.get('next_appointment', ''),
-                'next_visit': _next_visit(f),
-                'created_by': session['user_id'],
-                'created_at': utcnow(),
-                'updated_at': utcnow(),
-            }
-
+            treatment = treatment_records.new_treatment(
+                request.form, patient['_id'], clinic, session['user_id'],
+                session.get('user_name', ''), can_confirm_price(), today)
             if appt:
                 treatment['appointment_id'] = appt['_id']
 
-            # Price-confirmation: a dentist/admin's price is confirmed immediately;
-            # a staff member's price is PENDING until a dentist confirms it.
-            confirmer = _is_price_confirmer()
-            treatment['price_set_by'] = session['user_id']
-            treatment['price_confirmed'] = confirmer
-            treatment['price_confirmed_by'] = session['user_id'] if confirmer else None
-            treatment['price_confirmed_at'] = utcnow() if confirmer else None
-
-            sid = _submission_id(f)
+            sid = _submission_id(request.form)
             if sid:
                 treatment['submission_id'] = sid
             # A retry whose first attempt already saved returns that treatment.
@@ -138,10 +60,11 @@ def add_treatment(patient_id):
             )
             if created:
                 audit('create', 'treatment', tid, clinic=clinic)
-                if not confirmer:
+                if not treatment['price_confirmed']:
                     audit('price_proposed', 'treatment', tid, clinic=clinic)
             if appt:
-                _complete_linked_visit(appt, patient, clinic)
+                visit_links.complete(appt, patient,
+                                     visit_links.visit_clinic(appt, session['user_id']))
                 flash('Treatment saved and visit marked completed.', 'success')
                 return submit_success(url_for('patients.patient_detail', patient_id=patient_id,
                                               tab='treatment', visit=str(appt['_id']),
@@ -154,21 +77,31 @@ def add_treatment(patient_id):
                 flash('Treatment record added successfully!', 'success')
             return submit_success(url_for('patients.patient_detail', patient_id=patient_id))
 
+        except treatment_records.TreatmentInputError as e:
+            flash(str(e), 'error')
         except Exception:
             log.exception("Add treatment failed")
             flash('Error adding treatment record', 'error')
 
+    # Not arriving from a visit: offer this patient's still-open visits so the
+    # record can complete one here instead of a trip back to the calendar.
+    open_visits = [] if appt else visit_links.open_visits(
+        patient['_id'], _user_clinic_ids(), today)
     if requested_appt and not appt and request.method == 'GET':
-        flash("That appointment can't be completed here, so this treatment won't be linked to it.", 'warning')
+        flash("That appointment can't take treatments (cancelled, in the future, or for "
+              "another patient), so it won't be linked.", 'warning')
     return render_template(
         'treatments/add.html',
         patient=patient,
         clinic=clinic,
         appointment=appt,
+        open_visits=open_visits,
+        procedures=treatment_records.PROCEDURES,
+        clinic_names={str(c['_id']): c.get('name', '')
+                      for c in clinic_repo.accessible_active(session['user_id'])},
     )
 
 
-# ── EDIT TREATMENT ───────────────────────────────────────────────────────
 @treatments_bp.route('/treatments/<treatment_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_treatment(treatment_id):
@@ -203,14 +136,14 @@ def edit_treatment(treatment_id):
                 'status': f.get('status', 'completed'),
                 'notes': (f.get('notes') or '').strip(),
                 'next_appointment': f.get('next_appointment', ''),
-                'next_visit': _next_visit(f),
+                'next_visit': treatment_records.next_visit(f),
                 'updated_at': utcnow(),
             }
 
             # Price-confirmation on edit: a dentist/admin save confirms the price;
             # a staff edit that CHANGES the amount re-opens it as pending (a staff
             # edit that leaves the amount alone doesn't touch confirmation state).
-            confirmer = _is_price_confirmer()
+            confirmer = can_confirm_price()
             price_proposed = False
             if confirmer:
                 update['price_confirmed'] = True

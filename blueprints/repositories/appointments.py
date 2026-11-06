@@ -146,3 +146,16 @@ def active_for_patient(patient_id, limit=10):
         .sort([('date', -1), ('time', -1)])
         .limit(limit)
     )
+
+
+def open_for_patient(patient_id, clinic_ids, start, end):
+    """A patient's still-'scheduled' active visits dated start..end in the given
+    clinics, most recent first (Add Treatment offers to complete one)."""
+    return list(
+        mongo.db.appointments
+        .find({'patient_id': ObjectId(patient_id), 'is_active': True,
+               'status': {'$in': ['scheduled', None]},  # None = legacy, no status
+               'clinic_id': {'$in': list(clinic_ids)},
+               'date': {'$gte': start, '$lte': end}})
+        .sort([('date', -1), ('time', -1)])
+    )

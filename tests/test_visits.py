@@ -98,38 +98,7 @@ def _actions(db):
     return [a["action"] for a in db.audit_log.find({}, {"action": 1})]
 
 
-# ── Complete visit: routing ──────────────────────────────────────────────────
-
-def test_complete_redirects_to_linked_add_treatment(real_client, as_user, world, db):
-    appt = _appt(db, world.clinic_a, world.patient_a)
-    as_user("staff")
-    res = real_client.get(f"/appointments/{appt}/complete")
-    assert res.status_code == 302
-    assert f"/patients/{world.patient_a}/treatments/add" in res.location
-    assert f"appointment_id={appt}" in res.location
-
-
-def test_outsider_cannot_complete_clinic_a_visit(real_client, as_user, world, db):
-    appt = _appt(db, world.clinic_a, world.patient_a)
-    as_user("outsider")
-    res = real_client.get(f"/appointments/{appt}/complete")
-    assert res.status_code == 302 and "/treatments/add" not in res.location
-
-
-def test_future_visit_cannot_be_completed(real_client, as_user, world, db):
-    appt = _appt(db, world.clinic_a, world.patient_a, date=FUTURE)
-    as_user("dentist")
-    res = real_client.get(f"/appointments/{appt}/complete")
-    assert "/treatments/add" not in res.location
-
-
-def test_walk_in_needs_a_patient_pick(real_client, as_user, world, db):
-    appt = _appt(db, world.clinic_a, name="Walk In")
-    as_user("dentist")
-    assert "/treatments/add" not in real_client.get(f"/appointments/{appt}/complete").location
-    res = real_client.get(f"/appointments/{appt}/complete?patient_id={world.patient_a}")
-    assert f"/patients/{world.patient_a}/treatments/add" in res.location
-
+# ── Add Treatment opened for a visit ──────────────────────────────────────────
 
 def test_add_form_prefills_visit(real_client, as_user, world, db):
     appt = _appt(db, world.clinic_a, world.patient_a)

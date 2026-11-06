@@ -177,52 +177,102 @@ def _manila_date(days=0):
     return (today + timedelta(days=days)).strftime("%Y-%m-%d")
 
 
-def _insert_appt(db, seeded, date, status="scheduled", name=None):
+def _insert_appt(db, seeded, date, status="scheduled", name=None, clinic_id=None):
     p = seeded["patient"]
     full = name or f"{p['personal_info']['first_name']} {p['personal_info']['last_name']}"
     return db.appointments.insert_one({
-        "clinic_id": seeded["clinic"]["_id"], "patient_id": p["_id"], "patient_name": full,
-        "date": date, "time": "07:00", "duration": 30, "type": "checkup",
-        "priority": "normal", "notes": "", "status": status, "is_active": True,
+        "clinic_id": clinic_id or seeded["clinic"]["_id"], "patient_id": p["_id"],
+        "patient_name": full, "date": date, "time": "07:00", "duration": 30,
+        "type": "checkup", "priority": "normal", "notes": "", "status": status,
+        "is_active": True,
     }).inserted_id
 
 
+def _find_banner(s, appt):
+    """The appointment's card/banner, stepping back a week if it's in the last one
+    (e.g. "yesterday" on a Monday)."""
+    sel = f"#weekView [data-appointment-id='{appt}']"
+    if not s.page.locator(sel).count():
+        with s.page.expect_response(lambda r: "/appointments/api?" in r.url):
+            s.page.click("button[onclick='previousPeriod()']")
+    return s.page.locator(sel)
+
+
+def _save_visit(s, appt):
+    with s.page.expect_response(lambda r: r.url.endswith(f"/appointments/api/{appt}/visit")
+                                and r.request.method == "POST") as resp:
+        s.page.click("#visitSaveBtn")
+    assert resp.value.ok, resp.value.text()
+    s.page.wait_for_selector("#visitModal", state="hidden")
+
+
 def test_complete_visit_from_calendar(open_as, seeded, db):
+    """Tap today's visit -> Record visit dialog -> enter what was done -> saved,
+    without leaving the calendar."""
     appt = _insert_appt(db, seeded, _manila_date())
     s = open_as("staff")
     s.goto("/appointments")
-    s.page.click(f".appointment-card[data-appointment-id='{appt}']")
-    s.page.wait_for_selector("#completeVisitBtn", state="visible")
-    with s.page.expect_navigation():
-        s.page.click("#completeVisitBtn")
-    assert "/treatments/add" in s.page.url
-    assert s.page.locator("#visit-link-banner").is_visible()
-    s.page.select_option("#procedure", "Consultation")
-    s.page.fill("#amount_charged", "500")
-    s.page.fill("#amount_paid", "500")
-    with s.page.expect_navigation():
-        s.page.click("form[data-resilient-submit] button[type=submit]")
-    assert f"visit={appt}" in s.page.url
-    assert s.page.locator("#treatment-history tr.visit-highlight").count() == 1
+    _find_banner(s, appt).first.click()
+    s.page.wait_for_selector("#visitModal #visitEntry:not(.d-none)")
+    assert s.page.locator("#visitPriceNote").is_visible()        # staff price -> pending
+    for box in s.page.locator("#visitCandidateList input").all():
+        box.uncheck()                     # earlier tests/seed may leave records dated today
+    assert s.page.locator("#visitSaveBtn").is_disabled()          # nothing chosen yet
+    s.page.select_option("#visitProcedure", "Consultation")
+    s.page.fill("#visitCharged", "500")
+    s.page.fill("#visitPaid", "500")
+    _save_visit(s, appt)
+    assert "/appointments" in s.page.url and "/treatments/add" not in s.page.url
+    t = db.treatment_records.find_one({"appointment_id": appt})
+    assert t["procedure"] == "Consultation" and t["price_confirmed"] is False
     assert db.appointments.find_one({"_id": appt})["status"] == "completed"
-    assert db.treatment_records.find_one({"appointment_id": appt}) is not None
 
-    # Back on the calendar: staff set the price, so it's pending -> orange (!)
-    # with the reason; the banner still leads to the treatment tab.
-    s.goto("/appointments")
-    banner = s.page.locator(f".appointment-banner[data-appointment-id='{appt}']")
+    # The calendar redrew in place: orange (!) for the pending price, no amounts.
+    banner = s.page.locator(f"#weekView .appointment-banner[data-appointment-id='{appt}']")
     banner.wait_for()
     assert banner.get_attribute("data-visit-state") == "attention"
     assert "Price pending" in banner.get_attribute("title")
     assert "Consultation" in banner.inner_text() and "500" not in banner.inner_text()
     with s.page.expect_navigation():
-        banner.click()
+        banner.click()                        # completed -> its treatment records
     assert f"visit={appt}" in s.page.url
+    assert s.page.locator("#treatment-history tr.visit-highlight").count() == 1
 
-    # List view shows the amount.
     s.goto("/appointments/history?status=completed")
     row = s.page.locator("#visit-history-table tr", has_text="Price pending")
     assert "PHP 500.00" in row.first.inner_text()
+
+
+def test_link_existing_record_at_other_clinic(open_as, seeded, db):
+    """The reported bug: the patient is registered at one clinic but was booked at
+    the dentist's other clinic, and the treatment was entered from the patient
+    page the next day. One dialog, one tap: it links and the visit turns done."""
+    other = db.clinics.find_one({"owner_id": seeded["clinic"]["owner_id"],
+                                 "_id": {"$ne": seeded["clinic"]["_id"]}})
+    assert other, "seed_dev should create two clinics for the admin"
+    appt = _insert_appt(db, seeded, _manila_date(-1), clinic_id=other["_id"])
+    rec = db.treatment_records.insert_one({
+        "patient_id": seeded["patient"]["_id"], "clinic_id": seeded["clinic"]["_id"],
+        "date": _manila_date(), "procedure": "E2E antirabies", "amount_charged": 300.0,
+        "amount_paid": 300.0, "balance": 0.0, "price_confirmed": True,
+    }).inserted_id
+    s = open_as("admin")
+    s.goto("/appointments")
+    banner = _find_banner(s, appt)
+    assert banner.get_attribute("data-visit-state") == "attention"
+    banner.click()
+    box = s.page.locator(f"#visitCandidateList input[value='{rec}']")
+    box.wait_for()
+    assert "E2E antirabies" in s.page.inner_text("#visitCandidateList")
+    others = s.page.locator(f"#visitCandidateList input:not([value='{rec}'])")
+    # One candidate is pre-ticked; several are left for the user to choose.
+    assert box.is_checked() == (others.count() == 0)
+    for other in others.all():
+        assert not other.is_checked()
+    box.check()
+    _save_visit(s, appt)
+    assert db.treatment_records.find_one({"_id": rec})["appointment_id"] == appt
+    s.page.wait_for_selector(f"#weekView .appointment-banner.visit-done[data-appointment-id='{appt}']")
 
 
 def test_past_month_banner_and_no_show(open_as, seeded, db):
@@ -241,18 +291,16 @@ def test_past_month_banner_and_no_show(open_as, seeded, db):
     banner = s.page.locator(f".appointment-banner[data-appointment-id='{cancelled}']")
     assert banner.get_attribute("data-visit-state") == "cancelled"
 
-    # Yesterday's unmarked visit: orange banner -> modal -> No-show.
+    # Yesterday's unmarked visit: orange banner -> Record visit -> No-show.
     unmarked = _insert_appt(db, seeded, _manila_date(-1))
     s.goto("/appointments")
-    banner = s.page.locator(f".appointment-banner[data-appointment-id='{unmarked}']")
-    if not banner.count():                       # today is Sunday: yesterday is last week
-        with s.page.expect_response(lambda r: "/appointments/api?" in r.url):
-            s.page.click("button[onclick='previousPeriod()']")
+    banner = _find_banner(s, unmarked)
     assert banner.get_attribute("data-visit-state") == "attention"
     banner.click()
-    s.page.wait_for_selector("#noShowBtn", state="visible")
-    with s.page.expect_response(lambda r: f"/appointments/api/{unmarked}" in r.url) as resp:
-        s.page.click("#noShowBtn")           # confirm() auto-accepted by the Session
+    s.page.wait_for_selector("#visitNoShowBtn", state="visible")
+    with s.page.expect_response(lambda r: r.url.endswith(f"/appointments/api/{unmarked}")
+                                and r.request.method == "PUT") as resp:
+        s.page.click("#visitNoShowBtn")      # confirm() auto-accepted by the Session
     assert resp.value.ok
     assert db.appointments.find_one({"_id": unmarked})["status"] == "no-show"
     s.page.wait_for_selector(f".appointment-banner.visit-cancelled[data-appointment-id='{unmarked}']")

@@ -255,16 +255,22 @@ function createVisitBanner(appointment) {
     banner.setAttribute('aria-label', `${appointment.patientName}: ${why}`);
     banner.append(text, icon);
 
-    // Completed visit -> its treatment records (read view, not the edit form).
-    // Anything else (cancelled, no-show, not marked) -> the modal's actions.
-    banner.addEventListener('click', () => {
-        if (appointment.status === 'completed' && visit.url) {
-            window.location.href = visit.url;
-        } else {
-            editAppointment(appointment);
-        }
-    });
+    banner.addEventListener('click', () => openAppointment(appointment));
     return banner;
+}
+
+// One place decides what tapping an appointment does:
+//   completed visit           -> its treatment records (where Mark Paid / Confirm live)
+//   today's or past, scheduled -> Record visit (one step, stays on the calendar)
+//   anything else              -> the booking form (edit / cancel / reactivate)
+function openAppointment(appointment) {
+    if (appointment.status === 'completed' && appointment.visit.url) {
+        window.location.href = appointment.visit.url;
+    } else if (appointment.status === 'scheduled' && appointment.canComplete) {
+        VisitDialog.open(appointment);
+    } else {
+        editAppointment(appointment);
+    }
 }
 
 function createAppointmentElement(appointment) {
@@ -312,8 +318,7 @@ function createAppointmentElement(appointment) {
         apt.appendChild(cancelledBadge);
     }
 
-    // Click to edit
-    apt.addEventListener('click', () => editAppointment(appointment));
+    apt.addEventListener('click', () => openAppointment(appointment));
     
     return apt;
 }
@@ -422,7 +427,6 @@ function showAppointmentModal(patient, date) {
     document.getElementById('appointmentForm').dataset.selectedDate = date;
     document.getElementById('appointmentForm').dataset.editingId = '';
     hideCancelButton();
-    hideVisitActions();
 
     modal.show();
 }
@@ -520,90 +524,9 @@ function editAppointment(appointment) {
 
     // Show + configure the Cancel/Reactivate button for existing appointments
     configureCancelButton(appointment.status);
-    configureVisitActions(appointment);
 
     modal.show();
 }
-
-// The visit-outcome panel at the top of the modal (hidden for upcoming visits).
-function configureVisitActions(appointment) {
-    const panel = document.getElementById('visitActions');
-    if (!panel) return;
-    const visit = appointment.visit;
-    const showPanel = appointment.canComplete || visit.state !== 'upcoming';
-    panel.style.display = showPanel ? 'block' : 'none';
-    if (!showPanel) return;
-
-    document.getElementById('visitStatusText').textContent =
-        [visit.status_label, ...visit.reasons].join(' · ');
-
-    // Walk-in booked by typed name: pick which registered patient it was.
-    const picker = document.getElementById('visitPatientPicker');
-    const select = document.getElementById('visitPatientSelect');
-    const needsPatient = appointment.canComplete && !appointment.patientId;
-    picker.style.display = needsPatient ? 'block' : 'none';
-    if (needsPatient) {
-        select.innerHTML = '';
-        const placeholder = document.createElement('option');
-        placeholder.value = '';
-        placeholder.textContent = 'Select patient';
-        select.appendChild(placeholder);
-        dbPatients
-            .filter(p => p.clinic_id === appointment.clinicId)
-            .forEach(p => {
-                const opt = document.createElement('option');
-                opt.value = p.id;
-                opt.textContent = p.name;
-                if (p.name === appointment.patientName) opt.selected = true;
-                select.appendChild(opt);
-            });
-    }
-
-    const completeBtn = document.getElementById('completeVisitBtn');
-    completeBtn.style.display = appointment.canComplete ? 'inline-block' : 'none';
-    completeBtn.innerHTML = appointment.status === 'completed'
-        ? '<i class="fas fa-plus"></i> Add treatment to this visit'
-        : '<i class="fas fa-check"></i> Complete visit';
-    completeBtn.dataset.appointmentId = appointment.id;
-    completeBtn.dataset.needsPatient = needsPatient ? '1' : '';
-
-    const noShowBtn = document.getElementById('noShowBtn');
-    noShowBtn.style.display = appointment.status === 'scheduled' && appointment.canComplete
-        ? 'inline-block' : 'none';
-}
-
-function hideVisitActions() {
-    const panel = document.getElementById('visitActions');
-    if (panel) panel.style.display = 'none';
-}
-
-function completeCurrentVisit() {
-    const btn = document.getElementById('completeVisitBtn');
-    let url = `/appointments/${encodeURIComponent(btn.dataset.appointmentId)}/complete`;
-    if (btn.dataset.needsPatient) {
-        const patientId = document.getElementById('visitPatientSelect').value;
-        if (!patientId) {
-            alert('Select which patient this visit was for.');
-            return;
-        }
-        url += `?patient_id=${encodeURIComponent(patientId)}`;
-    }
-    apptModalSaved = true; // leaving on purpose — skip the unsaved-changes prompt
-    window.location.href = url;
-}
-
-async function markNoShow() {
-    const editingId = document.getElementById('appointmentForm').dataset.editingId;
-    if (!editingId || !confirm('Mark this appointment as a no-show?')) return;
-    await setAppointmentStatus(editingId, 'no-show', 'Marked as no-show.');
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    const completeBtn = document.getElementById('completeVisitBtn');
-    if (completeBtn) completeBtn.addEventListener('click', completeCurrentVisit);
-    const noShowBtn = document.getElementById('noShowBtn');
-    if (noShowBtn) noShowBtn.addEventListener('click', markNoShow);
-});
 
 function configureCancelButton(status) {
     const btn = document.getElementById('cancelAppointmentBtn');
@@ -654,16 +577,18 @@ async function setAppointmentStatus(appointmentId, status, successMessage) {
         if (data.success) {
             await refreshCalendar();
             apptModalSaved = true;
-            bootstrap.Modal.getInstance(document.getElementById('appointmentModal')).hide();
+            const modal = bootstrap.Modal.getInstance(document.getElementById('appointmentModal'));
+            if (modal) modal.hide();
             showNotification(successMessage, 'warning');
             document.getElementById('appointmentForm').dataset.editingId = '';
-        } else {
-            showNotification(data.error || 'Failed to update appointment', 'danger');
+            return true;
         }
+        showNotification(data.error || 'Failed to update appointment', 'danger');
     } catch (error) {
         console.error('Update appointment status error:', error);
         showNotification('Failed to update appointment', 'danger');
     }
+    return false;
 }
 
 // Reload the visible range and redraw (after a change or a period jump).
