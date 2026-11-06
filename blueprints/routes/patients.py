@@ -12,7 +12,7 @@ from bson.objectid import ObjectId
 from blueprints.utils import (
     login_required, verify_patient_access,
     role_required, ROLE_DENTIST, audit, scoped_clinic_ids, submission_id as _submission_id,
-    submit_success,
+    submit_success, PATIENT_TABS,
 )
 from blueprints.repositories import patients as patient_repo
 from blueprints.repositories import clinics as clinic_repo
@@ -276,7 +276,9 @@ def patient_detail(patient_id):
             linked = treatment_repo.by_appointment([highlight_visit]).get(highlight_visit, [])
             treatment_records += [t for t in linked
                                   if t['_id'] not in shown and t.get('patient_id') == patient['_id']]
-        active_tab = 'treatment' if request.args.get('tab') == 'treatment' else 'medical'
+        active_tab = request.args.get('tab')
+        if active_tab not in PATIENT_TABS:
+            active_tab = 'treatment' if highlight_visit else 'medical'
         patient_appointments = appt_repo.active_for_patient(patient_id, limit=10)
         prescriptions = uploads_repo.prescriptions_for_patient(patient_id)
         patient_files = uploads_repo.files_for_patient(patient_id)

@@ -559,7 +559,13 @@ async function cancelCurrentAppointment() {
     const btn = document.getElementById('cancelAppointmentBtn');
     const targetStatus = (btn && btn.dataset.targetStatus) || 'cancelled';
     const verb = targetStatus === 'cancelled' ? 'cancel' : 'reactivate';
-    if (!confirm(`Are you sure you want to ${verb} this appointment?`)) return;
+    const yes = await AppConfirm(
+        targetStatus === 'cancelled' ? 'Cancel this appointment?' : 'Reactivate this appointment?',
+        targetStatus === 'cancelled'
+            ? { title: 'Cancel appointment', confirmText: 'Yes, cancel it',
+                cancelText: 'Keep appointment', danger: true }
+            : { title: 'Reactivate appointment', confirmText: 'Reactivate' });
+    if (!yes) return;
     await setAppointmentStatus(
         editingId, targetStatus,
         targetStatus === 'cancelled' ? 'Appointment cancelled.' : 'Appointment reactivated.'
@@ -600,7 +606,7 @@ async function refreshCalendar() {
 }
 
 async function deleteAppointment(appointmentId) {
-    if (confirm('Are you sure you want to delete this appointment?')) {
+    if (await AppConfirm('Delete this appointment?', { title: 'Delete appointment', confirmText: 'Delete', danger: true })) {
         try {
             const response = await fetch(`${API_URL}/${appointmentId}`, { method: 'DELETE' });
             const data = await response.json();

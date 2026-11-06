@@ -113,7 +113,7 @@ def test_staff_price_pending_until_dentist_confirms(open_as, seeded, db):
     staff.page.fill("#amount_charged", "1234")
     staff.page.fill("#next_visit", "e2e-next-visit")
     staff.page.click("form[data-resilient-submit] button[type=submit]")
-    staff.page.wait_for_url(re.compile(_detail_path(seeded["patient"]) + "$"))
+    staff.page.wait_for_url(re.compile(_detail_path(seeded["patient"]) + r"\?tab=treatment"))
     t = db.treatment_records.find_one({"next_visit": "e2e-next-visit"})
     assert t["price_confirmed"] is False
 
@@ -144,7 +144,7 @@ def test_dropped_connection_on_treatment_add_saves_once(open_as, seeded, db):
         return route.continue_()
     s.page.route("**/treatments/add", flaky)
     s.page.click("form[data-resilient-submit] button[type=submit]")
-    s.page.wait_for_url(re.compile(_detail_path(seeded["patient"]) + "$"), timeout=20000)
+    s.page.wait_for_url(re.compile(_detail_path(seeded["patient"]) + r"\?tab=treatment"), timeout=20000)
     assert drops["n"] == 2
     assert db.treatment_records.count_documents({"next_visit": "e2e-dropped"}) == 1
 
@@ -300,7 +300,8 @@ def test_past_month_banner_and_no_show(open_as, seeded, db):
     s.page.wait_for_selector("#visitNoShowBtn", state="visible")
     with s.page.expect_response(lambda r: r.url.endswith(f"/appointments/api/{unmarked}")
                                 and r.request.method == "PUT") as resp:
-        s.page.click("#visitNoShowBtn")      # confirm() auto-accepted by the Session
+        s.page.click("#visitNoShowBtn")
+        s.confirm()
     assert resp.value.ok
     assert db.appointments.find_one({"_id": unmarked})["status"] == "no-show"
     s.page.wait_for_selector(f".appointment-banner.visit-cancelled[data-appointment-id='{unmarked}']")
@@ -335,6 +336,49 @@ def test_photo_file_and_prescription_uploads(open_as, seeded, db):
     assert db.prescriptions.count_documents({"description": "e2e amoxicillin 500mg"}) == 1
 
 
+# ── Confirm popup + staying on the tab ───────────────────────────────────────
+
+def test_delete_treatment_uses_app_popup_and_stays_on_tab(open_as, seeded, db):
+    p = seeded["patient"]
+    tid = db.treatment_records.insert_one({
+        "patient_id": p["_id"], "clinic_id": seeded["clinic"]["_id"], "date": "2026-01-02",
+        "procedure": "E2E Popup Test", "amount_charged": 100.0, "amount_paid": 100.0,
+        "balance": 0.0, "price_confirmed": True,
+    }).inserted_id
+    s = open_as("admin")
+    s.goto(_detail_path(p) + "?tab=treatment")
+    form = s.page.locator(f"form[action$='/treatments/{tid}/delete']")
+    form.locator("button").click()
+    assert "E2E Popup Test" in s.page.inner_text("#appConfirmModal")
+    s.confirm("Cancel")                                     # nothing happens
+    assert db.treatment_records.find_one({"_id": tid}) is not None
+
+    form.locator("button").click()
+    with s.page.expect_navigation():
+        s.confirm()
+    assert db.treatment_records.find_one({"_id": tid}) is None
+    assert "tab=treatment" in s.page.url
+    assert s.page.locator("#treatment-history.active").is_visible()
+
+
+def test_calendar_cancel_confirm_returns_to_the_booking(open_as, seeded, db):
+    appt = _insert_appt(db, seeded, "2099-04-01")
+    s = open_as("staff")
+    s.goto("/appointments")
+    s.page.evaluate("id => { currentDate = new Date(2099, 3, 1); return refreshCalendar(); }", str(appt))
+    s.page.locator(f"#weekView [data-appointment-id='{appt}']").click()
+    s.page.wait_for_selector("#appointmentModal.show")
+    s.page.click("#cancelAppointmentBtn")
+    s.confirm("Cancel")                       # back to the booking form, unchanged
+    s.page.wait_for_selector("#appointmentModal.show")
+    assert db.appointments.find_one({"_id": appt})["status"] == "scheduled"
+    s.page.click("#cancelAppointmentBtn")
+    with s.page.expect_response(lambda r: r.url.endswith(f"/appointments/api/{appt}")
+                                and r.request.method == "PUT"):
+        s.confirm()
+    assert db.appointments.find_one({"_id": appt})["status"] == "cancelled"
+
+
 # ── Deletion requests ────────────────────────────────────────────────────────
 
 def test_staff_requests_and_dentist_approves_deletion(open_as, seeded, db):
@@ -343,14 +387,16 @@ def test_staff_requests_and_dentist_approves_deletion(open_as, seeded, db):
     staff = open_as("staff")
     staff.goto(_detail_path(victim))
     staff.page.locator("form[action$='/deletions/request']:has(input[value='patient']) button").first.click()
-    staff.page.wait_for_load_state()
+    with staff.page.expect_navigation():
+        staff.confirm()
     req = db.deletion_requests.find_one({"entity_id": str(victim["_id"])})
     assert req["status"] == "pending"
 
     dentist = open_as("admin")
     dentist.goto("/deletions")
     dentist.page.locator(f"form[action$='/deletions/{req['_id']}/approve'] button").click()
-    dentist.page.wait_for_load_state()
+    with dentist.page.expect_navigation():
+        dentist.confirm()
     assert db.patients.find_one({"_id": victim["_id"]})["is_active"] is False
 
 

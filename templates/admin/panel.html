@@ -57,7 +57,7 @@
                                 {{ role_form(s.user) }}
                                 {{ active_form(s.user) }}
                                 <form method="POST" action="{{ url_for('admin.revoke_membership', membership_id=s.membership_id) }}"
-                                      onsubmit="return confirm('Unlink this staff member from {{ row.dentist.name }}?');">
+                                      data-confirm="Unlink this staff member from {{ row.dentist.name }}? They lose access to that dentist's clinics." data-confirm-title="Unlink staff" data-confirm-ok="Unlink" data-confirm-danger>
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">Unlink</button>
                                 </form>

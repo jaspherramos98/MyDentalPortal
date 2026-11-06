@@ -53,6 +53,30 @@ def submission_id(form):
     return value if _SUBMISSION_ID_RE.fullmatch(value) else None
 
 
+# Patient-page tabs: query value -> tab-pane element id (also the scroll anchor).
+PATIENT_TABS = {
+    'medical': 'medical-history', 'dental': 'dental-history',
+    'treatment': 'treatment-history', 'prescriptions': 'prescriptions',
+    'files': 'files', 'personal': 'personal-info',
+}
+
+
+def patient_url(patient_id, default_tab=None):
+    """The patient page, reopened on the tab an action came from.
+
+    Forms on the patient page send ``return_tab``; anything not in
+    PATIENT_TABS is ignored (falls back to ``default_tab``, then the page's
+    default tab) so the value can't inject into the URL.
+    """
+    tab = request.values.get('return_tab')
+    if tab not in PATIENT_TABS:
+        tab = default_tab if default_tab in PATIENT_TABS else None
+    if not tab:
+        return url_for('patients.patient_detail', patient_id=str(patient_id))
+    return url_for('patients.patient_detail', patient_id=str(patient_id),
+                   tab=tab, _anchor=PATIENT_TABS[tab])
+
+
 def submit_success(url):
     """Success outcome of a form save: a redirect for plain posts, explicit JSON
     for the resilient-submit client (to fetch(), a redirect is ambiguous — the

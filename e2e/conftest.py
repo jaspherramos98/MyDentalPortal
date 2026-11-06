@@ -127,7 +127,20 @@ class Session:
         page.on("pageerror", lambda e: self.errors.append(f"{page.url}: {e}"))
         page.on("console", lambda m: self.errors.append(f"{page.url}: {m.text}")
                 if m.type == "error" and "Failed to load resource" not in m.text else None)
-        page.on("dialog", lambda d: d.accept())       # confirm() on delete etc.
+        # The app has its own confirm popup (confirm-dialog.js); a native browser
+        # dialog means a regression, so it's recorded as an error (fails the test).
+        page.on("dialog", self._native_dialog)
+
+    def _native_dialog(self, dialog):
+        self.errors.append(f"{self.page.url}: native {dialog.type}() dialog: {dialog.message}")
+        dialog.dismiss()
+
+    def confirm(self, button="OK"):
+        """Answer the app's confirm popup (OK or Cancel) once it's on screen."""
+        modal = self.page.locator("#appConfirmModal.show")
+        modal.wait_for()
+        modal.locator("#appConfirmOk" if button == "OK" else "#appConfirmCancel").click()
+        self.page.locator("#appConfirmModal").wait_for(state="hidden")
 
     def goto(self, path):
         return self.page.goto(BASE_URL + path)

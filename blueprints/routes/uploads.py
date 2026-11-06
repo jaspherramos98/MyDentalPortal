@@ -25,6 +25,7 @@ from PIL import Image
 from blueprints.utils import (
     login_required, verify_patient_access as _verify_patient_access,
     role_required, ROLE_DENTIST, audit, submission_id as _submission_id, submit_success,
+    patient_url,
 )
 from blueprints.utils.images import shrink_image, PHOTO_MAX_SIDE, DOCUMENT_MAX_SIDE
 from blueprints.repositories import uploads as uploads_repo
@@ -125,14 +126,14 @@ def set_photo(patient_id):
     upload = request.files.get('photo')
     if not upload or not upload.filename:
         flash('Choose an image to upload.', 'error')
-        return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+        return redirect(patient_url(patient_id))
 
     ext = _ext(upload.filename)
     data = upload.read()
     ok, err = _validate(data, ext, IMAGE_EXTS)
     if not ok:
         flash(f'{err} Allowed image types: {IMAGE_EXTS_LABEL}.', 'error')
-        return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+        return redirect(patient_url(patient_id))
     data = shrink_image(data, ext, PHOTO_MAX_SIDE)
 
     # Replace any existing photo (delete the old GridFS blob first).
@@ -145,7 +146,7 @@ def set_photo(patient_id):
     })
     audit('update', 'photo', patient_id, clinic=clinic)
     flash('Patient photo updated.', 'success')
-    return submit_success(url_for('patients.patient_detail', patient_id=patient_id))
+    return submit_success(patient_url(patient_id))
 
 
 @uploads_bp.route('/patients/<patient_id>/photo')
@@ -188,7 +189,7 @@ def delete_photo(patient_id):
     patient_repo.unset(patient_id, ['photo_file_id', 'photo_ext', 'photo_content_type'])
     audit('delete', 'photo', patient_id, clinic=clinic)
     flash('Patient photo removed.', 'success')
-    return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+    return redirect(patient_url(patient_id))
 
 
 # ── PRESCRIPTIONS ────────────────────────────────────────────────────────────
@@ -205,9 +206,9 @@ def add_prescription(patient_id):
 
     if not description and not (upload and upload.filename):
         flash('Add a description or an image for the prescription.', 'error')
-        return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+        return redirect(patient_url(patient_id))
 
-    detail_url = url_for('patients.patient_detail', patient_id=patient_id)
+    detail_url = patient_url(patient_id)
     sid = _submission_id(request.form)
     # Retry of a save that already went through: don't store the image again.
     if submissions_repo.find('prescriptions', sid, session['user_id']):
@@ -230,7 +231,7 @@ def add_prescription(patient_id):
         ok, err = _validate(data, ext, IMAGE_EXTS)
         if not ok:
             flash(f'{err} Allowed image types: {IMAGE_EXTS_LABEL}.', 'error')
-            return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+            return redirect(patient_url(patient_id))
         data = shrink_image(data, ext, DOCUMENT_MAX_SIDE)
         doc['image_file_id'] = _store(data, upload.filename, ext)
         doc['image_name'] = secure_filename(upload.filename)
@@ -283,8 +284,7 @@ def delete_prescription(prescription_id):
             uploads_repo.delete_prescription(pres['_id'])
             audit('delete', 'prescription', prescription_id, clinic=clinic)
             flash('Prescription deleted.', 'success')
-            return redirect(url_for('patients.patient_detail',
-                                    patient_id=str(pres['patient_id'])))
+            return redirect(patient_url(str(pres['patient_id'])))
     flash('Access denied or prescription not found', 'error')
     return redirect(url_for('patients.list_patients'))
 
@@ -301,9 +301,9 @@ def add_file(patient_id):
     upload = request.files.get('file')
     if not upload or not upload.filename:
         flash('Choose a file to upload.', 'error')
-        return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+        return redirect(patient_url(patient_id))
 
-    detail_url = url_for('patients.patient_detail', patient_id=patient_id)
+    detail_url = patient_url(patient_id)
     sid = _submission_id(request.form)
     # Retry of an upload that already went through: don't store the file again.
     if submissions_repo.find('patient_files', sid, session['user_id']):
@@ -315,7 +315,7 @@ def add_file(patient_id):
     ok, err = _validate(data, ext, FILE_EXTS)
     if not ok:
         flash(f'{err} Allowed types: {FILE_EXTS_LABEL}.', 'error')
-        return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+        return redirect(patient_url(patient_id))
     # Attachments are stored EXACTLY as uploaded — never resized or re-encoded.
     # They include X-rays, where lossy compression or downscaling can erase the
     # fine detail a diagnosis depends on.
@@ -389,8 +389,7 @@ def rename_file(file_doc_id):
                 flash('File renamed.', 'success')
             else:
                 flash('New name cannot be empty.', 'error')
-            return redirect(url_for('patients.patient_detail',
-                                    patient_id=str(meta['patient_id'])))
+            return redirect(patient_url(str(meta['patient_id'])))
     flash('Access denied or file not found', 'error')
     return redirect(url_for('patients.list_patients'))
 
@@ -406,7 +405,6 @@ def delete_file(file_doc_id):
             uploads_repo.delete_file(meta['_id'])
             audit('delete', 'file', file_doc_id, clinic=clinic)
             flash('File deleted.', 'success')
-            return redirect(url_for('patients.patient_detail',
-                                    patient_id=str(meta['patient_id'])))
+            return redirect(patient_url(str(meta['patient_id'])))
     flash('Access denied or file not found', 'error')
     return redirect(url_for('patients.list_patients'))

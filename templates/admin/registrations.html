@@ -44,7 +44,7 @@
                             </form>
                             <form method="POST" class="d-inline"
                                   action="{{ url_for('admin.reject', user_id=u._id) }}"
-                                  onsubmit="return confirm('Reject this registration?');">
+                                  data-confirm="Reject this registration?" data-confirm-title="Reject registration" data-confirm-ok="Reject" data-confirm-danger>
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-outline-danger">
                                     <i class="fas fa-times"></i> Reject

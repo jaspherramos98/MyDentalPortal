@@ -13,13 +13,17 @@ document.addEventListener('DOMContentLoaded', function () {
     form.addEventListener('change', markDirty);
 
     // Reset flags each time the modal opens.
+    // (A confirm popup briefly swaps the modal out — data-confirm-swap — which
+    // is not a real open/close: keep the edits and stay quiet.)
     modalEl.addEventListener('shown.bs.modal', function () {
+        if (modalEl.dataset.confirmSwap) return;
         apptModalDirty = false;
         apptModalSaved = false;
     });
 
     // If it closes with edits and nothing was saved, say so plainly.
     modalEl.addEventListener('hidden.bs.modal', function () {
+        if (modalEl.dataset.confirmSwap) return;
         if (apptModalDirty && !apptModalSaved) {
             showNotification('Appointment was not saved — your changes were discarded.', 'warning');
         }

@@ -28,7 +28,7 @@
                         <td class="text-end">
                             <div class="d-inline-flex gap-2">
                                 <form method="POST" action="{{ url_for('deletions.approve', request_id=r._id) }}"
-                                      onsubmit="return confirm('Approve and permanently apply this deletion?');">
+                                      data-confirm="Approve and permanently apply this deletion? This can't be undone." data-confirm-title="Approve deletion" data-confirm-ok="Approve" data-confirm-danger>
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-sm btn-danger">Approve</button>
                                 </form>
