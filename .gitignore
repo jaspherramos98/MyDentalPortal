@@ -34,3 +34,7 @@ backups/
 
 # E2E browser run log (local only)
 e2e/server.log
+
+# Backup encryption: public key is machine-specific (not secret). The PRIVATE key must never be here.
+.backup-public-key.pem
+*PRIVATE-KEY*.pem

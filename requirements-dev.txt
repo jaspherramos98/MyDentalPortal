@@ -7,3 +7,5 @@ pytest==9.0.3
 mongomock==4.3.0
 # Lint gate in CI: flags unused imports/variables and undefined names. No deps.
 pyflakes==4.0.0
+# Ops: encrypts local prod backups (scripts/backup_crypto.py). Dev/ops only.
+cryptography==50.0.1

@@ -26,6 +26,7 @@ Exit code 0 on success, non-zero on any error or verification mismatch.
 """
 
 import argparse
+import io
 import json
 import os
 import sys
@@ -37,10 +38,22 @@ from bson import json_util
 from pymongo import MongoClient
 
 
-def _load_backup_dir(path):
-    """Return (dir_path, cleanup_fn). Accepts a .zip or an unzipped folder."""
+def _load_backup_dir(path, key_path=None):
+    """Return (dir_path, cleanup_fn). Accepts a .zip, an unzipped folder, or an
+    encrypted .zip.enc (needs --key: the backup PRIVATE key; see backup_crypto.py)."""
     if os.path.isdir(path):
         return path, (lambda: None)
+    if path.endswith('.enc'):
+        if not key_path:
+            raise SystemExit('ERROR: encrypted backup — pass --key <backup private key .pem>.')
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from backup_crypto import decrypt_bytes
+        with open(path, 'rb') as fh, open(key_path, 'rb') as kh:
+            plain = decrypt_bytes(fh.read(), kh.read())
+        tmp = tempfile.mkdtemp(prefix='restore-')
+        with zipfile.ZipFile(io.BytesIO(plain)) as zf:
+            zf.extractall(tmp)
+        return tmp, (lambda: shutil.rmtree(tmp, ignore_errors=True))
     if zipfile.is_zipfile(path):
         tmp = tempfile.mkdtemp(prefix='restore-')
         with zipfile.ZipFile(path) as zf:
@@ -50,7 +63,7 @@ def _load_backup_dir(path):
 
 
 def _restore(args):
-    backup_dir, cleanup = _load_backup_dir(args.backup)
+    backup_dir, cleanup = _load_backup_dir(args.backup, args.key)
     try:
         client = MongoClient(args.uri, serverSelectionTimeoutMS=15000)
         db = client.get_default_database()
@@ -130,6 +143,8 @@ def main():
                         help='Drop each collection before restoring (clean restore).')
     parser.add_argument('--yes', action='store_true',
                         help='Proceed without the confirmation gate (non-interactive).')
+    parser.add_argument('--key',
+                        help='Backup PRIVATE key (.pem) — required for an encrypted .zip.enc.')
     parser.add_argument('--allow-prod', action='store_true',
                         help='Permit a prod-looking target DB (genuine recovery only).')
     return _restore(parser.parse_args())
