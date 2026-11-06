@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% set active_nav = 'appointments' %}
+{% block title %}Visit History{% endblock %}
+
+{% macro visit_icon(visit) -%}
+    {%- if visit.state == 'done' -%}
+        <i class="fas fa-circle-check text-success" aria-hidden="true"></i>
+    {%- elif visit.state == 'cancelled' -%}
+        <i class="fas fa-circle-xmark text-danger" aria-hidden="true"></i>
+    {%- elif visit.state == 'attention' -%}
+        <i class="fas fa-circle-exclamation visit-attention-icon" aria-hidden="true"></i>
+    {%- else -%}
+        <i class="far fa-clock text-secondary" aria-hidden="true"></i>
+    {%- endif -%}
+{%- endmacro %}
+
+{% block extra_css %}
+<style>
+    .visit-attention-icon { color: #fd7e14; }
+    .visit-history-table td { vertical-align: middle; }
+    .visit-history-table .visit-reasons { color: #b35900; }
+    /* Phones: each visit becomes a stacked card (label left, value right) so the
+       amounts and status are on screen instead of behind a sideways scroll. */
+    @media (max-width: 767.98px) {
+        .visit-history-table thead { display: none; }
+        .visit-history-table tr { display: block; padding: 8px 12px; border-bottom: 1px solid #dee2e6; }
+        .visit-history-table td {
+            display: flex; justify-content: space-between; gap: 12px;
+            border: 0; padding: 3px 0; text-align: right !important;
+        }
+        .visit-history-table td::before {
+            content: attr(data-label); color: #6c757d; font-size: 0.8rem; text-align: left;
+        }
+        .visit-history-table td.visit-icon-cell { display: none; }
+        .visit-history-table td.visit-patient-cell { font-weight: 600; font-size: 1rem; justify-content: flex-start; text-align: left !important; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h4 class="mb-0"><i class="fas fa-list-check me-2"></i>Visit History</h4>
+        <div class="btn-group" role="group" aria-label="Appointments view">
+            <a class="btn btn-outline-primary" href="{{ url_for('appointments.appointments') }}">
+                <i class="fas fa-calendar-week"></i> Calendar
+            </a>
+            <a class="btn btn-primary" aria-current="page" href="{{ url_for('appointments.history') }}">
+                <i class="fas fa-list"></i> List
+            </a>
+        </div>
+    </div>
+
+    <form method="GET" class="card card-body mb-3" id="visit-history-filters">
+        <div class="row g-2 align-items-end">
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1" for="start">From</label>
+                <input type="date" class="form-control form-control-sm" id="start" name="start" value="{{ filters.start }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1" for="end">To</label>
+                <input type="date" class="form-control form-control-sm" id="end" name="end" value="{{ filters.end }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1" for="status">Status</label>
+                <select class="form-select form-select-sm" id="status" name="status">
+                    {% for value, label in [('', 'All'), ('attention', 'Needs attention'), ('completed', 'Completed'),
+                                            ('cancelled', 'Cancelled'), ('no-show', 'No-show'), ('scheduled', 'Scheduled')] %}
+                    <option value="{{ value }}"{{ ' selected' if filters.status == value }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if clinics|length > 1 %}
+            <div class="col-6 col-md-2">
+                <label class="form-label small mb-1" for="clinic_id">Clinic</label>
+                <select class="form-select form-select-sm" id="clinic_id" name="clinic_id">
+                    <option value="">All clinics</option>
+                    {% for c in clinics %}
+                    <option value="{{ c._id }}"{{ ' selected' if filters.clinic_id == c._id|string }}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="col-12 col-md">
+                <label class="form-label small mb-1" for="q">Patient</label>
+                <input type="search" class="form-control form-control-sm" id="q" name="q" maxlength="100"
+                       value="{{ filters.q }}" placeholder="Search by name">
+            </div>
+            <div class="col-12 col-md-auto">
+                <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-filter"></i> Apply</button>
+            </div>
+        </div>
+    </form>
+
+    <p class="text-muted small mb-2">
+        {{ total }} visit{{ '' if total == 1 else 's' }} ·
+        <i class="fas fa-circle-check text-success"></i> done
+        <i class="fas fa-circle-xmark text-danger ms-2"></i> cancelled / no-show
+        <i class="fas fa-circle-exclamation visit-attention-icon ms-2"></i> needs attention
+    </p>
+
+    <div class="card">
+        <div class="card-body p-0">
+            {% if rows %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 visit-history-table" id="visit-history-table">
+                    <thead>
+                        <tr>
+                            <th></th><th>Date</th><th>Patient</th><th>Procedure</th>
+                            <th class="text-end">Charged</th><th class="text-end">Balance</th>
+                            <th>Status</th>{% if clinics|length > 1 %}<th>Clinic</th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}
+                        {% set a, v = row.appt, row.visit %}
+                        <tr data-visit-state="{{ v.state }}">
+                            <td class="text-center visit-icon-cell">{{ visit_icon(v) }}</td>
+                            <td class="text-nowrap small" data-label="Date">{{ a.date | datefmt('%b %d, %Y') }}<br><span class="text-muted">{{ a.time }}</span></td>
+                            <td class="visit-patient-cell" data-label="">
+                                <span>
+                                    <span class="d-md-none me-1">{{ visit_icon(v) }}</span>
+                                    {% if row.url %}<a href="{{ row.url }}">{{ a.patient_name }}</a>{% else %}{{ a.patient_name }}{% endif %}
+                                </span>
+                            </td>
+                            <td class="small" data-label="Procedure">{{ v.procedures|join(', ') if v.procedures else '—' }}</td>
+                            <td class="text-end text-nowrap small" data-label="Charged">
+                                {% if v.procedures %}{{ row.currency }} {{ '%.2f'|format(v.charged) }}{% else %}—{% endif %}
+                            </td>
+                            <td class="text-end text-nowrap small{{ ' text-danger fw-semibold' if v.balance > 0 }}" data-label="Balance">
+                                {% if v.procedures %}{{ row.currency }} {{ '%.2f'|format(v.balance) }}{% else %}—{% endif %}
+                            </td>
+                            <td class="small" data-label="Status">
+                                <span>{{ v.status_label }}
+                                {% if v.reasons %}<br><span class="visit-reasons">{{ v.reasons|join(' · ') }}</span>{% endif %}</span>
+                            </td>
+                            {% if clinics|length > 1 %}<td class="small" data-label="Clinic">{{ row.clinic_name }}</td>{% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-3 text-muted">No visits match these filters.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if pages > 1 %}
+    <nav class="mt-3" aria-label="Visit history pages">
+        <ul class="pagination pagination-sm justify-content-center flex-wrap">
+            <li class="page-item{{ ' disabled' if page <= 1 }}">
+                <a class="page-link" href="{{ url_for('appointments.history', page=page - 1, **filters) }}">Previous</a>
+            </li>
+            <li class="page-item disabled"><span class="page-link">Page {{ page }} of {{ pages }}</span></li>
+            <li class="page-item{{ ' disabled' if page >= pages }}">
+                <a class="page-link" href="{{ url_for('appointments.history', page=page + 1, **filters) }}">Next</a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

@@ -48,6 +48,25 @@ def find_pending_prices(clinic_ids=None):
     return list(mongo.db.treatment_records.find(query).sort('date', -1))
 
 
+def by_appointment(appointment_ids):
+    """Treatments linked to the given appointments (``appointment_id``), grouped
+    as ``{appointment_id_str: [treatment, ...]}``. One query for a whole
+    calendar range / list page. Appointments with no treatments are absent;
+    malformed ids (e.g. from a query string) are skipped, not raised."""
+    ids = []
+    for a in appointment_ids:
+        try:
+            ids.append(a if isinstance(a, ObjectId) else ObjectId(a))
+        except (InvalidId, TypeError):
+            continue
+    grouped = {}
+    if not ids:
+        return grouped
+    for t in mongo.db.treatment_records.find({'appointment_id': {'$in': ids}}).sort('created_at', 1):
+        grouped.setdefault(str(t['appointment_id']), []).append(t)
+    return grouped
+
+
 def insert(doc):
     """Insert a treatment document; return the new _id (str)."""
     return str(mongo.db.treatment_records.insert_one(doc).inserted_id)

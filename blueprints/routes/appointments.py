@@ -2,10 +2,11 @@
 # Appointment management routes — calendar + CRUD API
 
 import logging
+import re
 
 from flask import (
     Blueprint, render_template, request, jsonify,
-    session, redirect, url_for, flash,
+    session, redirect, url_for, flash, current_app,
 )
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta
@@ -16,7 +17,9 @@ from blueprints.utils import (
 from blueprints.repositories import appointments as appt_repo
 from blueprints.repositories import clinics as clinic_repo
 from blueprints.repositories import patients as patient_repo
-from blueprints.clock import utcnow
+from blueprints.repositories import treatments as treatment_repo
+from blueprints.clock import utcnow, clinic_today
+from blueprints import visits
 
 appointments_bp = Blueprint('appointments', __name__)
 log = logging.getLogger(__name__)
@@ -26,19 +29,48 @@ ALLOWED_TYPES = {
     'checkup', 'cleaning', 'filling', 'extraction',
     'emergency', 'follow-up', 'surgery', 'orthodontic', 'others',
 }
-ALLOWED_STATUSES = {'scheduled', 'cancelled', 'completed', 'no-show'}
+# Statuses the calendar may set directly. `completed` is only reached through
+# "Complete visit" (saving a treatment linked to the appointment), so a visit is
+# never marked done without the record of what was done.
+SETTABLE_STATUSES = {'scheduled', 'cancelled', 'no-show'}
+STATUS_AUDIT_ACTIONS = {'cancelled': 'cancel', 'no-show': 'no_show', 'scheduled': 'reopen'}
+
+HISTORY_PAGE_SIZE = 50
+HISTORY_DEFAULT_DAYS = 30
+HISTORY_MAX_DAYS = 366       # bounds one list query (filtered/paginated in Python)
+HISTORY_STATUS_FILTERS = {
+    # filter value -> statuses fetched from the DB (attention is narrowed after)
+    '': None,
+    'completed': ['completed'],
+    'cancelled': ['cancelled'],
+    'no-show': ['no-show'],
+    'scheduled': ['scheduled'],
+    'attention': ['scheduled', 'completed'],
+}
 ALLOWED_PRIORITIES = {'normal', 'high', 'urgent'}
 
 
 def _today_str():
     """Today's date as 'YYYY-MM-DD' in the clinic's timezone (for date bounds)."""
-    try:
-        from zoneinfo import ZoneInfo
-        from flask import current_app
-        tz = ZoneInfo(current_app.config.get('TIMEZONE', 'Asia/Manila'))
-        return datetime.now(tz).strftime('%Y-%m-%d')
-    except Exception:
-        return datetime.now().strftime('%Y-%m-%d')
+    return clinic_today(current_app.config.get('TIMEZONE', 'Asia/Manila'))
+
+
+def _visit_url(appt):
+    """Where a finished visit's banner/row leads: the patient's Treatment tab
+    with this visit's records highlighted. None when no patient is linked."""
+    if not appt.get('patient_id'):
+        return None
+    return url_for('patients.patient_detail', patient_id=str(appt['patient_id']),
+                   tab='treatment', visit=str(appt['_id']), _anchor='treatment-history')
+
+
+def _visits_for(appts, today):
+    """``{appointment_id_str: Visit}`` for a batch, with one treatment query."""
+    linked = treatment_repo.by_appointment([a['_id'] for a in appts])
+    return {
+        str(a['_id']): visits.summarize(a, linked.get(str(a['_id']), []), today)
+        for a in appts
+    }
 
 
 def _to_minutes(time_str):
@@ -127,8 +159,11 @@ def get_appointments():
             start, end = ws.strftime('%Y-%m-%d'), we.strftime('%Y-%m-%d')
 
         appts = appt_repo.find_in_range(clinic_ids, start, end)
+        today = _today_str()
+        visit_by_id = _visits_for(appts, today)
         out = []
         for a in appts:
+            visit = visit_by_id[str(a['_id'])]
             out.append({
                 'id': str(a['_id']),
                 'clinic_id': str(a['clinic_id']),
@@ -141,8 +176,21 @@ def get_appointments():
                 'priority': a.get('priority', 'normal'),
                 'status': a.get('status', 'scheduled'),
                 'notes': a.get('notes', ''),
+                # Visit outcome for the calendar banner. Amounts are deliberately
+                # NOT sent: the calendar may face patients (owner decision), so
+                # they live in the list view only.
+                'visit': {
+                    'state': visit.state,
+                    'status_label': visit.status_label,
+                    'reasons': visit.reasons,
+                    'procedures': visit.procedures,
+                    'url': _visit_url(a),
+                },
+                'can_complete': (a.get('status', 'scheduled') in ('scheduled', 'completed')
+                                 and a['date'] <= today),
             })
-        return jsonify({'success': True, 'appointments': out, 'total': len(out)})
+        return jsonify({'success': True, 'appointments': out, 'total': len(out),
+                        'today': today})
     except Exception:
         log.exception("Get appointments failed")
         return jsonify({'success': False, 'error': 'Could not load appointments.'}), 500
@@ -245,8 +293,12 @@ def update_appointment(appt_id):
         # Validate client-supplied enums before persisting.
         if 'type' in data and data['type'] not in ALLOWED_TYPES:
             return jsonify({'success': False, 'error': 'Invalid appointment type'}), 400
-        if 'status' in data and data['status'] not in ALLOWED_STATUSES:
-            return jsonify({'success': False, 'error': 'Invalid status'}), 400
+        new_status = data.get('status')
+        status_changes = new_status is not None and new_status != appt.get('status', 'scheduled')
+        if status_changes:
+            error = _status_change_error(appt, new_status)
+            if error:
+                return jsonify({'success': False, 'error': error}), 400
         if 'priority' in data and data['priority'] not in ALLOWED_PRIORITIES:
             return jsonify({'success': False, 'error': 'Invalid priority'}), 400
 
@@ -262,12 +314,133 @@ def update_appointment(appt_id):
                 update[field] = val
 
         appt_repo.update_set(appt_id, update)
-        action = 'cancel' if data.get('status') == 'cancelled' else 'update'
+        action = STATUS_AUDIT_ACTIONS.get(new_status, 'update') if status_changes else 'update'
         audit(action, 'appointment', appt_id, clinic=clinic)
         return jsonify({'success': True, 'message': 'Updated'})
     except Exception:
         log.exception("Update appointment failed")
         return jsonify({'success': False, 'error': 'Update failed'}), 500
+
+
+def _status_change_error(appt, new_status):
+    """Why `appt` may not move to `new_status` (None = allowed)."""
+    if new_status not in SETTABLE_STATUSES:
+        return 'Invalid status'
+    if new_status == 'no-show' and appt['date'] > _today_str():
+        return "A future appointment can't be a no-show."
+    if appt.get('status') == 'completed' and treatment_repo.by_appointment([appt['_id']]):
+        return 'This visit has treatment records. Edit those instead.'
+    return None
+
+
+# ── Complete visit -> Add Treatment linked to this appointment ───────────
+@appointments_bp.route('/appointments/<appt_id>/complete')
+@login_required
+def complete_visit(appt_id):
+    """Send the user to Add Treatment for the appointment's patient with the
+    appointment attached. Saving that treatment marks the visit completed
+    (treatments.add_treatment re-validates everything; this only routes).
+    A typed-in walk-in has no patient yet: the calendar passes ``?patient_id=``
+    picked from the clinic's patients."""
+    appt = appt_repo.get(appt_id)
+    clinic = None
+    if appt and appt.get('is_active'):
+        clinic = clinic_repo.get_accessible(appt['clinic_id'], session['user_id'])
+    if not clinic:
+        flash('Appointment not found', 'error')
+        return redirect(url_for('appointments.appointments'))
+    if appt.get('status', 'scheduled') not in ('scheduled', 'completed'):
+        flash('Only scheduled or completed visits can have treatments added.', 'warning')
+        return redirect(url_for('appointments.appointments'))
+    if appt['date'] > _today_str():
+        flash("A future appointment can't be completed yet.", 'warning')
+        return redirect(url_for('appointments.appointments'))
+
+    patient_id = appt.get('patient_id') or request.args.get('patient_id')
+    if not patient_id:
+        flash('Pick which registered patient this visit was for.', 'warning')
+        return redirect(url_for('appointments.appointments'))
+    return redirect(url_for('treatments.add_treatment', patient_id=str(patient_id),
+                            appointment_id=str(appt['_id'])))
+
+
+# ── Visit history (list view) ────────────────────────────────────────────
+def _parse_day(value):
+    try:
+        return datetime.strptime(value or '', '%Y-%m-%d').date()
+    except ValueError:
+        return None
+
+
+def _history_range(args, today):
+    """(start, end) 'YYYY-MM-DD' from the query string; defaults to the last
+    HISTORY_DEFAULT_DAYS, swapped if reversed, capped at HISTORY_MAX_DAYS."""
+    end = _parse_day(args.get('end')) or _parse_day(today)
+    start = _parse_day(args.get('start')) or (end - timedelta(days=HISTORY_DEFAULT_DAYS))
+    if start > end:
+        start, end = end, start
+    if (end - start).days > HISTORY_MAX_DAYS:
+        start = end - timedelta(days=HISTORY_MAX_DAYS)
+    return start.isoformat(), end.isoformat()
+
+
+def _page_number(value):
+    try:
+        return max(int(value), 1)
+    except (TypeError, ValueError):
+        return 1
+
+
+@appointments_bp.route('/appointments/history')
+@login_required
+def history():
+    """Visit history: appointments in a date range as a filterable list with
+    procedures and amounts. Read-only; scoped to the user's accessible clinics
+    (a ?clinic_id= filter can only narrow that scope)."""
+    try:
+        user_clinics = clinic_repo.accessible_active(session['user_id'])
+        clinics_by_id = {c['_id']: c for c in user_clinics}
+        today = _today_str()
+        start, end = _history_range(request.args, today)
+        status_filter = request.args.get('status', '')
+        if status_filter not in HISTORY_STATUS_FILTERS:
+            status_filter = ''
+        query = (request.args.get('q') or '').strip()[:100]
+        clinic_ids = scoped_clinic_ids(request.args.get('clinic_id'))
+
+        appts = []
+        if clinic_ids:
+            appts = appt_repo.find_history(
+                clinic_ids, start, end,
+                statuses=HISTORY_STATUS_FILTERS[status_filter],
+                name_pattern=re.escape(query) if query else None,
+            )
+        visit_by_id = _visits_for(appts, today)
+        rows = []
+        for a in appts:
+            visit = visit_by_id[str(a['_id'])]
+            if status_filter == 'attention' and visit.state != visits.STATE_ATTENTION:
+                continue
+            clinic = clinics_by_id.get(a['clinic_id'], {})
+            rows.append({'appt': a, 'visit': visit, 'url': _visit_url(a),
+                         'clinic_name': clinic.get('name', ''),
+                         'currency': clinic.get('currency', 'PHP')})
+
+        pages = max((len(rows) + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE, 1)
+        page = min(_page_number(request.args.get('page')), pages)
+        page_rows = rows[(page - 1) * HISTORY_PAGE_SIZE: page * HISTORY_PAGE_SIZE]
+
+        filters = {'start': start, 'end': end, 'status': status_filter, 'q': query,
+                   'clinic_id': request.args.get('clinic_id', '')}
+        return render_template(
+            'appointments/history.html',
+            rows=page_rows, total=len(rows), page=page, pages=pages,
+            filters=filters, clinics=user_clinics,
+        )
+    except Exception:
+        log.exception("Visit history failed")
+        flash('Could not load visit history.', 'error')
+        return redirect(url_for('appointments.appointments'))
 
 
 # ── API: delete ──────────────────────────────────────────────────────────

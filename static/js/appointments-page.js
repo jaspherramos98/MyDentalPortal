@@ -32,14 +32,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Fetch real appointments from backend API
+// Fetch appointments for the previous, current and next month around the date
+// being viewed — wide enough for any week or 6-week month grid on screen.
+// Local-date formatting (not toISOString, which is UTC and is "yesterday" in
+// Manila until 8 AM).
 async function loadAppointmentsFromAPI() {
     try {
-        const today = new Date();
-        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 2, 0);
-        const start = startOfMonth.toISOString().split('T')[0];
-        const end = endOfMonth.toISOString().split('T')[0];
+        const start = formatDateForStorage(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+        const end = formatDateForStorage(new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 0));
 
         let url = `${API_URL}?start_date=${start}&end_date=${end}`;
         if (currentClinic) url += `&clinic_id=${currentClinic}`;
@@ -59,7 +59,9 @@ async function loadAppointmentsFromAPI() {
                 type: a.type || 'checkup',
                 priority: a.priority || 'normal',
                 notes: a.notes || '',
-                status: a.status || 'scheduled'
+                status: a.status || 'scheduled',
+                visit: a.visit || { state: 'upcoming', reasons: [], procedures: [] },
+                canComplete: !!a.can_complete
             }));
         } else {
             appointments = [];
@@ -218,7 +220,55 @@ function createMonthDayElement(date) {
     return day;
 }
 
+// Visit-state icons for finished/past visits (shared with the legend).
+const VISIT_ICONS = {
+    done: { icon: 'fa-circle-check', label: 'Done' },
+    cancelled: { icon: 'fa-circle-xmark', label: 'Cancelled / no-show' },
+    attention: { icon: 'fa-circle-exclamation', label: 'Needs attention' },
+};
+
+// Compact one-line banner: "Name | Procedure" + state icon. No amounts — the
+// calendar may face patients; amounts live in the list view. All user-derived
+// text goes in via textContent (DOM-XSS safe).
+function createVisitBanner(appointment) {
+    const visit = appointment.visit;
+    const meta = VISIT_ICONS[visit.state] || VISIT_ICONS.attention;
+    const banner = document.createElement('div');
+    banner.className = `appointment-card appointment-banner ${appointment.type} visit-${visit.state}`;
+    banner.dataset.appointmentId = appointment.id;
+    banner.dataset.clinicId = appointment.clinicId;
+    banner.dataset.visitState = visit.state;
+
+    const detail = visit.procedures.length
+        ? visit.procedures.join(', ')
+        : (visit.reasons[0] || visit.status_label);
+    const text = document.createElement('span');
+    text.className = 'banner-text';
+    text.textContent = `${appointment.patientName} | ${detail}`;
+
+    const icon = document.createElement('i');
+    icon.className = `fas ${meta.icon} banner-icon`;
+    icon.setAttribute('aria-hidden', 'true');
+
+    const why = [visit.status_label, ...visit.reasons].join(' · ');
+    banner.title = `${formatTimeRange(appointment.time, appointment.duration)} — ${why}`;
+    banner.setAttribute('aria-label', `${appointment.patientName}: ${why}`);
+    banner.append(text, icon);
+
+    // Completed visit -> its treatment records (read view, not the edit form).
+    // Anything else (cancelled, no-show, not marked) -> the modal's actions.
+    banner.addEventListener('click', () => {
+        if (appointment.status === 'completed' && visit.url) {
+            window.location.href = visit.url;
+        } else {
+            editAppointment(appointment);
+        }
+    });
+    return banner;
+}
+
 function createAppointmentElement(appointment) {
+    if (appointment.visit.state !== 'upcoming') return createVisitBanner(appointment);
     const apt = document.createElement('div');
     apt.className = `appointment-card ${appointment.type}`;
     if (appointment.status === 'cancelled') apt.classList.add('cancelled');
@@ -269,7 +319,7 @@ function createAppointmentElement(appointment) {
 }
 
 function setupDragAndDrop() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatDateForStorage(new Date());
     // Setup draggable patients (desktop) + tap-to-add (mobile/touch,
     // where HTML5 drag-and-drop doesn't fire). A plain click doesn't
     // fire after a real drag, so desktop dragging is unaffected.
@@ -372,6 +422,7 @@ function showAppointmentModal(patient, date) {
     document.getElementById('appointmentForm').dataset.selectedDate = date;
     document.getElementById('appointmentForm').dataset.editingId = '';
     hideCancelButton();
+    hideVisitActions();
 
     modal.show();
 }
@@ -469,15 +520,101 @@ function editAppointment(appointment) {
 
     // Show + configure the Cancel/Reactivate button for existing appointments
     configureCancelButton(appointment.status);
+    configureVisitActions(appointment);
 
     modal.show();
 }
 
+// The visit-outcome panel at the top of the modal (hidden for upcoming visits).
+function configureVisitActions(appointment) {
+    const panel = document.getElementById('visitActions');
+    if (!panel) return;
+    const visit = appointment.visit;
+    const showPanel = appointment.canComplete || visit.state !== 'upcoming';
+    panel.style.display = showPanel ? 'block' : 'none';
+    if (!showPanel) return;
+
+    document.getElementById('visitStatusText').textContent =
+        [visit.status_label, ...visit.reasons].join(' · ');
+
+    // Walk-in booked by typed name: pick which registered patient it was.
+    const picker = document.getElementById('visitPatientPicker');
+    const select = document.getElementById('visitPatientSelect');
+    const needsPatient = appointment.canComplete && !appointment.patientId;
+    picker.style.display = needsPatient ? 'block' : 'none';
+    if (needsPatient) {
+        select.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Select patient';
+        select.appendChild(placeholder);
+        dbPatients
+            .filter(p => p.clinic_id === appointment.clinicId)
+            .forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                if (p.name === appointment.patientName) opt.selected = true;
+                select.appendChild(opt);
+            });
+    }
+
+    const completeBtn = document.getElementById('completeVisitBtn');
+    completeBtn.style.display = appointment.canComplete ? 'inline-block' : 'none';
+    completeBtn.innerHTML = appointment.status === 'completed'
+        ? '<i class="fas fa-plus"></i> Add treatment to this visit'
+        : '<i class="fas fa-check"></i> Complete visit';
+    completeBtn.dataset.appointmentId = appointment.id;
+    completeBtn.dataset.needsPatient = needsPatient ? '1' : '';
+
+    const noShowBtn = document.getElementById('noShowBtn');
+    noShowBtn.style.display = appointment.status === 'scheduled' && appointment.canComplete
+        ? 'inline-block' : 'none';
+}
+
+function hideVisitActions() {
+    const panel = document.getElementById('visitActions');
+    if (panel) panel.style.display = 'none';
+}
+
+function completeCurrentVisit() {
+    const btn = document.getElementById('completeVisitBtn');
+    let url = `/appointments/${encodeURIComponent(btn.dataset.appointmentId)}/complete`;
+    if (btn.dataset.needsPatient) {
+        const patientId = document.getElementById('visitPatientSelect').value;
+        if (!patientId) {
+            alert('Select which patient this visit was for.');
+            return;
+        }
+        url += `?patient_id=${encodeURIComponent(patientId)}`;
+    }
+    apptModalSaved = true; // leaving on purpose — skip the unsaved-changes prompt
+    window.location.href = url;
+}
+
+async function markNoShow() {
+    const editingId = document.getElementById('appointmentForm').dataset.editingId;
+    if (!editingId || !confirm('Mark this appointment as a no-show?')) return;
+    await setAppointmentStatus(editingId, 'no-show', 'Marked as no-show.');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const completeBtn = document.getElementById('completeVisitBtn');
+    if (completeBtn) completeBtn.addEventListener('click', completeCurrentVisit);
+    const noShowBtn = document.getElementById('noShowBtn');
+    if (noShowBtn) noShowBtn.addEventListener('click', markNoShow);
+});
+
 function configureCancelButton(status) {
     const btn = document.getElementById('cancelAppointmentBtn');
     if (!btn) return;
+    // A completed visit's outcome is its treatment records — no cancel here.
+    if (status === 'completed') {
+        btn.style.display = 'none';
+        return;
+    }
     btn.style.display = 'inline-block';
-    if (status === 'cancelled') {
+    if (status === 'cancelled' || status === 'no-show') {
         btn.className = 'btn btn-outline-success me-auto';
         btn.innerHTML = '<i class="fas fa-rotate-left"></i> Reactivate Appointment';
         btn.dataset.targetStatus = 'scheduled';
@@ -500,32 +637,41 @@ async function cancelCurrentAppointment() {
     const targetStatus = (btn && btn.dataset.targetStatus) || 'cancelled';
     const verb = targetStatus === 'cancelled' ? 'cancel' : 'reactivate';
     if (!confirm(`Are you sure you want to ${verb} this appointment?`)) return;
+    await setAppointmentStatus(
+        editingId, targetStatus,
+        targetStatus === 'cancelled' ? 'Appointment cancelled.' : 'Appointment reactivated.'
+    );
+}
+
+async function setAppointmentStatus(appointmentId, status, successMessage) {
     try {
-        const response = await fetch(`${API_URL}/${editingId}`, {
+        const response = await fetch(`${API_URL}/${appointmentId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: targetStatus }),
+            body: JSON.stringify({ status: status }),
         });
         const data = await response.json();
         if (data.success) {
-            await loadAppointmentsFromAPI();
-            if (currentView === 'week') generateWeekView();
-            else generateMonthView();
-            updateStats();
+            await refreshCalendar();
             apptModalSaved = true;
             bootstrap.Modal.getInstance(document.getElementById('appointmentModal')).hide();
-            showNotification(
-                targetStatus === 'cancelled' ? 'Appointment cancelled.' : 'Appointment reactivated.',
-                'warning'
-            );
+            showNotification(successMessage, 'warning');
             document.getElementById('appointmentForm').dataset.editingId = '';
         } else {
             showNotification(data.error || 'Failed to update appointment', 'danger');
         }
     } catch (error) {
-        console.error('Cancel appointment error:', error);
+        console.error('Update appointment status error:', error);
         showNotification('Failed to update appointment', 'danger');
     }
+}
+
+// Reload the visible range and redraw (after a change or a period jump).
+async function refreshCalendar() {
+    await loadAppointmentsFromAPI();
+    if (currentView === 'week') generateWeekView();
+    else generateMonthView();
+    updateStats();
 }
 
 async function deleteAppointment(appointmentId) {
@@ -549,35 +695,29 @@ async function deleteAppointment(appointmentId) {
     }
 }
 
-function previousPeriod() {
+async function previousPeriod() {
     if (currentView === 'week') {
         currentDate.setDate(currentDate.getDate() - 7);
-        generateWeekView();
     } else {
+        currentDate.setDate(1); // avoid Jan 31 -> "Feb 31" = Mar 3
         currentDate.setMonth(currentDate.getMonth() - 1);
-        generateMonthView();
     }
+    await refreshCalendar();
 }
 
-function nextPeriod() {
+async function nextPeriod() {
     if (currentView === 'week') {
         currentDate.setDate(currentDate.getDate() + 7);
-        generateWeekView();
     } else {
+        currentDate.setDate(1);
         currentDate.setMonth(currentDate.getMonth() + 1);
-        generateMonthView();
     }
+    await refreshCalendar();
 }
 
 async function goToToday() {
     currentDate = new Date();
-    await loadAppointmentsFromAPI();
-    if (currentView === 'week') {
-        generateWeekView();
-    } else {
-        generateMonthView();
-    }
-    updateStats();
+    await refreshCalendar();
 }
 
 function setupSearch() {
