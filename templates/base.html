@@ -182,17 +182,17 @@
 
             /* Patient-detail actions: a tidy 2-column grid of compact buttons on
                mobile instead of a row of full-size buttons that wrap raggedly. */
-            .patient-actions.btn-group {
-                display: grid;
+            .patient-actions {
+                display: grid !important;   /* beats Bootstrap's d-flex !important */
                 grid-template-columns: 1fr 1fr;
                 gap: 6px;
                 width: 100%;
             }
-            .patient-actions.btn-group > form {
+            .patient-actions > form {
                 display: block;
             }
-            .patient-actions.btn-group > .btn,
-            .patient-actions.btn-group > form > .btn {
+            .patient-actions > .btn,
+            .patient-actions > form > .btn {
                 width: 100%;
                 border-radius: 6px !important;
                 font-size: 0.85rem;

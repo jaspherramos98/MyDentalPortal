@@ -11,7 +11,7 @@ from flask import (
 
 from blueprints.utils import (
     login_required, role_required, ROLE_DENTIST, is_admin,
-    verify_patient_access, audit,
+    verify_patient_access, audit, patient_url,
 )
 from blueprints.repositories import deletion_requests as dr_repo
 from blueprints.repositories import patients as patient_repo
@@ -92,7 +92,7 @@ def request_deletion():
                    session['user_id'])
     audit('request_deletion', entity_type, entity_id, clinic=clinic)
     flash('Deletion requested. A dentist will review it.', 'success')
-    return redirect(url_for('patients.patient_detail', patient_id=patient_id))
+    return redirect(patient_url(patient_id))
 
 
 @deletions_bp.route('/deletions')

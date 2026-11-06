@@ -22,7 +22,7 @@
                     <i class="fas fa-building"></i> {{ clinic.name }}
                 </p>
             </div>
-            <div class="btn-group patient-actions" role="group">
+            <div class="d-flex flex-wrap gap-2 patient-actions" role="group" aria-label="Patient actions">
                 <a href="{{ url_for('patients.list_patients') }}" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left"></i> Back
                 </a>
@@ -44,7 +44,7 @@
                 {% if session.user_role == 'staff' %}
                 <form method="POST" action="{{ url_for('deletions.request_deletion') }}"
                       class="d-inline"
-                      onsubmit="return confirm('Request deletion of this patient? A dentist must approve it.');">
+                      data-confirm="Ask a dentist to delete this patient's record?" data-confirm-title="Request deletion" data-confirm-ok="Send request">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="entity_type" value="patient">
                     <input type="hidden" name="entity_id" value="{{ patient._id }}">
@@ -55,7 +55,7 @@
                 {% else %}
                 <form method="POST" action="{{ url_for('patients.delete_patient', patient_id=patient._id) }}"
                       class="d-inline"
-                      onsubmit="return confirm('Delete {{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}? The record is removed from the active list.');">
+                      data-confirm="Delete {{ patient.personal_info.first_name }} {{ patient.personal_info.last_name }}? The record is removed from the active patient list." data-confirm-title="Delete patient" data-confirm-ok="Delete patient" data-confirm-danger>
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-outline-danger">
                         <i class="fas fa-trash"></i> Delete
@@ -112,7 +112,7 @@
                         {% if session.user_role == 'staff' %}
                         <form method="POST" action="{{ url_for('deletions.request_deletion') }}"
                               class="mt-1" data-no-guard
-                              onsubmit="return confirm('Request removal of this photo? A dentist must approve it.');">
+                              data-confirm="Ask a dentist to remove this photo?" data-confirm-title="Request removal" data-confirm-ok="Send request">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="entity_type" value="photo">
                             <input type="hidden" name="entity_id" value="{{ patient._id }}">
@@ -124,7 +124,7 @@
                         <form method="POST"
                               action="{{ url_for('uploads.delete_photo', patient_id=patient._id) }}"
                               class="mt-1" data-no-guard
-                              onsubmit="return confirm('Remove this patient photo?');">
+                              data-confirm="Remove this patient's photo?" data-confirm-title="Remove photo" data-confirm-ok="Remove" data-confirm-danger>
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-sm btn-link text-danger">
                                 <i class="fas fa-trash"></i> Remove photo
@@ -310,7 +310,7 @@
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#dental-history" type="button" role="tab">
+                                <button class="nav-link{{ ' active' if active_tab == 'dental' }}" data-bs-toggle="tab" data-bs-target="#dental-history" type="button" role="tab">
                                     <i class="fas fa-tooth"></i> Dental History
                                 </button>
                             </li>
@@ -320,17 +320,17 @@
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#prescriptions" type="button" role="tab">
+                                <button class="nav-link{{ ' active' if active_tab == 'prescriptions' }}" data-bs-toggle="tab" data-bs-target="#prescriptions" type="button" role="tab">
                                     <i class="fas fa-prescription"></i> Prescriptions
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#files" type="button" role="tab">
+                                <button class="nav-link{{ ' active' if active_tab == 'files' }}" data-bs-toggle="tab" data-bs-target="#files" type="button" role="tab">
                                     <i class="fas fa-folder-open"></i> Files
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#personal-info" type="button" role="tab">
+                                <button class="nav-link{{ ' active' if active_tab == 'personal' }}" data-bs-toggle="tab" data-bs-target="#personal-info" type="button" role="tab">
                                     <i class="fas fa-id-card"></i> Personal Info
                                 </button>
                             </li>
@@ -474,7 +474,7 @@
                             </div>
 
                             <!-- Dental History Tab -->
-                            <div class="tab-pane fade" id="dental-history" role="tabpanel">
+                            <div class="tab-pane fade{{ ' show active' if active_tab == 'dental' }}" id="dental-history" role="tabpanel">
                                 <div class="row">
                                     <div class="col-md-6">
                                         <h6><i class="fas fa-tooth"></i> Previous Dental Care</h6>
@@ -594,7 +594,7 @@
                                                     {% if session.user_role != 'staff' %}
                                                     <form method="POST" class="d-inline"
                                                           action="{{ url_for('treatments.confirm_price', treatment_id=treatment._id) }}">
-                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_tab" value="treatment">
                                                         <button type="submit" class="btn btn-sm btn-link p-0 ms-1">Confirm</button>
                                                     </form>
                                                     {% endif %}
@@ -609,19 +609,19 @@
                                                     {% if treatment.get('next_visit') %}{{ treatment.next_visit }}{% else %}<span class="text-muted">—</span>{% endif %}
                                                 </td>
                                                 <td class="text-end text-nowrap">
-                                                    <div class="btn-group btn-group-sm" role="group">
+                                                    <div class="d-inline-flex gap-1" role="group" aria-label="Treatment actions">
                                                         {% if treatment.balance > 0 %}
                                                         <form method="POST" class="d-inline"
                                                               action="{{ url_for('treatments.mark_paid', treatment_id=treatment._id) }}"
-                                                              onsubmit="return confirm('Mark this treatment as fully paid? This sets Amount Paid to {{ clinic.get('currency', 'PHP') }} {{ '%.2f'|format(treatment.amount_charged) }} and clears the balance.');">
-                                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                            <button type="submit" class="btn btn-outline-success" title="Mark fully paid" aria-label="Mark fully paid">
+                                                              data-confirm="Mark {{ treatment.procedure }} as fully paid? Amount Paid becomes {{ clinic.get('currency', 'PHP') }} {{ '%.2f'|format(treatment.amount_charged) }} and the balance is cleared." data-confirm-title="Mark as paid" data-confirm-ok="Mark paid">
+                                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_tab" value="treatment">
+                                                            <button type="submit" class="btn btn-outline-success btn-sm" title="Mark fully paid" aria-label="Mark fully paid">
                                                                 {# Icon-only below 1200px so Actions doesn't squeeze Next Visit (iPad). #}
                                                                 <i class="fas fa-check"></i><span class="d-none d-xl-inline"> Mark Paid</span>
                                                             </button>
                                                         </form>
                                                         {% endif %}
-                                                        <a class="btn btn-outline-primary"
+                                                        <a class="btn btn-outline-primary btn-sm"
                                                            href="{{ url_for('treatments.edit_treatment', treatment_id=treatment._id) }}"
                                                            title="Edit treatment (for partial payments)">
                                                             <i class="fas fa-edit"></i>
@@ -629,20 +629,20 @@
                                                         {% if session.user_role == 'staff' %}
                                                         <form method="POST" class="d-inline"
                                                               action="{{ url_for('deletions.request_deletion') }}"
-                                                              onsubmit="return confirm('Request deletion of this treatment? A dentist must approve it.');">
-                                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                              data-confirm="Ask a dentist to delete {{ treatment.procedure }} ({{ treatment.date | datefmt('%b %d, %Y') }})?" data-confirm-title="Request deletion" data-confirm-ok="Send request">
+                                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_tab" value="treatment">
                                                             <input type="hidden" name="entity_type" value="treatment">
                                                             <input type="hidden" name="entity_id" value="{{ treatment._id }}">
-                                                            <button type="submit" class="btn btn-outline-danger" title="Request deletion">
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Request deletion">
                                                                 <i class="fas fa-trash"></i>
                                                             </button>
                                                         </form>
                                                         {% else %}
                                                         <form method="POST" class="d-inline"
                                                               action="{{ url_for('treatments.delete_treatment', treatment_id=treatment._id) }}"
-                                                              onsubmit="return confirm('Delete this treatment record? This cannot be undone.');">
-                                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                            <button type="submit" class="btn btn-outline-danger" title="Delete treatment">
+                                                              data-confirm="Delete {{ treatment.procedure }} ({{ treatment.date | datefmt('%b %d, %Y') }})? This can't be undone." data-confirm-title="Delete treatment" data-confirm-ok="Delete" data-confirm-danger>
+                                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_tab" value="treatment">
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete treatment">
                                                                 <i class="fas fa-trash"></i>
                                                             </button>
                                                         </form>
@@ -667,12 +667,12 @@
                             </div>
 
                             <!-- Prescriptions Tab -->
-                            <div class="tab-pane fade" id="prescriptions" role="tabpanel">
+                            <div class="tab-pane fade{{ ' show active' if active_tab == 'prescriptions' }}" id="prescriptions" role="tabpanel">
                                 <h6 class="mb-3"><i class="fas fa-prescription"></i> Add Prescription</h6>
                                 <form method="POST"
                                       action="{{ url_for('uploads.add_prescription', patient_id=patient._id) }}"
                                       enctype="multipart/form-data" class="mb-4" data-resilient-submit="auto">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_tab" value="prescriptions">
                                     <input type="hidden" name="submission_id">
                                     <div class="mb-3">
                                         <label class="form-label" for="presc_description">Description</label>
@@ -705,8 +705,8 @@
                                                     {% if session.user_role == 'staff' %}
                                                     <form method="POST"
                                                           action="{{ url_for('deletions.request_deletion') }}"
-                                                          onsubmit="return confirm('Request deletion of this prescription? A dentist must approve it.');">
-                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                          data-confirm="Ask a dentist to delete this prescription?" data-confirm-title="Request deletion" data-confirm-ok="Send request">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_tab" value="prescriptions">
                                                         <input type="hidden" name="entity_type" value="prescription">
                                                         <input type="hidden" name="entity_id" value="{{ p._id }}">
                                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Request deletion">
@@ -716,8 +716,8 @@
                                                     {% else %}
                                                     <form method="POST"
                                                           action="{{ url_for('uploads.delete_prescription', prescription_id=p._id) }}"
-                                                          onsubmit="return confirm('Delete this prescription?');">
-                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                          data-confirm="Delete this prescription? This can't be undone." data-confirm-title="Delete prescription" data-confirm-ok="Delete" data-confirm-danger>
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_tab" value="prescriptions">
                                                         <button type="submit" class="btn btn-sm btn-outline-danger">
                                                             <i class="fas fa-trash"></i>
                                                         </button>
@@ -746,12 +746,12 @@
                             </div>
 
                             <!-- Files Tab -->
-                            <div class="tab-pane fade" id="files" role="tabpanel">
+                            <div class="tab-pane fade{{ ' show active' if active_tab == 'files' }}" id="files" role="tabpanel">
                                 <h6 class="mb-3"><i class="fas fa-folder-open"></i> Upload File</h6>
                                 <form method="POST"
                                       action="{{ url_for('uploads.add_file', patient_id=patient._id) }}"
                                       enctype="multipart/form-data" class="mb-4" data-resilient-submit="auto">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_tab" value="files">
                                     <input type="hidden" name="submission_id">
                                     <div class="row g-2 align-items-end">
                                         <div class="col-md-5">
@@ -807,8 +807,8 @@
                                                     {% if session.user_role == 'staff' %}
                                                     <form method="POST" class="d-inline"
                                                           action="{{ url_for('deletions.request_deletion') }}"
-                                                          onsubmit="return confirm('Request deletion of this file? A dentist must approve it.');">
-                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                          data-confirm="Ask a dentist to delete this file?" data-confirm-title="Request deletion" data-confirm-ok="Send request">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_tab" value="files">
                                                         <input type="hidden" name="entity_type" value="file">
                                                         <input type="hidden" name="entity_id" value="{{ f._id }}">
                                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Request deletion">
@@ -818,8 +818,8 @@
                                                     {% else %}
                                                     <form method="POST" class="d-inline"
                                                           action="{{ url_for('uploads.delete_file', file_doc_id=f._id) }}"
-                                                          onsubmit="return confirm('Delete this file?');">
-                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                          data-confirm="Delete this file? This can't be undone." data-confirm-title="Delete file" data-confirm-ok="Delete" data-confirm-danger>
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_tab" value="files">
                                                         <button type="submit" class="btn btn-sm btn-outline-danger">
                                                             <i class="fas fa-trash"></i>
                                                         </button>
@@ -832,7 +832,7 @@
                                                             <div class="modal-content">
                                                                 <form method="POST"
                                                                       action="{{ url_for('uploads.rename_file', file_doc_id=f._id) }}">
-                                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_tab" value="files">
                                                                     <div class="modal-header">
                                                                         <h5 class="modal-title">Rename File</h5>
                                                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -863,7 +863,7 @@
                             </div>
 
                             <!-- Personal Info Tab -->
-                            <div class="tab-pane fade" id="personal-info" role="tabpanel">
+                            <div class="tab-pane fade{{ ' show active' if active_tab == 'personal' }}" id="personal-info" role="tabpanel">
                                 <div class="row">
                                     <div class="col-md-6">
                                         <h6><i class="fas fa-user"></i> Personal Details</h6>

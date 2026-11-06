@@ -195,7 +195,7 @@ def test_treatment_add_json_success_and_retry_is_idempotent(real_client, as_user
     first = c.post(f"/patients/{world.patient_a}/treatments/add", data=form, headers=JSON_MODE)
     retry = c.post(f"/patients/{world.patient_a}/treatments/add", data=form, headers=JSON_MODE)
     assert first.get_json() == retry.get_json() == {
-        "ok": True, "redirect": f"/patients/{world.patient_a}"}
+        "ok": True, "redirect": f"/patients/{world.patient_a}?tab=treatment#treatment-history"}
     assert db.treatment_records.count_documents({"procedure": "Filling"}) == 1
     assert db.audit_log.count_documents({"action": "create", "entity_type": "treatment"}) == 1
 
@@ -205,7 +205,7 @@ def test_treatment_edit_json_success(real_client, as_user, world):
     res = c.post(f"/treatments/{world.treatment_a}/edit",
                  data={"procedure": "Cleaning", "date": "2026-09-01", "amount_charged": "1500",
                        "amount_paid": "500"}, headers=JSON_MODE)
-    assert res.get_json() == {"ok": True, "redirect": f"/patients/{world.patient_a}"}
+    assert res.get_json() == {"ok": True, "redirect": f"/patients/{world.patient_a}?tab=treatment#treatment-history"}
 
 
 def test_clinic_create_retry_is_idempotent(real_client, as_user, world, db):

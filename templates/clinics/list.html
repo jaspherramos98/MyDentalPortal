@@ -71,13 +71,13 @@
                            class="btn btn-outline-info btn-sm" title="Edit Clinic">
                             <i class="fas fa-edit"></i>
                         </a>
-                        <button class="btn btn-outline-danger btn-sm" title="Delete Clinic"
-                                onclick="if(confirm('Delete {{ clinic.name }}? This cannot be undone.')) document.getElementById('delete-{{ clinic._id }}').submit();">
+                        <button type="submit" form="delete-{{ clinic._id }}" class="btn btn-outline-danger btn-sm"
+                                title="Delete Clinic" aria-label="Delete {{ clinic.name }}">
                             <i class="fas fa-trash"></i>
                         </button>
-                        <form id="delete-{{ clinic._id }}" method="POST"
+                        <form id="delete-{{ clinic._id }}" method="POST" class="d-none"
                               action="{{ url_for('clinics.delete_clinic', clinic_id=clinic._id) }}"
-                              style="display:none;">
+                              data-confirm="Delete {{ clinic.name }}? This can't be undone." data-confirm-title="Delete clinic" data-confirm-ok="Delete" data-confirm-danger>
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         </form>
                     </div>

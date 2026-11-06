@@ -194,8 +194,9 @@ const VisitDialog = (function () {
     }
 
     async function markNoShow() {
-        if (!confirm('Mark this appointment as a no-show?')) return;
-        modal.hide();
+        const yes = await AppConfirm('The patient did not come to this appointment?',
+            { title: 'Mark as no-show', confirmText: 'Mark no-show' });
+        if (!yes) return;
         await setAppointmentStatus(appointment.id, 'no-show', 'Marked as no-show.');
     }
 

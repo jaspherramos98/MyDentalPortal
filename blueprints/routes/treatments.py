@@ -12,7 +12,7 @@ from blueprints.utils import (
     login_required, verify_patient_access as _verify_patient_access,
     role_required, ROLE_DENTIST, is_admin, can_confirm_price,
     user_clinic_ids as _user_clinic_ids, audit,
-    submission_id as _submission_id, submit_success,
+    submission_id as _submission_id, submit_success, patient_url,
 )
 from blueprints.repositories import treatments as treatment_repo
 from blueprints.repositories import patients as patient_repo
@@ -75,7 +75,7 @@ def add_treatment(patient_id):
                 flash('Treatment saved, but it could not be linked to that appointment.', 'warning')
             else:
                 flash('Treatment record added successfully!', 'success')
-            return submit_success(url_for('patients.patient_detail', patient_id=patient_id))
+            return submit_success(patient_url(patient_id, 'treatment'))
 
         except treatment_records.TreatmentInputError as e:
             flash(str(e), 'error')
@@ -161,8 +161,7 @@ def edit_treatment(treatment_id):
             if price_proposed:
                 audit('price_proposed', 'treatment', treatment_id, clinic=clinic)
             flash('Treatment updated successfully!', 'success')
-            return submit_success(url_for('patients.patient_detail',
-                                          patient_id=str(treatment['patient_id'])))
+            return submit_success(patient_url(str(treatment['patient_id']), 'treatment'))
 
         return render_template(
             'treatments/edit.html',
@@ -192,8 +191,7 @@ def mark_paid(treatment_id):
                 })
                 audit('mark_paid', 'treatment', treatment_id, clinic=clinic)
                 flash('Treatment marked as fully paid.', 'success')
-                return redirect(url_for('patients.patient_detail',
-                                        patient_id=str(treatment['patient_id'])))
+                return redirect(patient_url(str(treatment['patient_id']), 'treatment'))
         flash('Access denied or treatment not found', 'error')
     except Exception:
         log.exception("Mark paid failed")
@@ -213,8 +211,7 @@ def delete_treatment(treatment_id):
                 treatment_repo.delete(treatment_id)
                 audit('delete', 'treatment', treatment_id, clinic=clinic)
                 flash('Treatment record deleted', 'success')
-                return redirect(url_for('patients.patient_detail',
-                                        patient_id=str(treatment['patient_id'])))
+                return redirect(patient_url(str(treatment['patient_id']), 'treatment'))
         flash('Access denied or treatment not found', 'error')
     except Exception:
         log.exception("Delete treatment failed")
@@ -240,8 +237,7 @@ def confirm_price(treatment_id):
             flash('Price confirmed.', 'success')
             if request.form.get('from') == 'queue':
                 return redirect(url_for('treatments.pending_prices'))
-            return redirect(url_for('patients.patient_detail',
-                                    patient_id=str(treatment['patient_id'])))
+            return redirect(patient_url(str(treatment['patient_id']), 'treatment'))
     flash('Access denied or treatment not found', 'error')
     return redirect(url_for('patients.list_patients'))
 
