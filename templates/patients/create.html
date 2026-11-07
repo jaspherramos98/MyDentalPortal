@@ -112,7 +112,7 @@
                     <div class="col-md-3 mb-3">
                         <label for="age" class="form-label">Age <span class="required">*</span></label>
                         <input type="number" class="form-control" id="age" name="age" min="0" max="150"
-                            value="{{ form_data.get('age', '') }}" required>
+                            data-age-from="birthdate" value="{{ form_data.get('age', '') }}" required>
                         <div class="invalid-feedback">Please provide an age.</div>
                     </div>
                 </div>
@@ -591,5 +591,6 @@
     </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/age-field.js') }}"></script>
 <script src="{{ url_for('static', filename='js/patient-create.js') }}"></script>
 {% endblock %}

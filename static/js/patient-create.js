@@ -15,18 +15,6 @@
 
     // Utility functions
     const Utils = {
-        calculateAge: function(birthDate) {
-            const today = new Date();
-            const birth = new Date(birthDate);
-            let age = today.getFullYear() - birth.getFullYear();
-            const monthDiff = today.getMonth() - birth.getMonth();
-            
-            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-                age--;
-            }
-            return age;
-        },
-
         formatPhoneNumber: function(value) {
             // Leave phone numbers exactly as entered. PH numbers vary widely
             // (mobile 09xx / +639xx, landlines with 2- or 3-digit area codes),
@@ -62,21 +50,14 @@
     const GuardianHandler = {
         checkRequirement: function() {
             const ageInput = document.getElementById('age');
-            const birthdateInput = document.getElementById('birthdate');
             const guardianSection = document.getElementById('guardian-section');
             const guardianNameInput = document.getElementById('guardian_name');
             const guardianOccupationInput = document.getElementById('guardian_occupation');
             
             if (!guardianSection || !guardianNameInput) return;
             
-            let age = null;
-            
-            // Get age from input or calculate from birthdate
-            if (ageInput && ageInput.value) {
-                age = parseInt(ageInput.value);
-            } else if (birthdateInput && birthdateInput.value) {
-                age = Utils.calculateAge(birthdateInput.value);
-            }
+            // age-field.js keeps the age filled from the birthday.
+            const age = ageInput && ageInput.value ? parseInt(ageInput.value, 10) : null;
 
             this.updateGuardianSection(age, guardianSection, guardianNameInput, guardianOccupationInput);
         },
@@ -340,20 +321,10 @@
             });
         },
 
+        // Age itself is filled from the birthday by age-field.js, which fires
+        // `input` on the age field — re-check the guardian rule on every change.
         setupAgeCalculation: function() {
-            const birthdateInput = document.getElementById('birthdate');
             const ageInput = document.getElementById('age');
-            
-            if (birthdateInput) {
-                birthdateInput.addEventListener('change', function() {
-                    const age = Utils.calculateAge(this.value);
-                    if (age >= 0 && age <= 150 && ageInput) {
-                        ageInput.value = age;
-                        GuardianHandler.checkRequirement();
-                    }
-                });
-            }
-            
             if (ageInput) {
                 ageInput.addEventListener('input', function() {
                     GuardianHandler.checkRequirement();

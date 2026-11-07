@@ -22,6 +22,7 @@ from werkzeug.security import generate_password_hash
 from extensions import mongo, limiter
 from blueprints.utils import enforce_idle_timeout, wants_json_submit, is_admin
 from blueprints.clock import utcnow, clinic_today
+from blueprints.ages import display_age
 from config import get_config
 from observability import configure_logging
 from blueprints.repositories import submissions as submissions_repo
@@ -117,6 +118,7 @@ def _register_template_helpers(app):
             is_admin=is_admin(),
             today=_today,
             min_birth_date='1900-01-01',
+            patient_age=lambda pi: display_age(pi, _today),
         )
 
 

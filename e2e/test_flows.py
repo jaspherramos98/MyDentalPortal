@@ -81,6 +81,28 @@ def test_patient_create_edit_and_pdf(open_as, db):
     assert pdf.status == 200 and pdf.body()[:5] == b"%PDF-"
 
 
+def _age(birthday):
+    from datetime import date
+    b, t = date.fromisoformat(birthday), date.today()
+    return str(t.year - b.year - ((t.month, t.day) < (b.month, b.day)))
+
+
+def test_age_fills_from_birthday_on_create_and_edit(open_as, seeded):
+    s = open_as("staff")
+    s.goto("/patients/create")
+    s.page.fill("#birthdate", "2015-03-10")
+    assert s.page.input_value("#age") == _age("2015-03-10")
+    assert s.page.locator("#age").evaluate("el => el.readOnly")
+    assert "Minor Patient" in s.page.inner_text("#guardian-section")   # guardian rule ran
+    s.page.evaluate("UnsavedGuard.markClean()")                  # leave the draft without the warning
+
+    s.goto(_detail_path(seeded["patient"]) + "/edit")
+    s.page.fill("#birthday", "1990-01-01")
+    assert s.page.input_value("input[name=age]") == _age("1990-01-01")
+    s.page.fill("#birthday", "")                                 # unknown birthday -> typeable
+    assert not s.page.locator("input[name=age]").evaluate("el => el.readOnly")
+
+
 def test_outsider_cannot_open_another_clinics_patient(open_as, seeded):
     s = open_as("outsider")
     s.goto(_detail_path(seeded["patient"]))
