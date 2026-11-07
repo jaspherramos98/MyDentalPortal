@@ -16,6 +16,8 @@
 import io
 from xml.sax.saxutils import escape
 
+from blueprints.ages import current_age
+
 from reportlab.lib.pagesizes import LETTER, landscape
 from reportlab.lib.units import inch
 from reportlab.lib import colors
@@ -189,7 +191,7 @@ def build_chart_pdf(patient, clinic, chart):
     story = [Paragraph('Dental Chart', title)]
     info = '%s &nbsp;|&nbsp; Age: %s &nbsp;|&nbsp; %s &nbsp;|&nbsp; %s' % (
         escape(full or '—'),
-        escape(str(pi.get('age', '—'))),
+        escape(str(current_age(pi) or '—')),
         _GENDER.get(pi.get('gender'), '—'),
         escape(clinic.get('name', '')),
     )

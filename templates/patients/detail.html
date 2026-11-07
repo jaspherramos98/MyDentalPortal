@@ -137,7 +137,7 @@
                         <table class="table table-sm">
                             <tr>
                                 <td><strong>Age:</strong></td>
-                                <td>{{ patient.personal_info.age or 'N/A' }} years</td>
+                                <td>{% set age = patient_age(patient.personal_info) %}{{ age ~ ' years' if age is not none else 'N/A' }}</td>
                             </tr>
                             <tr>
                                 <td><strong>Gender:</strong></td>

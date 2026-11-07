@@ -55,13 +55,14 @@
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Birthday</label>
-                        <input type="date" class="form-control" name="birthday"
+                        <input type="date" class="form-control" id="birthday" name="birthday"
                                value="{{ patient.personal_info.get('birthday', '') }}" max="{{ today }}" min="{{ min_birth_date }}">
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Age</label>
-                        <input type="text" class="form-control" name="age"
-                               value="{{ patient.personal_info.get('age', '') }}">
+                        {% set age = patient_age(patient.personal_info) %}
+                        <input type="number" class="form-control" name="age" min="0" max="150"
+                               data-age-from="birthday" value="{{ age if age is not none else '' }}">
                     </div>
                 </div>
                 <div class="row mb-3">
@@ -423,5 +424,6 @@
     </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/age-field.js') }}"></script>
 <script src="{{ url_for('static', filename='js/patient-edit.js') }}"></script>
 {% endblock %}

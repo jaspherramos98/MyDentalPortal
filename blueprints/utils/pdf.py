@@ -4,6 +4,8 @@
 import io
 from xml.sax.saxutils import escape
 
+from blueprints.ages import current_age
+
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.units import inch
 from reportlab.lib import colors
@@ -109,7 +111,7 @@ def build_patient_pdf(patient, clinic, photo_bytes=None):
                                      pi.get('last_name', ''))).strip()),
         ('Gender', _GENDER.get(pi.get('gender'), '—')),
         ('Birthday', pi.get('birthday')),
-        ('Age', pi.get('age')),
+        ('Age', current_age(pi)),
         ('Religion', pi.get('religion')),
         ('Nationality', pi.get('nationality')),
         ('Occupation', pi.get('occupation')),

@@ -5,7 +5,7 @@ import logging
 
 from flask import (
     Blueprint, render_template, request, session,
-    redirect, url_for, flash, send_file,
+    redirect, url_for, flash, send_file, current_app,
 )
 from bson.objectid import ObjectId
 
@@ -21,11 +21,16 @@ from blueprints.repositories import treatments as treatment_repo
 from blueprints.repositories import appointments as appt_repo
 from blueprints.repositories import uploads as uploads_repo
 from blueprints.repositories import submissions as submissions_repo
-from blueprints.clock import utcnow
+from blueprints.clock import utcnow, clinic_today
+from blueprints.ages import age_to_store
 from werkzeug.utils import secure_filename
 
 patients_bp = Blueprint('patients', __name__)
 log = logging.getLogger(__name__)
+
+
+def _today():
+    return clinic_today(current_app.config.get('TIMEZONE', 'Asia/Manila'))
 
 # ── LIST ─────────────────────────────────────────────────────────────────
 @patients_bp.route('/patients')
@@ -103,7 +108,7 @@ def create_patient():
                     'nickname': (f.get('nickname') or '').strip(),
                     'gender': f.get('gender', ''),
                     'birthday': f.get('birthdate', ''),
-                    'age': f.get('age', ''),
+                    'age': age_to_store(f.get('birthdate'), f.get('age'), _today()),
                     'religion': (f.get('religion') or '').strip(),
                     'nationality': (f.get('nationality') or '').strip(),
                     'occupation': (f.get('occupation') or '').strip(),
@@ -369,7 +374,7 @@ def edit_patient(patient_id):
                 'personal_info.nickname': (f.get('nickname') or '').strip(),
                 'personal_info.gender': f.get('gender', ''),
                 'personal_info.birthday': f.get('birthday', ''),
-                'personal_info.age': f.get('age', ''),
+                'personal_info.age': age_to_store(f.get('birthday'), f.get('age'), _today()),
                 'personal_info.religion': (f.get('religion') or '').strip(),
                 'personal_info.nationality': (f.get('nationality') or '').strip(),
                 'personal_info.occupation': (f.get('occupation') or '').strip(),
